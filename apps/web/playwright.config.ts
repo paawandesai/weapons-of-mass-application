@@ -5,7 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
  * (`pnpm dev` at the repository root); the web dev server is started here when it is not up.
  * The dev server proxies /api and /auth to the API on :3000, so one origin serves both.
  */
-export const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:5173';
+const WEB_PORT = process.env.WEB_PORT ?? '5173';
+export const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${WEB_PORT}`;
 export const STORAGE_STATE = 'e2e/.auth/state.json';
 
 export default defineConfig({
@@ -23,7 +24,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'pnpm exec vite --port 5173 --strictPort',
+    command: `pnpm exec vite --port ${WEB_PORT} --strictPort`,
     url: BASE_URL,
     reuseExistingServer: true,
     timeout: 60_000,

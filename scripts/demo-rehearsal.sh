@@ -7,6 +7,7 @@ set -euo pipefail
 CONTAINER="wma-postgres"
 API_PORT="${PORT:-3000}"
 FORMS_PORT="${DEMO_FORMS_PORT:-4310}"
+WEB_PORT="${WEB_PORT:-5173}"
 LOG_DIR="./data/logs"
 WAIT_S=90
 RUN_E2E=0
@@ -24,6 +25,7 @@ Usage: scripts/demo-rehearsal.sh [options]
   --container NAME   Postgres container name (default: $CONTAINER)
   --api-port N       API port (default: \$PORT or $API_PORT)
   --forms-port N     Fixture form server port (default: \$DEMO_FORMS_PORT or $FORMS_PORT)
+  --web-port N       Web dev server port for --e2e (default: \$WEB_PORT or $WEB_PORT)
   --log-dir DIR      Where api.log and worker.log go (default: $LOG_DIR)
   --wait N           Seconds to wait for each service (default: $WAIT_S)
   -h, --help         Show this help
@@ -41,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     --container) CONTAINER="$2"; shift 2 ;;
     --api-port) API_PORT="$2"; shift 2 ;;
     --forms-port) FORMS_PORT="$2"; shift 2 ;;
+    --web-port) WEB_PORT="$2"; shift 2 ;;
     --log-dir) LOG_DIR="$2"; shift 2 ;;
     --wait) WAIT_S="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -60,7 +63,7 @@ for var in VAULT_MASTER_KEY SESSION_SECRET; do
   if [[ -z "${!var:-}" ]]; then echo "$var is not set (see .env.example)" >&2; exit 2; fi
 done
 export DEMO_LOGIN_TOKEN="${DEMO_LOGIN_TOKEN:-rehearsal-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')}"
-export DEMO_FORMS_PORT="$FORMS_PORT" PORT="$API_PORT"
+export DEMO_FORMS_PORT="$FORMS_PORT" PORT="$API_PORT" WEB_PORT="$WEB_PORT" API_ORIGIN="http://127.0.0.1:$API_PORT" WEB_ORIGIN="http://localhost:$WEB_PORT"
 export SIMULATED_RECRUITER_DELAY_S="${SIMULATED_RECRUITER_DELAY_S:-5}"
 
 STARTED_PIDS=()
