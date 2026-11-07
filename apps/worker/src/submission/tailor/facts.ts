@@ -103,8 +103,8 @@ function degreeForms(e: ProfileDocument['education'][number]): Set<string> {
 /**
  * Rule 6: every employer, title, degree and certification in the resume facts must be in the
  * profile after normalization, and no date range may fall outside the profile's range for that
- * employer. Returns one quoted failure per problem; empty means the check passed. Skills are not
- * checked.
+ * employer. Returns one quoted failure per problem; empty means the check passed. Skills are
+ * checked separately by compareSkills.
  */
 export function compareFacts(profile: ProfileDocument, facts: ResumeFacts): string[] {
   const failures: string[] = [];
@@ -214,6 +214,28 @@ export function compareFacts(profile: ProfileDocument, facts: ResumeFacts): stri
     }
   }
   return failures;
+}
+
+// Unlike normalizeName, keeps symbols: "C++", "C#" and "C" are different skills.
+const skillKey = (s: string) => s.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * Every entry in the resume's skills list and project technologies must name a profile skill or a
+ * technology of a profile project. Skills inferred from highlights ("Team leadership" from "Led a
+ * team of four") and posting synonyms ("SQL" for PostgreSQL) fail. The summary, headline and
+ * bullets are not checked here.
+ */
+export function compareSkills(profile: ProfileDocument, content: TailoredResume): string[] {
+  const known = new Set([
+    ...profile.skills.map((s) => skillKey(s.name)),
+    ...profile.projects.flatMap((p) => p.technologies.map(skillKey)),
+  ]);
+  const claimed = [...content.skills, ...content.projects.flatMap((p) => p.technologies)];
+  return dedupe(
+    claimed
+      .filter((s) => !known.has(skillKey(s)))
+      .map((s) => `Skill "${s}" is not in the profile.`),
+  );
 }
 
 /** The same facts read straight off the structured resume (a deterministic second check). */

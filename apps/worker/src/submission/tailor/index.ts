@@ -3,7 +3,7 @@ import type { ProfileDocument } from '@wma/shared';
 import { callStructured, esc } from '../structured';
 import { renderResumePdf, ResumeTooLongError, type RenderOptions, type RenderedPdf } from '../pdf';
 import type { SubmissionContext, TailorResult } from '../types';
-import { compareFacts, dedupe, factsFromContent } from './facts';
+import { compareFacts, compareSkills, dedupe, factsFromContent } from './facts';
 import { resumeToText } from './format';
 import {
   resumeFactsSchema,
@@ -12,7 +12,7 @@ import {
   type TailoredResume,
 } from './schema';
 
-export { compareFacts, normalizeName } from './facts';
+export { compareFacts, compareSkills, normalizeName } from './facts';
 export type { ResumeDocument, TailoredResume } from './schema';
 
 export const TAILOR_PROMPT = 'tailor-resume';
@@ -92,6 +92,7 @@ async function check(ctx: SubmissionContext, doc: ResumeDocument): Promise<strin
   return dedupe([
     ...compareFacts(ctx.profile, extracted),
     ...compareFacts(ctx.profile, factsFromContent(doc.content)),
+    ...compareSkills(ctx.profile, doc.content),
   ]);
 }
 
