@@ -542,3 +542,54 @@ Second golden run (21:54, with rules 45-49): 6 of 8 passed. The two left:
 
 Not changed: the scorecard contract. The remaining expectation that could not be met on this host
 was the follow-up itself, which rule 48 unblocks.
+
+## Interview rounds (rule 52 fix, 2026-11-07, 22:15)
+
+Purpose: a recruiter who writes again in the same thread after an interview is booked is either
+moving that interview or inviting to the next one. Today every such message is a reschedule, so
+the three rounds of the Gauntlet Systems scenario moved one calendar event three times.
+
+Inputs: the inbox classification of the new message (model, `inbox-classify`), the message body,
+the newest interview on the thread (`getInterviewByThread`), the clock.
+
+Rules:
+53. `InboxClassification` gains `reschedule: boolean` (zod `.default(false)`): true when the email
+    moves, cancels or re-proposes a time already agreed in this thread ("move our call",
+    "something came up", "no longer works", "reschedule", "a different time instead"); false for a
+    new conversation, the next round, or a first proposal. The prompt says so. A deterministic
+    override in the sync, `RESCHEDULE_WORDS` (`/\b(?:re-?schedul\w*|move (?:our|the|this) (?:call|interview|conversation|meeting)|no longer works?|something (?:has )?came up|push(?:ed)? (?:it |the call |the interview )?back|(?:change|changing) (?:the|our) time|(?:a )?different time)\b/i`),
+    sets it true whatever the model said. The flag travels on `OfferSlotsInput.reschedule`.
+54. A thread may hold several interviews. The unique constraint `interviews_tenant_thread_key`
+    is dropped (migration 0017, generated with drizzle-kit) and replaced by an index on
+    `(tenant_id, thread_id, created_at)`. `getInterviewByThread` returns the newest row by
+    `created_at` (then id). `insertInterview` becomes a plain insert (no conflict target) and
+    always returns `created: true`; its signature stays.
+55. `recordOffer`, with `existing` the newest interview on the thread and `now` the clock:
+    - no row: create one (as today);
+    - `existing` not confirmed: reuse it, replacing its open slots (as today);
+    - `existing` confirmed, `input.reschedule` true and `existing.startsAt > now`: reschedule the
+      same row (as today: slots invalidated, confirmation cleared, generation bumped);
+    - `existing` confirmed otherwise (new round, or a "reschedule" of an interview already in the
+      past, which cannot be moved): a new interview row for the thread, `reschedule` false; the
+      earlier interview, its confirmation and its calendar event are untouched.
+    `slots_offered` logs `round` (the thread's interview count after the write) and `reschedule`.
+56. Everything downstream is per interview and needs no change: confirm links, booking, reminders,
+    prep plans, the scorecard (`booked(r, 3)` counts rows per application).
+
+Edge cases: the "same times offered again" check (already_offered) compares against the newest
+row only; a reschedule arriving for a confirmed interview whose message carries no reschedule
+word and that the model also misses creates a second interview (the old event stays; the digest
+shows both), which is the safe failure. Time: `deps.clock.now()`, UTC instants.
+
+Tests (one per line): schema default false and round-trip; RESCHEDULE_WORDS positive for each
+phrase and negative for "invite you to a technical interview" / "final conversation";
+recordOffer: confirmed + reschedule + future → same row, cleared; confirmed + no flag → second
+row, first row's confirmedSlotId and calendarEventId intact, activity `round: 2`; confirmed +
+reschedule + past start → second row; unconfirmed + new proposal → same row; getInterviewByThread
+returns the newest of two; `pnpm -F @wma/db db:check` clean; existing reschedule tests
+(book.test.ts, review-fixes.test.ts) still pass with `reschedule: true` on their inputs; the
+Gauntlet recruiter test for rounds unchanged; sync.test: classification `reschedule` reaches
+`recordOffer`, and the regex override does too.
+
+Out of scope: merging two interviews after a missed reschedule; UI changes; the recruiter
+scripts.

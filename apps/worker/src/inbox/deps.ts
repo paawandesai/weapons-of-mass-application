@@ -14,6 +14,8 @@ export interface OfferSlotsInput {
   slots: ProposedSlot[];
   /** The message also asked about or stated compensation: the reply template must carry no money text. */
   compensationFlag: boolean;
+  /** The message moves or re-proposes a time already agreed in this thread (rule 53). */
+  reschedule?: boolean;
 }
 
 /** An offer whose slots are committed and whose confirmation email is still to be sent. */

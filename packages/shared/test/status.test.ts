@@ -86,7 +86,7 @@ describe('InboxClassification', () => {
   };
 
   it('accepts the rule 3 shape', () => {
-    expect(InboxClassification.parse(valid)).toEqual(valid);
+    expect(InboxClassification.parse(valid)).toEqual({ ...valid, reschedule: false });
   });
 
   it('rejects an unknown classification and a missing slot flag', () => {
@@ -99,10 +99,16 @@ describe('InboxClassification', () => {
     ).toBe(false);
   });
 
-  it('exports a JSON schema with the four top-level properties', () => {
+  it('exports a JSON schema with the top-level properties', () => {
     const props = Object.keys((InboxClassificationJsonSchema as { properties: object }).properties);
     expect(props.sort()).toEqual(
-      ['booking_link', 'classification', 'compensation_flag', 'proposed_slots'].sort(),
+      [
+        'booking_link',
+        'classification',
+        'compensation_flag',
+        'proposed_slots',
+        'reschedule',
+      ].sort(),
     );
   });
 });

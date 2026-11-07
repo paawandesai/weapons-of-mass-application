@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNotNull, sql } from 'drizzle-orm';
 import type { TenantHandle } from '../client';
 import { interviews, pendingJobs } from '../schema';
 
@@ -27,7 +27,7 @@ export interface InterviewInput {
   threadId: string;
 }
 
-/** One interview per application thread: a second insert returns the existing row. */
+/** A thread may hold several interviews (one per round): every insert creates a new row. */
 export async function insertInterview(
   handle: TenantHandle,
   input: InterviewInput,
@@ -41,13 +41,9 @@ export async function insertInterview(
         applicationId: input.applicationId,
         threadId: input.threadId,
       })
-      .onConflictDoNothing({ target: [interviews.tenantId, interviews.threadId] })
       .returning(),
   );
-  if (inserted[0]) return { interview: inserted[0], created: true };
-  const existing = await getInterviewByThread(handle, input.threadId);
-  if (!existing) throw new Error('interview insert conflicted but no row exists');
-  return { interview: existing, created: false };
+  return { interview: inserted[0]!, created: true };
 }
 
 export async function getInterview(handle: TenantHandle, id: string): Promise<InterviewRow | null> {
@@ -68,9 +64,25 @@ export async function getInterviewByThread(
     tx
       .select()
       .from(interviews)
-      .where(and(eq(interviews.tenantId, handle.tenantId), eq(interviews.threadId, threadId))),
+      .where(and(eq(interviews.tenantId, handle.tenantId), eq(interviews.threadId, threadId)))
+      .orderBy(desc(interviews.createdAt), desc(interviews.id))
+      .limit(1),
   );
   return rows[0] ?? null;
+}
+
+/** How many interviews (rounds) the thread holds. */
+export async function countInterviewsForThread(
+  handle: TenantHandle,
+  threadId: string,
+): Promise<number> {
+  const rows = await handle.run((tx) =>
+    tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(interviews)
+      .where(and(eq(interviews.tenantId, handle.tenantId), eq(interviews.threadId, threadId))),
+  );
+  return rows[0]?.n ?? 0;
 }
 
 export function listInterviewsForApplication(

@@ -645,7 +645,7 @@ export const interviews = pgTable(
   (t) => [
     unique('interviews_tenant_id_id_key').on(t.tenantId, t.id),
     // One interview per application thread.
-    unique('interviews_tenant_thread_key').on(t.tenantId, t.threadId),
+    index('interviews_tenant_thread_created_idx').on(t.tenantId, t.threadId, t.createdAt),
     index('interviews_tenant_application_idx').on(t.tenantId, t.applicationId),
     index('interviews_tenant_user_starts_idx').on(t.tenantId, t.userId, t.startsAt),
     userRef(t),

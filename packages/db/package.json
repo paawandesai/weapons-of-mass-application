@@ -16,7 +16,8 @@
     "seed:demo": "tsx src/seed/cli.ts",
     "gauntlet:mail": "tsx src/seed/mailbox-cli.ts",
     "gauntlet:autopilot": "tsx src/seed/autopilot-cli.ts",
-    "gauntlet:score": "tsx src/seed/scorecard-cli.ts"
+    "gauntlet:score": "tsx src/seed/scorecard-cli.ts",
+    "score": "tsx src/score/score-cli.ts"
   },
   "dependencies": {
     "@wma/shared": "workspace:*",

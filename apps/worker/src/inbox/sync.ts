@@ -19,7 +19,7 @@ import { markRevoked } from '@wma/google';
 import { negotiationKey, NEGOTIATION_JOB, type ProposedSlot } from '@wma/shared';
 import { CalendarUnavailableError } from '../scheduling/offer';
 import { meterLlm } from '../llm-usage';
-import { classifyMessage } from './classify';
+import { classifyMessage, RESCHEDULE_WORDS } from './classify';
 import type { InboxDeps, OfferToSend } from './deps';
 import { isAuthError, type InboxMessage } from './gmail-reader';
 import { linkMessage, loadCandidates } from './link';
@@ -329,6 +329,7 @@ export async function processMessage(
           messageId: id,
           slots,
           compensationFlag: result.compensation_flag,
+          reschedule: result.reschedule || RESCHEDULE_WORDS.test(msg.text),
         };
         // Last in the transaction: if the calendar cannot be read the whole message rolls back
         // (not recorded as processed) and is retried. Only the slots are written here; the

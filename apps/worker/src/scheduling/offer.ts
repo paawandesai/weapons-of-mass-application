@@ -8,6 +8,7 @@ import {
   getJob,
   getUserById,
   clearConfirmationForReschedule,
+  countInterviewsForThread,
   insertInterview,
   insertInterviewSlot,
   invalidateOpenSlots,
@@ -197,11 +198,19 @@ export async function recordOffer(
   const { slots, notes } = normalizeSlots(input.slots, now, ctx.user.timezone);
   const base = { thread_id: input.threadId, message_id: input.messageId };
 
+  // The newest interview on the thread. A confirmed one is moved only when the message says so and
+  // the interview is still ahead; otherwise this is a new round and gets its own row (rule 55).
   const existing = await getInterviewByThread(handle, input.threadId);
-  const reschedule = existing?.confirmedSlotId != null;
+  const confirmed = existing?.confirmedSlotId != null;
+  const reschedule =
+    confirmed &&
+    input.reschedule === true &&
+    existing!.startsAt != null &&
+    existing!.startsAt > now;
+  const newRound = confirmed && !reschedule;
 
   // The same times offered again while their request is out: nothing to do.
-  if (existing && !reschedule && existing.confirmationEmailSentAt && slots.length > 0) {
+  if (existing && !confirmed && existing.confirmationEmailSentAt && slots.length > 0) {
     const open = (await listSlotsForInterview(handle, existing.id)).filter(
       (s) => !s.invalidatedAt && !s.confirmedAt && s.expiresAt > now,
     );
@@ -230,11 +239,17 @@ export async function recordOffer(
     return none('no_free_slot', { notes });
   }
 
-  const { interview } = await insertInterview(handle, {
-    userId: input.userId,
-    applicationId: input.applicationId,
-    threadId: input.threadId,
-  });
+  const interview =
+    existing && !newRound
+      ? existing
+      : (
+          await insertInterview(handle, {
+            userId: input.userId,
+            applicationId: input.applicationId,
+            threadId: input.threadId,
+          })
+        ).interview;
+  const round = await countInterviewsForThread(handle, input.threadId);
   const issued = await writeSlots(handle, interview, free, deps, reschedule);
   await activity.logActivity(handle, {
     userId: input.userId,
@@ -247,6 +262,7 @@ export async function recordOffer(
       count: free.length,
       slots: free.map(iso),
       notes,
+      round,
       reschedule,
       compensation_flag: input.compensationFlag,
     },

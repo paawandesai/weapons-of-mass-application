@@ -8,7 +8,9 @@ import {
   createOutgoingStore,
   getEmailThread,
   getEmailThreadByGmailId,
+  countInterviewsForThread,
   getInterview,
+  getInterviewByThread,
   getMailSyncState,
   getSlotByTokenHash,
   insertInterview,
@@ -139,15 +141,17 @@ describe('schema round trips', () => {
     ).toBe(true);
   });
 
-  it('interviews: one per thread; slots and prep plan columns round trip', async () => {
+  it('interviews: a thread holds several rounds, newest first; slots and prep plan columns round trip', async () => {
     const s = await seedInterview(A, 1);
     const again = await insertInterview(A.handle, {
       userId: A.userId,
       applicationId: s.application.id,
       threadId: s.thread.id,
     });
-    expect(again.created).toBe(false);
-    expect(again.interview.id).toBe(s.interview.id);
+    expect(again.created).toBe(true);
+    expect(again.interview.id).not.toBe(s.interview.id);
+    expect((await getInterviewByThread(A.handle, s.thread.id))?.id).toBe(again.interview.id);
+    expect(await countInterviewsForThread(A.handle, s.thread.id)).toBe(2);
     const slots = await listSlotsForInterview(A.handle, s.interview.id);
     expect(slots).toHaveLength(1);
     expect(slots[0]!.expiresAt.getTime()).toBeGreaterThan(Date.now() + 6.9 * 86400_000);

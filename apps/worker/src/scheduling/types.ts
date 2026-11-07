@@ -70,6 +70,8 @@ export interface OfferInput {
   messageId: string;
   slots: ProposedSlot[];
   compensationFlag: boolean;
+  /** The message moves a time already agreed (rule 53); a confirmed interview is only rescheduled when set. */
+  reschedule?: boolean;
 }
 
 /** A slot just stored, with its raw single-use token. The token lives only in memory and in the email. */

@@ -20,7 +20,8 @@
     "seed:demo": "pnpm --filter @wma/db seed:demo",
     "gauntlet:mail": "pnpm --filter @wma/db gauntlet:mail",
     "gauntlet:autopilot": "pnpm --filter @wma/db gauntlet:autopilot",
-    "gauntlet:score": "pnpm --filter @wma/db gauntlet:score"
+    "gauntlet:score": "pnpm --filter @wma/db gauntlet:score",
+    "score": "pnpm --filter @wma/db score"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

@@ -19,6 +19,8 @@ export const InboxClassification = z.object({
   compensation_flag: z.boolean(),
   booking_link: z.string().nullable(),
   proposed_slots: z.array(ProposedSlot),
+  /** The email moves, cancels or re-proposes a time already agreed in this thread (rule 53). */
+  reschedule: z.boolean().default(false),
 });
 export type InboxClassification = z.infer<typeof InboxClassification>;
 

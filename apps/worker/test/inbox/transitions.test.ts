@@ -11,7 +11,7 @@ import {
 } from '@wma/db';
 import { InboxClassificationJsonSchema } from '@wma/shared';
 import { CalendarUnavailableError } from '../../src/scheduling/offer';
-import { INBOX_CLASSIFY_PROMPT } from '../../src/inbox/classify';
+import { INBOX_CLASSIFY_PROMPT, RESCHEDULE_WORDS } from '../../src/inbox/classify';
 import { processMessage, runMailSync } from '../../src/inbox/sync';
 import {
   approve,
@@ -85,6 +85,7 @@ describe('rule 3: classification', () => {
       'compensation_flag',
       'booking_link',
       'proposed_slots',
+      'reschedule',
     ]);
   });
 
@@ -219,6 +220,25 @@ describe('rules 6 and 7: compensation and booking links', () => {
         slots: r.f.classification.proposed_slots,
       }),
     );
+  });
+
+  it('the classification reschedule flag reaches scheduling; absent it is false', async () => {
+    const plain = await deliver('interview');
+    expect(plain.offerSlots.mock.calls[0]![1]).toMatchObject({ reschedule: false });
+    const flagged = await deliver('interview', 'applied', (f) => ({
+      ...f,
+      classification: { ...f.classification, reschedule: true },
+    }));
+    expect(flagged.offerSlots.mock.calls[0]![1]).toMatchObject({ reschedule: true });
+  });
+
+  it('the RESCHEDULE_WORDS override reaches scheduling whatever the model said', async () => {
+    const r = await deliver('interview', 'applied', (f) => ({
+      ...f,
+      body: `${f.body}\n\nSorry, something came up, here are a few other options.`,
+      classification: { ...f.classification, reschedule: false },
+    }));
+    expect(r.offerSlots.mock.calls[0]![1]).toMatchObject({ reschedule: true });
   });
 
   it('booking link: digest item with the link, no slots offered, no reply', async () => {
@@ -409,5 +429,34 @@ describe('concurrent classifications', () => {
       expect(outcomes).toEqual(['linked', 'linked']);
       expect((await getApplication(t.handle, s.application.id))!.status).toBe('closed');
     }
+  });
+});
+
+describe('RESCHEDULE_WORDS (rule 53)', () => {
+  it.each([
+    'Can we reschedule?',
+    'Could we re-schedule for next week',
+    'We need to move our call to Friday',
+    'Please move the interview',
+    'Please move this meeting',
+    'That time no longer works for me',
+    'Sorry, something came up',
+    'Something has came up on our side',
+    'Can we push it back a day',
+    'We pushed the call back',
+    'Could we change the time?',
+    'We are changing our time',
+    'Would a different time work?',
+  ])('matches %s', (text) => {
+    expect(RESCHEDULE_WORDS.test(text)).toBe(true);
+  });
+
+  it.each([
+    'We would like to invite you to a technical interview',
+    'Next is the final conversation with our CTO',
+    'Here are three times that work for us',
+    'Thanks for your time',
+  ])('does not match %s', (text) => {
+    expect(RESCHEDULE_WORDS.test(text)).toBe(false);
   });
 });
