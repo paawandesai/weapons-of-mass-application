@@ -1,12 +1,14 @@
 # Weapons of Mass Application — PRD (hackathon MVP)
 
-Version 1.1 · 2026-11-06 · Owner: Andre Batista
+Version 1.2 · 2026-11-06 · Owner: Andre Batista
 
 ## 1. Summary
 
 An agent that runs a job search end to end. The user connects their accounts once, answers a short preferences survey, reviews the profile the agent built, and from then on the agent finds jobs, decides which are worth applying to, writes a tailored resume for each, submits the application, follows up, handles scheduling email, and books interviews only after the user confirms a day and time. The user sees everything on a kanban board and in a daily digest.
 
 This document describes the hackathon MVP of a multi-tenant SaaS. It records decisions already made, the assumptions taken where no decision was made, and what is explicitly out of scope.
+
+The testable requirements derived from this document live in `openspec/` as OpenSpec changes; see the README for the order in which they apply.
 
 ## 2. Goals and non-goals
 
@@ -39,6 +41,8 @@ This document describes the hackathon MVP of a multi-tenant SaaS. It records dec
 | Area | Decision |
 |---|---|
 | Deployment | One cloud droplet runs everything. |
+| Database | Postgres. Profiles and other documents are jsonb columns. |
+| Sign-in | Google OAuth. The same consent grants Gmail read and send, Calendar read and write, and Drive read. One token set per user, stored in the vault. |
 | Tenancy | Multi-tenant SaaS; MVP ships with that data model, not a single-user shortcut. |
 | Autonomy | Full autopilot. Applications, follow-ups and scheduling replies go out without per-item review. |
 | Apply surfaces | Ashby, Greenhouse and Lever hosted application forms only. |
@@ -68,8 +72,8 @@ These are reversible. Each one changes a bounded part of the system.
 | A2 | Company discovery: an LLM generates a candidate company list from the profile, each name is resolved against the Ashby, Greenhouse and Lever public APIs, and HN "Who is hiring" is parsed as a second source. LinkedIn discovery is best-effort via public job search pages. | A curated seed list is simpler and more predictable for the demo. |
 | A3 | CAPTCHA human path: the agent emails the user the CAPTCHA image with a one-click reply form; the browser session waits up to 15 minutes. | A live browser view (noVNC-style) is more general but costs a day of work. |
 | A4 | ATS accounts are created with the user's own Gmail address. Verification links and one-time codes are read through the existing Gmail connection. | A system-owned mailbox per user avoids cluttering the user's inbox but needs mail hosting. |
-| A5 | Sign-in is Google OAuth, and the same consent grants Gmail read/send and Calendar read/write. | A magic-link login plus separate connects adds one more screen. |
 | A6 | Password store is an application-level encrypted vault in Postgres (per-tenant key, envelope encryption). | A user-owned 1Password integration is out of reach for a hackathon. |
+| A13 | The Google OAuth app runs in testing mode for the hackathon: up to 100 listed test users, with an unverified-app warning on the consent screen. Gmail send and Calendar write are restricted scopes and need Google's verification before a public launch. | Verification takes weeks and is a post-hackathon task. |
 | A7 | Calendly-style booking links from recruiters are forwarded to the user in the digest rather than clicked by the agent. | Automating booking links adds one more Playwright flow. |
 | A8 | Recruiter emails that raise compensation are surfaced in the digest and left unanswered by the agent. | Drafting a reply for the user to send is a small addition. |
 | A9 | Decision output is a yes/no with written reasons, no numeric threshold. Near-misses are not surfaced in the MVP. | A score lets the user tune volume; can be layered on later. |

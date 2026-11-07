@@ -1,0 +1,16 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# node
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# runtime
+data/
+playwright-report/
+test-results/
+*.log

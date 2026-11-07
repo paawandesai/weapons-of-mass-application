@@ -1,0 +1,41 @@
+schema: spec-driven
+
+context: |
+  Product: an autonomous job-search agent (hackathon MVP of a multi-tenant SaaS).
+  The behavioral source of truth is docs/PRD.md v1.2; architecture is docs/ARCHITECTURE.md.
+  Settled decisions (do not re-open): Postgres; Google OAuth sign-in that also grants
+  Gmail read/send, Calendar read/write and Drive read; one cloud droplet; Playwright for
+  ATS forms; apply only on Ashby, Greenhouse and Lever forms; LinkedIn and HN for discovery
+  only; full autopilot with no per-application or per-message review; stateless daily run
+  (query, rank, apply to top N, store only what was applied to; no Found stage, no queue);
+  CAPTCHA chain agent 1 -> agent 2 -> human by email; agent creates ATS accounts with an
+  encrypted vault; LLM answers free-text form questions from the profile and never invents
+  experience; voluntary self-identification fields left blank; email sends are scheduling
+  and follow-ups only, never anything involving compensation; interviews booked only after
+  the user confirms a slot; board columns Applied, Interviewing, Offer, Closed with PENDING
+  as a badge inside Applied; outcomes logged but no learning loop; no SMS; no home folder.
+  Open and NOT to be decided in specs: interviewer-facing voice feedback.
+
+  Stack (design and tasks assume this): TypeScript on Node 22, pnpm workspaces monorepo
+  (apps/web, apps/api, apps/worker, packages/db, packages/llm, packages/shared).
+  API: Hono. Web: React + Vite. ORM and migrations: Drizzle on Postgres. Queue and
+  scheduler: pg-boss (Postgres-backed, no Redis). Browser automation and PDF rendering:
+  Playwright. Google APIs: googleapis. LLM: Anthropic SDK (@anthropic-ai/sdk), model
+  claude-opus-5-5 with adaptive thinking, structured outputs via output_config.format,
+  versioned prompts in packages/llm/prompts. Tests: Vitest; Playwright for e2e.
+  Secrets: envelope encryption with a per-tenant data key wrapped by a master key from env.
+
+  Spec conventions: flat capability layout (openspec/specs/<capability>/spec.md), one
+  behavior per requirement, scenarios testable, no library or class names in specs.
+  Every table carries tenant_id; every agent action is written to the activity log.
+
+rules:
+  proposal:
+    - State what is explicitly out of scope for this change
+    - Reference the PRD section numbers the change implements
+  specs:
+    - Keep requirement descriptions under 400 characters; put edge cases in scenarios
+    - Include at least one failure or edge scenario per capability
+  tasks:
+    - Each task names its verification (test command, observable behavior, or artifact)
+    - Keep tasks under roughly two hours each
