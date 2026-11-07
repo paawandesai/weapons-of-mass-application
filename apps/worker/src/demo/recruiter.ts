@@ -18,8 +18,8 @@ import {
   afterBooking,
   confirmationMessage,
   firstMessage,
-  GAUNTLET_SLUG,
-  gauntletScenario,
+  gauntletMode,
+  scenarioFor,
   type GauntletScenario,
 } from './gauntlet';
 import { isDemoTenant } from './ports';
@@ -60,8 +60,11 @@ export interface RecruiterOptions {
   clock?: RecruiterClock;
   /** Ignore the delay (the on-demand sync). */
   immediate?: boolean;
-  /** Gauntlet Jobs scenario; default `GAUNTLET_SCENARIO`. Null runs Gauntlet Jobs like any seeded job. */
-  scenario?: GauntletScenario | null;
+  /**
+   * Gauntlet mode: `golden`, one scenario, or null; default `GAUNTLET_SCENARIO`. Null runs every
+   * Gauntlet employer like any seeded job.
+   */
+  scenario?: GauntletScenario | 'golden' | null;
   /** Called once per message written, e.g. to queue a mail sync for the user. */
   onDelivered?: (info: Delivered) => Promise<void> | void;
 }
@@ -318,7 +321,7 @@ export async function runSimulatedRecruiter(
   const zone = user.timezone;
   const firstName = (user.displayName ?? 'there').split(' ')[0]!;
   const delivered: Delivered[] = [];
-  const scenario = options.scenario === undefined ? gauntletScenario() : options.scenario;
+  const mode = options.scenario === undefined ? gauntletMode() : options.scenario;
 
   const deliver = async (
     d: Delivered,
@@ -382,7 +385,7 @@ export async function runSimulatedRecruiter(
     },
     internalDate: now,
   });
-  const isGauntlet = (c: { boardSlug: string | null }) => scenario && c.boardSlug === GAUNTLET_SLUG;
+  const scenarioOf = (c: { boardSlug: string | null }) => scenarioFor(mode, c.boardSlug);
 
   for (const app of applied) {
     const job = jobs.get(app.jobId);
@@ -400,7 +403,8 @@ export async function runSimulatedRecruiter(
     const threadId = `sim-thread-${app.id}`;
     // Gauntlet Jobs confirms at once, like an applicant-tracking system, in a thread of its own.
     const confirmId = `sim-confirm-${app.id}`;
-    if (isGauntlet(company) && !(await getDemoMessage(handle, confirmId))) {
+    const scenario = scenarioOf(company);
+    if (scenario && !(await getDemoMessage(handle, confirmId))) {
       const careers = {
         address: `no-reply@${recruiter.address.split('@')[1]}`,
         name: `${company.name} Careers`,
@@ -428,9 +432,9 @@ export async function runSimulatedRecruiter(
     const gmailMessageId = proposalId(app.id);
     if (await getDemoMessage(handle, gmailMessageId)) continue;
     const proposal = proposalBody(input);
-    const msg = isGauntlet(company)
+    const msg = scenario
       ? firstMessage(
-          scenario!,
+          scenario,
           input,
           proposal,
           `${demoFormsOrigin()}/forms/greenhouse/gauntlet-book.html`,
@@ -510,8 +514,8 @@ export async function runSimulatedRecruiter(
     );
   }
 
-  // 3. Gauntlet Jobs follow-ups after each booked interview (a reschedule, the next round).
-  if (scenario) {
+  // 3. Gauntlet follow-ups after each booked interview (a reschedule, the next round).
+  if (mode) {
     const all = await listApplications(handle, userId);
     const allJobs = new Map(
       (
@@ -527,7 +531,7 @@ export async function runSimulatedRecruiter(
           ...new Set([...allJobs.values()].flatMap((j) => (j.companyId ? [j.companyId] : []))),
         ])
       )
-        .filter((c) => c.boardSlug === GAUNTLET_SLUG)
+        .filter((c) => scenarioOf(c))
         .map((c) => [c.id, c]),
     );
     for (const app of all) {
@@ -552,7 +556,7 @@ export async function runSimulatedRecruiter(
         slots,
         zone,
       };
-      const msg = afterBooking(scenario, acks.length, input, bullets(slots, zone));
+      const msg = afterBooking(scenarioOf(company)!, acks.length, input, bullets(slots, zone));
       if (!msg) continue;
       await deliver(
         { kind: 'proposal', applicationId: app.id, threadId, gmailMessageId },

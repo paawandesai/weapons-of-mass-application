@@ -1,3 +1,4 @@
+import { GAUNTLET_SCENARIO_BY_SLUG } from '@wma/db';
 import type { MessageInput } from './recruiter';
 
 /**
@@ -23,16 +24,42 @@ export const GAUNTLET_SCENARIOS = [
 
 export type GauntletScenario = (typeof GAUNTLET_SCENARIOS)[number];
 
-/** `GAUNTLET_SCENARIO`, or null when unset. An unknown name throws, so a typo fails loudly. */
-export function gauntletScenario(env: NodeJS.ProcessEnv = process.env): GauntletScenario | null {
+/**
+ * `GAUNTLET_SCENARIO`: `golden` (all eight postings, each with its own scenario), one scenario
+ * name, or unset (null). An unknown name throws, so a typo fails loudly.
+ */
+export function gauntletMode(
+  env: NodeJS.ProcessEnv = process.env,
+): GauntletScenario | 'golden' | null {
   const raw = env.GAUNTLET_SCENARIO?.trim();
   if (!raw) return null;
+  if (raw === 'golden') return raw;
   if (!(GAUNTLET_SCENARIOS as readonly string[]).includes(raw)) {
     throw new Error(
-      `GAUNTLET_SCENARIO must be one of ${GAUNTLET_SCENARIOS.join(', ')}; got "${raw}"`,
+      `GAUNTLET_SCENARIO must be golden or one of ${GAUNTLET_SCENARIOS.join(', ')}; got "${raw}"`,
     );
   }
   return raw as GauntletScenario;
+}
+
+/** Kept for callers that only care whether a single scenario is set. */
+export function gauntletScenario(env: NodeJS.ProcessEnv = process.env): GauntletScenario | null {
+  const mode = gauntletMode(env);
+  return mode === 'golden' ? null : mode;
+}
+
+/**
+ * The scenario a company runs under `mode`, or null when it is not a Gauntlet employer. In golden
+ * mode each golden slug has its own; with one scenario set, every Gauntlet employer runs it.
+ */
+export function scenarioFor(
+  mode: GauntletScenario | 'golden' | null,
+  boardSlug: string | null,
+): GauntletScenario | null {
+  if (!mode || !boardSlug) return null;
+  const own = GAUNTLET_SCENARIO_BY_SLUG[boardSlug] as GauntletScenario | undefined;
+  if (mode === 'golden') return own ?? null;
+  return own || boardSlug === GAUNTLET_SLUG ? mode : null;
 }
 
 export interface GauntletMessage {

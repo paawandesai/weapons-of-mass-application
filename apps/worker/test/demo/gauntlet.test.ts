@@ -8,6 +8,8 @@ import {
   demoPostings,
   demoProfile,
   GAUNTLET_POSTING,
+  GAUNTLET_POSTINGS,
+  GAUNTLET_SCENARIO_BY_SLUG,
   insertOutgoingMessage,
   listDemoThread,
   postingUrl,
@@ -16,7 +18,12 @@ import {
   type DemoMailboxMessageRow,
 } from '@wma/db';
 import { FORMS_ROOT, resolveFormPath } from '../../src/demo/forms-server';
-import { gauntletScenario, type GauntletScenario } from '../../src/demo/gauntlet';
+import {
+  gauntletMode,
+  gauntletScenario,
+  scenarioFor,
+  type GauntletScenario,
+} from '../../src/demo/gauntlet';
 import { createDemoSender } from '../../src/demo/ports';
 import {
   runSimulatedRecruiter,
@@ -30,40 +37,42 @@ import { appliedTo, setupDemoEnv, type DemoEnv } from './support';
 const ZONE = 'America/Los_Angeles';
 let env: DemoEnv;
 let userId: string;
-let companyId: string;
+const companyIds = new Map<string, string>();
 beforeAll(async () => {
   env = await setupDemoEnv();
   userId = env.summary.userId;
-  companyId = (
-    await upsertCompany(env.handle, {
-      name: 'Gauntlet Jobs',
+  for (const p of GAUNTLET_POSTINGS) {
+    const c = await upsertCompany(env.handle, {
+      name: p.company,
       ats: 'greenhouse', // as the seed sets it: the board slug is kept only with an ATS
-      boardSlug: 'gauntlet-jobs',
+      boardSlug: p.slug,
       createdBy: 'user',
-    })
-  ).id;
+    });
+    companyIds.set(p.slug, c.id);
+  }
 });
 afterAll(async () => {
   await env.owner.query(
-    `delete from companies c where c.board_slug = 'gauntlet-jobs'
+    `delete from companies c where c.board_slug like 'gauntlet-%'
        and not exists (select 1 from jobs j where j.company_id = c.id)`,
   );
   await env.cleanup();
 });
 
 let n = 0;
-/** A fresh seeded Gauntlet posting with an application on it, applied at `appliedAt`. */
-async function gauntletApp(appliedAt = new Date()) {
+/** A fresh seeded Gauntlet posting (default Gauntlet Jobs) with an application on it. */
+async function gauntletApp(appliedAt = new Date(), slug = 'gauntlet-jobs') {
+  const posting = GAUNTLET_POSTINGS.find((p) => p.slug === slug)!;
   const { job } = await upsertJob(env.handle, {
-    companyId,
-    title: 'AI Engineer',
-    url: `http://127.0.0.1:4310/forms/greenhouse/gauntlet-jobs-ai-engineer?t=${n++}`,
+    companyId: companyIds.get(slug)!,
+    title: posting.title,
+    url: `${postingUrl(posting)}?t=${n++}`,
   });
   await env.owner.query('update jobs set seeded = true where id = $1', [job.id]);
   return appliedTo(env.handle, userId, job.id, appliedAt);
 }
 
-const run = (scenario: GauntletScenario | null, extra = {}) =>
+const run = (scenario: GauntletScenario | 'golden' | null, extra = {}) =>
   runSimulatedRecruiter(env.handle, userId, { delayMs: 0, scenario, ...extra });
 const header = (m: DemoMailboxMessageRow, k: string) => (m.headers as Record<string, string>)[k];
 const slotsOf = (m: DemoMailboxMessageRow): ProposedTime[] =>
@@ -100,18 +109,51 @@ async function confirm(appId: string, slot: ProposedTime) {
 }
 
 describe('Gauntlet Jobs setup', () => {
-  it('reads the scenario from GAUNTLET_SCENARIO and rejects typos', () => {
-    expect(gauntletScenario({})).toBeNull();
+  it('reads the mode from GAUNTLET_SCENARIO and rejects typos', () => {
+    expect(gauntletMode({})).toBeNull();
+    expect(gauntletMode({ GAUNTLET_SCENARIO: 'golden' })).toBe('golden');
+    expect(gauntletScenario({ GAUNTLET_SCENARIO: 'golden' })).toBeNull();
     expect(gauntletScenario({ GAUNTLET_SCENARIO: 'offer' })).toBe('offer');
-    expect(() => gauntletScenario({ GAUNTLET_SCENARIO: 'ofer' })).toThrow(/must be one of/);
+    expect(() => gauntletMode({ GAUNTLET_SCENARIO: 'ofer' })).toThrow(/must be golden or one of/);
   });
 
-  it('seeds only the AI Engineer posting, for a profile that targets it', () => {
-    const env = { GAUNTLET_SCENARIO: 'slots' };
+  it('gives each golden employer its own scenario, and the override to all of them', () => {
+    expect(scenarioFor(null, 'gauntlet-jobs')).toBeNull();
+    expect(scenarioFor('golden', 'gauntlet-jobs')).toBe('slots');
+    expect(scenarioFor('golden', 'gauntlet-labs')).toBe('ghost');
+    expect(scenarioFor('golden', 'acme')).toBeNull();
+    expect(scenarioFor('offer', 'gauntlet-jobs')).toBe('offer');
+    expect(scenarioFor('offer', 'gauntlet-labs')).toBe('offer');
+    expect(scenarioFor('offer', 'acme')).toBeNull();
+  });
+
+  it('seeds the golden eight, one posting per scenario, or one posting by scenario name', () => {
     expect(demoPostings({})).toBe(DEMO_POSTINGS);
-    expect(demoPostings(env)).toEqual([GAUNTLET_POSTING]);
+    const eight = demoPostings({ GAUNTLET_SCENARIO: 'golden' });
+    expect(eight).toHaveLength(8);
+    expect(new Set(eight.map((p) => p.slug)).size).toBe(8); // one company each
+    expect(eight.map((p) => GAUNTLET_SCENARIO_BY_SLUG[p.slug]).sort()).toEqual(
+      [
+        'booking-link',
+        'ghost',
+        'injection',
+        'pay-question',
+        'reschedule',
+        'rounds',
+        'slots',
+        'vague-time',
+      ].sort(),
+    );
+    expect(demoPostings({ GAUNTLET_SCENARIO: 'slots' })).toEqual([GAUNTLET_POSTING]);
+    expect(demoPostings({ GAUNTLET_SCENARIO: 'ghost' })[0]!.slug).toBe('gauntlet-labs');
+    expect(demoPostings({ GAUNTLET_SCENARIO: 'offer' })).toEqual([GAUNTLET_POSTING]);
+    expect(() => demoPostings({ GAUNTLET_SCENARIO: 'nope' })).toThrow(/unknown scenario/);
+  });
+
+  it('gives the persona every golden title', () => {
     expect(demoProfile({})).toBe(DEMO_PROFILE);
-    expect(demoProfile(env).preferences.target_titles[0]).toBe('AI Engineer');
+    const titles = demoProfile({ GAUNTLET_SCENARIO: 'golden' }).preferences.target_titles;
+    for (const p of GAUNTLET_POSTINGS) expect(titles).toContain(p.title);
   });
 
   it('loads and validates a profile from DEMO_PROFILE_PATH', () => {
@@ -130,9 +172,13 @@ describe('Gauntlet Jobs setup', () => {
     expect(() => demoProfile({ DEMO_PROFILE_PATH: bad })).toThrow();
   });
 
-  it('serves the posting its own form', async () => {
-    const path = new URL(postingUrl(GAUNTLET_POSTING)).pathname;
-    expect(await resolveFormPath(FORMS_ROOT, path)).toMatch(/gauntlet-jobs-ai-engineer\.html$/);
+  it('serves every golden posting its own form', async () => {
+    for (const p of GAUNTLET_POSTINGS) {
+      const path = new URL(postingUrl(p)).pathname;
+      expect(await resolveFormPath(FORMS_ROOT, path)).toMatch(
+        new RegExp(`${path.split('/').pop()}\\.html$`),
+      );
+    }
     expect(await resolveFormPath(FORMS_ROOT, '/forms/greenhouse/other-posting')).toMatch(
       /greenhouse\/form\.html$/,
     );
@@ -238,6 +284,20 @@ describe('Gauntlet Jobs recruiter', () => {
       if (round) expect(last.bodyText).toMatch(round);
       else expect(header(last, KIND_HEADER)).toBe('acknowledgement');
     }
+  });
+
+  it('in golden mode, runs each employer under its own scenario in one pass', async () => {
+    const jobs = await gauntletApp(new Date(), 'gauntlet-jobs');
+    const labs = await gauntletApp(new Date(), 'gauntlet-labs');
+    const platform = await gauntletApp(new Date(), 'gauntlet-platform');
+    const r = await run('golden');
+    const kinds = (id: string) =>
+      r.delivered.filter((d) => d.applicationId === id).map((d) => d.kind);
+    expect(kinds(jobs.id)).toEqual(['confirmation', 'proposal']);
+    expect(kinds(labs.id)).toEqual(['confirmation']); // ghost
+    expect(kinds(platform.id)).toEqual(['confirmation', 'proposal']);
+    expect((await thread(platform.id))[0]!.bodyText).toMatch(/salary range/);
+    expect((await thread(jobs.id))[0]!.bodyText).not.toMatch(/salary range/);
   });
 
   it('treats the posting like any seeded job when no scenario is set', async () => {
