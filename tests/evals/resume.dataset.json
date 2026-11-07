@@ -1,0 +1,194 @@
+[
+  {
+    "input": "Title: Senior Backend Engineer, Data Platform\nCompany: Northwind Labs\nLocation: Remote - EU\n\nBuild the streaming pipelines behind Northwind's analytics. Go and Postgres No on-call Salary: EUR 110,000 - 140,000. Apply by 2026-11-20.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Account Executive\nCompany: Northwind Labs\nLocation: London\n\nSell things.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Platform Engineer\nCompany: Initrode\nLocation: Lisbon, Portugal\n\nOwn the internal developer platform at Quillbase.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Office Manager\nCompany: Initrode\nLocation: Berlin\n\nKeep the office running.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Platform Engineer\nCompany: Harbor Robotics\nLocation: San Francisco, CA\n\nOwn the fleet telemetry platform that every warehouse robot reports to.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Backend Engineer\nCompany: Lumen Labs\nLocation: Remote (US)\n\nBuild the ingestion services behind a sensor analytics product.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Software Engineer, Data Pipelines\nCompany: Northwind Grid\nLocation: Oakland, CA\n\nMove energy-market batch jobs to a streaming architecture.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Software Engineer, Scheduling\nCompany: Cedar Health\nLocation: Remote (US)\n\nDesign the appointment scheduling core for a clinic network.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Principal Engineer, Developer Tools\nCompany: Quarry Systems\nLocation: San Jose, CA\n\nLead the build and test infrastructure used by every engineering team.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Engineer, Payments Reliability\nCompany: Tidewater Pay\nLocation: San Francisco, CA\n\nKeep a card-processing platform correct under load.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Platform Engineer\nCompany: Northwind Cloud\nLocation: Seattle, WA\n\nBuild and maintain the internal Kubernetes platform that serves 400 microservices.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Software Engineer, Backend\nCompany: Lumen Payments\nLocation: Remote (US)\nTech Stack: Go, PostgreSQL, Kafka, AWS\nSalary: $210,000 - $260,000\n\nLead the design of our ledger service and mentor mid-level engineers across three squads.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Sales Associate\nCompany: BrightMart\nLocation: Tulsa, OK\n\nSell things.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Principal Site Reliability Engineer\nCompany: Orbitron Systems\nLocation: Austin, TX\nOn-call: 1 week in 6, with follow-the-sun coverage\nApplication Deadline: 2025-03-15\n\nDrive reliability strategy for our global streaming infrastructure and define SLOs across product teams.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Junior Frontend Developer\nCompany: PixelPush Studio\nLocation: Berlin, Germany\nTech Stack: React, TypeScript\n\nBuild UI components under the guidance of senior engineers on our marketing sites.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior DevOps Engineer\nCompany: Helix Health\nLocation: Boston, MA\n\nHelp with infrastructure.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Engineering Manager, Platform\nCompany: Vantage Logistics\nLocation: Chicago, IL\nSalary: $190,000 - $230,000\n\nManage a team of eight engineers building the shared developer tooling and CI/CD pipelines.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Backend Engineer (Rust)\nCompany: Ferrous Labs\nLocation: Remote (EU)\nTech Stack: Rust, gRPC, Redis, Terraform\nOn-call: None, business hours only\n\nDesign low-latency services for our real-time bidding engine.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Barista\nCompany: Daily Grind Coffee\nLocation: Portland, OR\n\nPrepare coffee drinks and keep the counter clean during morning shifts.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Platform Engineer\nCompany: Stratus Data\nLocation: San Francisco, CA\nTech Stack: Kubernetes, Envoy, Istio, Go, Terraform\nSalary: $240,000 - $300,000\nOn-call: Primary rotation every 8 weeks\nApplication Deadline: 2025-04-01\n\nOwn the service mesh and multi-cluster networking strategy for our data processing platform.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Software Engineer, Infrastructure\nCompany: Quanta Robotics\nLocation: Pittsburgh, PA\n\nWork on the cloud infrastructure that supports our fleet of warehouse robots.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Data Analyst\nCompany: Redwood Insurance\nLocation: Hartford, CT\nTech Stack: SQL, Tableau\n\nAnalyze claims data and produce weekly dashboards for the operations team.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Lead Cloud Architect\nCompany: Meridian Bank\nLocation: London, UK\nSalary: \u00a3120,000 - \u00a3150,000\n\nDefine the target-state cloud architecture for migrating core banking workloads to Azure.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Full Stack Engineer\nCompany: TaskBloom\nLocation: Toronto, Canada\nTech Stack: Node.js, React, GraphQL, MongoDB\n\nShip features end to end for our project management SaaS used by 50,000 teams.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Principal Engineer, Distributed Systems\nCompany: Aperture DB\nLocation: Remote (Worldwide)\nTech Stack: C++, Rust, Raft\nSalary: $280,000 - $350,000\n\nDesign and implement the consensus and replication layers of our distributed database.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Customer Support Representative\nCompany: ShopEasy\nLocation: Manila, Philippines\n\nAnswer customer emails and chats about orders and returns.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Site Reliability Engineer\nCompany: Cobalt Gaming\nLocation: Los Angeles, CA\nOn-call: 24/7 paging, compensated with additional pay\nTech Stack: Prometheus, Grafana, GCP, Python\n\nKeep our multiplayer game servers highly available during peak launches.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Software Engineer II\nCompany: Evergreen Retail Tech\nLocation: Denver, CO\nApplication Deadline: 2025-02-28\n\nImplement features for our point-of-sale APIs in Java.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Machine Learning Platform Engineer\nCompany: Neuronest\nLocation: New York, NY\nTech Stack: Python, Ray, Kubeflow, PyTorch, AWS\nSalary: $200,000 - $245,000\n\nBuild the training and serving platform that lets researchers ship models to production.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Director of Engineering\nCompany: Fathom Media\nLocation: Remote (US)\n\nLead.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Security Engineer\nCompany: Bastion Networks\nLocation: Washington, DC\nOn-call: Occasional incident response\n\nDesign secure-by-default infrastructure patterns and run threat modeling for our cloud services.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Platform Engineer\nCompany: Kite Mobility\nLocation: Amsterdam, Netherlands\nTech Stack: AWS, Pulumi, TypeScript, ArgoCD\n\nBuild self-service golden paths so product engineers can deploy services in minutes.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Warehouse Associate\nCompany: SwiftShip\nLocation: Memphis, TN\nSalary: $18 - $21/hour\n\nPick, pack, and load orders in a fast-paced distribution center.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Mobile Engineer (iOS)\nCompany: Fitwave\nLocation: Remote (US)\nTech Stack: Swift, SwiftUI, Combine\nSalary: $170,000 - $205,000\n\nOwn the iOS app experience for our workout tracking product with over 2 million monthly users.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Site Reliability Engineer\nCompany: Zenith Cloud\nLocation: Dublin, Ireland\nOn-call: Follow-the-sun, no overnight pages\nApplication Deadline: 2025-05-10\n\nLead incident management practices and build automation to reduce toil across our regional clusters.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Software Engineer\nCompany: Stealth Startup\nLocation: Palo Alto, CA\n\nBuild something big with a small team.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Marketing Manager\nCompany: Verdant Foods\nLocation: Minneapolis, MN\nSalary: $85,000 - $105,000\n\nPlan and run campaigns across email, social, and retail partnerships.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Observability Engineer\nCompany: Lattice Analytics\nLocation: Remote (Canada)\nTech Stack: OpenTelemetry, Datadog, Go, Kubernetes\n\nStandardize tracing, metrics, and logging across 150 services and improve developer debugging workflows.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Principal Software Engineer, Developer Experience\nCompany: Cascade Software\nLocation: Vancouver, Canada\nSalary: CAD 190,000 - 230,000\nApplication Deadline: 2025-03-31\n\nShape the build systems, monorepo tooling, and internal SDKs used by more than 600 engineers.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Database Reliability Engineer\nCompany: Ledgerline\nLocation: Atlanta, GA\nTech Stack: PostgreSQL, Vitess, MySQL, Ansible\nOn-call: 1 week in 5\n\nManage backups, failover, and performance tuning for our high-volume transactional databases.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Backend Engineer\nCompany: Tandem Travel\nLocation: Lisbon, Portugal\nTech Stack: Kotlin, Spring Boot, Kafka, PostgreSQL\nSalary: \u20ac85,000 - \u20ac105,000\n\nBuild booking and pricing services that handle millions of searches per day.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Receptionist\nCompany: Harbor Dental\nLocation: Savannah, GA\n\nGreet patients and manage the appointment calendar.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Embedded Software Engineer\nCompany: Voltaic Energy\nLocation: Munich, Germany\nTech Stack: C, RTOS, CAN bus\n\nDevelop firmware for battery management systems in grid-scale storage units.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Cloud Infrastructure Engineer, Senior\nCompany: Prism Biotech\nLocation: Cambridge, MA\nSalary: $175,000 - $210,000\nOn-call: Light, weekday evenings only\n\nAutomate our AWS environments to support genomics pipelines running on thousands of cores.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Tech Lead, Payments Platform\nCompany: Mosaic Commerce\nLocation: Singapore\nTech Stack: Java, Kubernetes, Cassandra, Kafka\nApplication Deadline: 2025-06-01\n\nLead a squad of six engineers to deliver a multi-currency payments orchestration platform.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Software Engineer, Search\nCompany: Quill Marketplace\nLocation: Remote (US/Canada)\nTech Stack: Elasticsearch, Python, Kubernetes\n\nImprove relevance and latency for the search experience powering our two-sided marketplace.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Intern, Software Engineering\nCompany: Beacon Systems\nLocation: Raleigh, NC\nApplication Deadline: 2025-01-31\n\nSupport the engineering team with bug fixes and small feature work during a 12-week summer internship.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: VP of Platform Engineering\nCompany: Atlas Fintech\nLocation: New York, NY\nSalary: $320,000 - $400,000 plus equity\n\nOwn the strategy, budget, and org design for a 70-person platform engineering organization spanning infrastructure, security, and developer productivity.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  }
+]
