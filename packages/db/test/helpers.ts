@@ -82,3 +82,17 @@ export async function pgErrorMessage(p: Promise<unknown>): Promise<string> {
   }
   throw new Error('expected the statement to fail, but it succeeded');
 }
+
+/** Inserts a job and a pending application for the tenant's user. */
+export async function makeApplication(
+  t: { handle: TenantHandle; userId: string },
+  tag: string = randomUUID(),
+) {
+  const { upsertJob, insertApplication } = await import('../src');
+  const { job } = await upsertJob(t.handle, {
+    title: 'Engineer',
+    url: `https://jobs.example.test/${tag}`,
+  });
+  const { application } = await insertApplication(t.handle, { userId: t.userId, jobId: job.id });
+  return { job, application };
+}

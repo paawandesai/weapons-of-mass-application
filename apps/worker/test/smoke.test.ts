@@ -11,7 +11,7 @@ import { LINKEDIN_TEXT, RESUME_TEXT } from './fixtures/sources';
 loadEnv();
 
 // Real API call; run with RUN_LLM_SMOKE=1. Optional SMOKE_OUT=<file> saves the raw model output.
-describe.skipIf(!process.env.RUN_LLM_SMOKE)('profile build against the real model', () => {
+describe.skipIf(process.env.RUN_LLM_SMOKE !== '1')('profile build against the real model', () => {
   it('returns schema-valid output that survives post-validation', async () => {
     const bundle: SourceBundle = {
       accountEmail: 'mara.quill@example.com',

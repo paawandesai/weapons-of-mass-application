@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Senior Platform Engineer @ Acme Robotics</title>
+  </head>
+  <body>
+    <div id="root" class="ashby-job-posting-application">
+      <h1>Senior Platform Engineer</h1>
+      <form
+        id="ashby-application-form"
+        class="ashby-application-form"
+        data-confirm="confirmation.html"
+        novalidate
+      >
+        <ol class="ashby-steps-indicator">
+          <li>Your details</li>
+          <li>Questions</li>
+          <li>Self-identification</li>
+        </ol>
+
+        <section class="ashby-step" data-step="0">
+          <h2>Your details</h2>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="_systemfield_name"
+              >Name <span class="ashby-application-form-question-required">*</span></label
+            >
+            <input type="text" id="_systemfield_name" name="_systemfield_name" required />
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="_systemfield_email"
+              >Email <span class="ashby-application-form-question-required">*</span></label
+            >
+            <input type="email" id="_systemfield_email" name="_systemfield_email" required />
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="_systemfield_resume"
+              >Resume <span class="ashby-application-form-question-required">*</span></label
+            >
+            <input type="file" id="_systemfield_resume" name="_systemfield_resume" required />
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="phone-1">Phone number</label>
+            <input type="tel" id="phone-1" name="phone-1" />
+          </div>
+          <div class="ashby-nav"><button type="button" class="ashby-next">Next</button></div>
+        </section>
+
+        <section class="ashby-step" data-step="1" hidden>
+          <h2>Questions</h2>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="q-linkedin">LinkedIn</label>
+            <input type="text" id="q-linkedin" name="q-linkedin" />
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="q-why"
+              >What excites you about working on our platform team?
+              <span class="ashby-application-form-question-required">*</span></label
+            >
+            <textarea id="q-why" name="q-why" maxlength="1200" required></textarea>
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="q-sponsor"
+              >Will you require visa sponsorship to work in the United States?
+              <span class="ashby-application-form-question-required">*</span></label
+            >
+            <select id="q-sponsor" name="q-sponsor" required>
+              <option value="">Select an option</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <div class="ashby-application-form-question-title" role="heading">
+              Which of these have you used in production?
+              <span class="ashby-application-form-question-required">*</span>
+            </div>
+            <label class="option"
+              ><input type="checkbox" name="q-stack" value="Kubernetes" /> Kubernetes</label
+            >
+            <label class="option"
+              ><input type="checkbox" name="q-stack" value="Terraform" /> Terraform</label
+            >
+            <label class="option"
+              ><input type="checkbox" name="q-stack" value="Postgres" /> Postgres</label
+            >
+          </div>
+          <div class="ashby-application-form-field-entry" data-variant="unmapped">
+            <label class="ashby-application-form-question-title" for="q-archive"
+              >Portfolio archive
+              <span class="ashby-application-form-question-required">*</span></label
+            >
+            <input type="file" id="q-archive" name="q-archive" required />
+          </div>
+          <div class="ashby-nav">
+            <button type="button" class="ashby-back">Back</button
+            ><button type="button" class="ashby-next">Next</button>
+          </div>
+        </section>
+
+        <section class="ashby-step ashby-application-form-section-container" data-step="2" hidden>
+          <h2 class="ashby-application-form-section-header">Voluntary Self-Identification</h2>
+          <p>Optional. Your answers are kept separate from your application.</p>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="eeo-gender">Gender</label>
+            <select id="eeo-gender" name="eeo-gender">
+              <option value="">Select an option</option>
+              <option>Man</option>
+              <option>Woman</option>
+              <option>Prefer not to say</option>
+            </select>
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="eeo-race"
+              >Race / Ethnicity</label
+            >
+            <select id="eeo-race" name="eeo-race">
+              <option value="">Select an option</option>
+              <option>Asian</option>
+              <option>White</option>
+              <option>Prefer not to say</option>
+            </select>
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="eeo-veteran"
+              >Veteran Status</label
+            >
+            <select id="eeo-veteran" name="eeo-veteran">
+              <option value="">Select an option</option>
+              <option>Protected veteran</option>
+              <option>Not a veteran</option>
+              <option>Prefer not to say</option>
+            </select>
+          </div>
+          <div class="ashby-application-form-field-entry">
+            <label class="ashby-application-form-question-title" for="eeo-disability"
+              >Disability Status</label
+            >
+            <select id="eeo-disability" name="eeo-disability">
+              <option value="">Select an option</option>
+              <option>Yes</option>
+              <option>No</option>
+              <option>Prefer not to say</option>
+            </select>
+          </div>
+
+          <div id="captcha-widget" class="captcha-widget" data-variant="captcha" hidden>
+            <p>Verify you are human to submit.</p>
+            <img class="captcha-img" alt="Security check" width="160" height="56" />
+            <input type="text" name="captcha" autocomplete="off" />
+            <button type="button" data-captcha-verify>Verify</button>
+            <p class="captcha-error" hidden>Incorrect. Please try again.</p>
+          </div>
+
+          <div class="ashby-nav">
+            <button type="button" class="ashby-back">Back</button
+            ><button type="submit" class="ashby-application-form-submit-button">
+              Submit Application
+            </button>
+          </div>
+        </section>
+      </form>
+    </div>
+    <script src="../_shared/fixture.js"></script>
+    <script>
+      // Steps: Next validates the current step's text controls and its resume upload (other files are checked on the final submit).
+      (function () {
+        var form = document.getElementById('ashby-application-form');
+        var steps = Array.prototype.slice.call(form.querySelectorAll('.ashby-step'));
+        var index = 0;
+        function show(i) {
+          index = i;
+          steps.forEach(function (s, n) {
+            s.hidden = n !== i;
+          });
+        }
+        function stepValid(step) {
+          var ok = true;
+          Array.prototype.forEach.call(step.querySelectorAll('[required]'), function (c) {
+            if (c.type === 'file' && c.id !== '_systemfield_resume') return;
+            if (c.type === 'file' ? !c.files.length : !c.value) {
+              ok = false;
+              c.setAttribute('aria-invalid', 'true');
+            }
+          });
+          return ok;
+        }
+        Array.prototype.forEach.call(form.querySelectorAll('.ashby-next'), function (b) {
+          b.addEventListener('click', function () {
+            if (stepValid(steps[index])) show(index + 1);
+          });
+        });
+        Array.prototype.forEach.call(form.querySelectorAll('.ashby-back'), function (b) {
+          b.addEventListener('click', function () {
+            show(index - 1);
+          });
+        });
+        // Capture-phase gate: the shared handler only runs when every required control has a value.
+        form.addEventListener(
+          'submit',
+          function (event) {
+            var missing = Array.prototype.some.call(
+              form.querySelectorAll('[required]'),
+              function (c) {
+                return !(c.type === 'file' ? c.files.length : c.value);
+              },
+            );
+            if (missing) {
+              event.stopImmediatePropagation();
+              event.preventDefault();
+            }
+          },
+          true,
+        );
+      })();
+    </script>
+  </body>
+</html>

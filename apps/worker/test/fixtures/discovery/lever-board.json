@@ -1,0 +1,27 @@
+[
+  {
+    "id": "0c7c1a52-3f0e-4c63-8b8e-5a1f6d2b9e11",
+    "text": "Staff Platform Engineer",
+    "hostedUrl": "https://jobs.lever.co/quillbase/0c7c1a52-3f0e-4c63-8b8e-5a1f6d2b9e11",
+    "applyUrl": "https://jobs.lever.co/quillbase/0c7c1a52-3f0e-4c63-8b8e-5a1f6d2b9e11/apply",
+    "createdAt": 1793696400000,
+    "categories": { "location": "Lisbon, Portugal", "commitment": "Full-time", "team": "Platform" },
+    "workplaceType": "hybrid",
+    "descriptionPlain": "Own the internal developer platform at Quillbase.",
+    "additionalPlain": "We offer a four-day week.",
+    "salaryRange": {
+      "min": 120000,
+      "max": 150000,
+      "currency": "EUR",
+      "interval": "per-year-salary"
+    }
+  },
+  {
+    "id": "5d1e0f77-9a4b-4d2a-a0c3-77a2b1c4d9e2",
+    "text": "Office Manager",
+    "hostedUrl": "https://jobs.lever.co/quillbase/5d1e0f77-9a4b-4d2a-a0c3-77a2b1c4d9e2",
+    "createdAt": 1793000000000,
+    "categories": { "location": "Berlin" },
+    "descriptionPlain": "Keep the office running."
+  }
+]

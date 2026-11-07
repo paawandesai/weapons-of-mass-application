@@ -4,6 +4,7 @@ import { createBoss } from './boss';
 import { createAppDb } from './db';
 import { googleDrivePort } from './drive';
 import { registerJobs } from './register';
+import { closeSharedBrowser } from './submission/browser';
 
 loadEnv();
 // Fail before any job can be consumed: Drive reads need the vault, and a build must not complete
@@ -19,6 +20,7 @@ console.log('worker started');
 
 const stop = async () => {
   await boss.stop();
+  await closeSharedBrowser();
   await db.close();
   process.exit(0);
 };

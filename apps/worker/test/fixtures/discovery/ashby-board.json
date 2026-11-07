@@ -1,0 +1,23 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "8f2b6c1e-0d44-4f37-9a55-2e3c8b7d1a60",
+      "title": "Senior Backend Engineer",
+      "location": "Remote (EU)",
+      "isRemote": true,
+      "isListed": true,
+      "jobUrl": "https://jobs.ashbyhq.com/brightforge/8f2b6c1e-0d44-4f37-9a55-2e3c8b7d1a60",
+      "publishedAt": "2026-11-05T08:30:00.000+00:00",
+      "descriptionPlain": "Brightforge builds scheduling infrastructure. You will own services written in TypeScript and Postgres.",
+      "compensation": { "scrapeableCompensationSalarySummary": "EUR 95K - 125K" }
+    },
+    {
+      "id": "1a9d3e55-6b70-4c1f-8d02-4f6e9a2b3c71",
+      "title": "Unlisted Role",
+      "isListed": false,
+      "jobUrl": "https://jobs.ashbyhq.com/brightforge/1a9d3e55-6b70-4c1f-8d02-4f6e9a2b3c71",
+      "descriptionPlain": "Hidden."
+    }
+  ]
+}

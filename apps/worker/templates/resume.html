@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{TITLE}}</title>
+    <style>
+      @page {
+        size: Letter;
+        margin: 0.6in 0.65in;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-print-color-adjust: exact;
+      }
+      body {
+        margin: 0;
+        font-family: 'Helvetica Neue', Helvetica, Arial, 'Liberation Sans', sans-serif;
+        font-size: {{FONT_SIZE}}pt;
+        line-height: 1.32;
+        color: #111;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.9em;
+        line-height: 1.1;
+        letter-spacing: 0.01em;
+      }
+      .headline {
+        margin: 0.15em 0 0;
+        font-size: 1.1em;
+        color: #333;
+      }
+      .contact {
+        margin: 0.3em 0 0;
+        color: #333;
+      }
+      h2 {
+        margin: 1.1em 0 0.4em;
+        padding-bottom: 0.15em;
+        border-bottom: 0.75pt solid #999;
+        font-size: 0.95em;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      p {
+        margin: 0;
+      }
+      .entry {
+        margin: 0 0 0.7em;
+        break-inside: avoid-page;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1em;
+        font-weight: 600;
+      }
+      .row .when {
+        flex: none;
+        font-weight: 400;
+        color: #333;
+      }
+      .sub {
+        color: #333;
+      }
+      ul {
+        margin: 0.25em 0 0;
+        padding-left: 1.2em;
+      }
+      li {
+        margin: 0.1em 0;
+      }
+    </style>
+  </head>
+  <body>
+    {{BODY}}
+  </body>
+</html>

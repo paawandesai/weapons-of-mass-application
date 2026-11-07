@@ -1,0 +1,39 @@
+{
+  "90000003": {
+    "id": 90000003,
+    "type": "story",
+    "title": "Ask HN: Who is hiring? (November 2026)",
+    "kids": [91000001, 91000002, 91000003, 91000004]
+  },
+  "90000002": {
+    "id": 90000002,
+    "type": "story",
+    "title": "Ask HN: Who wants to be hired? (November 2026)",
+    "kids": []
+  },
+  "90000001": {
+    "id": 90000001,
+    "type": "story",
+    "title": "Ask HN: Who is hiring? (October 2026)",
+    "kids": []
+  },
+  "91000001": {
+    "id": 91000001,
+    "type": "comment",
+    "time": 1793700000,
+    "text": "Lanternworks | Senior Backend Engineer | Remote (EU) | Full-time<p>We build observability tooling. Apply: <a href=\"https:&#x2F;&#x2F;jobs.lever.co&#x2F;lanternworks&#x2F;3b9c7e10-2d5a-4f61-8e47-9c0a1b2d3e4f?lever-source=hn\" rel=\"nofollow\">https:&#x2F;&#x2F;jobs.lever.co&#x2F;lanternworks&#x2F;3b9c7e10-...</a>"
+  },
+  "91000002": {
+    "id": 91000002,
+    "type": "comment",
+    "time": 1793700100,
+    "text": "Marlowe Systems | Platform Engineer | Berlin<p>Details on our careers page: <a href=\"https:&#x2F;&#x2F;marlowe.example&#x2F;careers\">https:&#x2F;&#x2F;marlowe.example&#x2F;careers</a>"
+  },
+  "91000003": {
+    "id": 91000003,
+    "type": "comment",
+    "time": 1793700200,
+    "text": "Tidewater | Backend | Remote<p>Email us at jobs@tidewater.example"
+  },
+  "91000004": { "id": 91000004, "type": "comment", "deleted": true }
+}

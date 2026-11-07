@@ -1,0 +1,50 @@
+{
+  "companies": [
+    {
+      "name": "Northwind Labs",
+      "reason": "Streaming data pipelines match the data platform work in the profile.",
+      "slug_hints": ["northwindlabs"]
+    },
+    {
+      "name": "Quillbase",
+      "reason": "Platform engineering is the stated career direction.",
+      "slug_hints": []
+    },
+    {
+      "name": "Brightforge",
+      "reason": "TypeScript and Postgres services in a remote-friendly team.",
+      "slug_hints": ["brightforge-hq"]
+    },
+    {
+      "name": "Lanternworks",
+      "reason": "Observability tooling for backend teams.",
+      "slug_hints": []
+    },
+    { "name": "Orchard Co", "reason": "Backend roles in Portugal.", "slug_hints": [] },
+    { "name": "Fernhill Systems", "reason": "Reliable services for logistics.", "slug_hints": [] },
+    { "name": "Copperline", "reason": "Data-heavy backend work.", "slug_hints": [] },
+    { "name": "Saltmarsh", "reason": "Remote EU engineering team.", "slug_hints": [] },
+    { "name": "Ironvale", "reason": "Platform team hiring seniors.", "slug_hints": [] },
+    {
+      "name": "Pinecrest AI",
+      "reason": "Backend infrastructure for ML products.",
+      "slug_hints": []
+    },
+    { "name": "Harborlight", "reason": "Event-driven payments backend.", "slug_hints": [] },
+    { "name": "Duskwater", "reason": "Distributed systems focus.", "slug_hints": [] },
+    { "name": "Vellum Freight", "reason": "Logistics platform in Lisbon.", "slug_hints": [] },
+    { "name": "Moonrake", "reason": "Small senior-heavy team.", "slug_hints": [] },
+    {
+      "name": "Tallow & Wick",
+      "reason": "Commerce backend, remote EU.",
+      "slug_hints": ["tallowandwick"]
+    },
+    { "name": "Kestrel Grid", "reason": "Energy data platform.", "slug_hints": [] },
+    { "name": "Oakhaven", "reason": "Healthcare data pipelines.", "slug_hints": [] },
+    { "name": "Redfinch", "reason": "Marketplace backend.", "slug_hints": [] },
+    { "name": "Silverpine", "reason": "Platform tooling.", "slug_hints": [] },
+    { "name": "Thistledown", "reason": "Developer tools, EU remote.", "slug_hints": [] },
+    { "name": "Umbra Works", "reason": "Security backend.", "slug_hints": [] },
+    { "name": "Waverly Cloud", "reason": "Cloud infrastructure.", "slug_hints": [] }
+  ]
+}

@@ -5,7 +5,15 @@ import {
   PROFILE_BUILD_JOB,
   type ProfileBuildJobData,
 } from './jobs/profile-build';
+import { registerDailyRun } from './jobs/daily-run';
+import { registerSubmitApplication } from './jobs/submit-application';
 import type { BuildDeps } from './profile/build';
+
+/** Wave 2 job registration; each file owns its own handler. */
+export async function registerWave2Jobs(boss: PgBoss, db: Db): Promise<void> {
+  await registerDailyRun(boss, db);
+  await registerSubmitApplication(boss, db);
+}
 
 /** Registers every job handler. New jobs other than profile.build go through guardedJob. */
 export async function registerJobs(boss: PgBoss, db: Db, deps: BuildDeps): Promise<void> {
@@ -16,4 +24,5 @@ export async function registerJobs(boss: PgBoss, db: Db, deps: BuildDeps): Promi
       await executeProfileBuild(handle, job.data, deps);
     }
   });
+  await registerWave2Jobs(boss, db);
 }

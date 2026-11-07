@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { activity, ActivityRedactionError } from '../src';
-import { setupEnv, type TestEnv } from './helpers';
+import { makeApplication, setupEnv, type TestEnv } from './helpers';
 
 let env: TestEnv;
 beforeAll(async () => {
@@ -65,7 +65,7 @@ describe('activity log', () => {
 
   it('filters by application', async () => {
     const t = await env.makeTenant();
-    const app1 = crypto.randomUUID();
+    const app1 = (await makeApplication(t)).application.id;
     await activity.logActivity(t.handle, { userId: t.userId, actor: 'user', action: 'x' });
     await activity.logActivity(t.handle, {
       userId: t.userId,

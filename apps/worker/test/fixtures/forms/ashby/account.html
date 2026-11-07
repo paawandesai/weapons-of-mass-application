@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Create your candidate account</title>
+  </head>
+  <body>
+    <div class="ashby-auth">
+      <h1>Create your candidate account</h1>
+      <form class="ashby-auth-form" data-mode="sign-up">
+        <label for="auth-email">Email address</label>
+        <input type="email" id="auth-email" name="email" required />
+        <label for="auth-password">Password</label>
+        <input type="password" id="auth-password" name="password" minlength="12" required />
+        <button type="submit" class="ashby-auth-submit">Create account</button>
+        <button type="button" class="ashby-auth-switch" onclick="location.href = 'signin.html'">
+          I already have an account
+        </button>
+        <p class="ashby-auth-error" role="alert" hidden></p>
+      </form>
+    </div>
+    <script>
+      document.querySelector('.ashby-auth-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        location.href = 'check-email.html';
+      });
+    </script>
+  </body>
+</html>

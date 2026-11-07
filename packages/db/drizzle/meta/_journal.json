@@ -29,6 +29,34 @@
       "when": 1794039957278,
       "tag": "0003_wave1_fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794040987269,
+      "tag": "0004_wave2_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794040991334,
+      "tag": "0005_wave2_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794044289168,
+      "tag": "0006_wave2_review_fixes",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794044335811,
+      "tag": "0007_minor_iceman",
+      "breakpoints": true
     }
   ]
 }

@@ -31,8 +31,27 @@ export function createLlmClient(options: LlmClientOptions = {}): LlmClient {
         model,
         max_tokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
         thinking: { type: 'adaptive' },
-        system: req.system,
-        messages: [{ role: 'user', content: req.user }],
+        system: req.cacheSystem
+          ? [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }]
+          : req.system,
+        messages: [
+          {
+            role: 'user',
+            content: req.images?.length
+              ? [
+                  ...req.images.map((img) => ({
+                    type: 'image' as const,
+                    source: {
+                      type: 'base64' as const,
+                      media_type: img.mediaType,
+                      data: img.data,
+                    },
+                  })),
+                  { type: 'text' as const, text: req.user },
+                ]
+              : req.user,
+          },
+        ],
         output_config: { format: { type: 'json_schema', schema: format.wire } },
       });
       const message = await stream.finalMessage();

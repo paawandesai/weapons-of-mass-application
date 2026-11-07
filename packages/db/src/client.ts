@@ -26,6 +26,13 @@ export interface SessionIdentity {
   expiresAt: Date;
 }
 
+export interface RosterEntry {
+  tenantId: string;
+  userId: string;
+  /** UTC hour 0-23. */
+  runHour: number;
+}
+
 export interface Db {
   readonly pool: pg.Pool;
   forTenant(tenantId: string): TenantHandle;
@@ -35,8 +42,17 @@ export interface Db {
   resolveSession(sessionId: string): Promise<SessionIdentity | null>;
   /** Pre-tenant lookup of a user by Google subject only (never by email), for sign-in. */
   findUserIdentity(googleSub: string): Promise<{ tenantId: string; userId: string } | null>;
+  /** Pre-tenant lookup of a CAPTCHA request by the sha256 of its token (the public /captcha page). */
+  resolveCaptchaToken(tokenHash: string): Promise<{ tenantId: string; requestId: string } | null>;
   /** Pre-tenant check whether a user with this email already exists (account conflict). */
   emailExists(email: string): Promise<boolean>;
+  /**
+   * Scheduler enumeration: every user with an approved profile and the UTC hour their run starts.
+   * Goes through a SECURITY DEFINER function so the worker needs no privilege beyond wma_app.
+   */
+  runRoster(): Promise<RosterEntry[]>;
+  /** Tenants that own runs dated before `cutoff` (`YYYY-MM-DD`); the nightly cleanup visits them. */
+  tenantsWithRunsBefore(cutoff: string): Promise<string[]>;
   close(): Promise<void>;
 }
 
@@ -104,11 +120,36 @@ export function createDb(url: string): Db {
       const row = r.rows[0];
       return row ? { tenantId: row.tenant_id, userId: row.user_id } : null;
     },
+    async resolveCaptchaToken(tokenHash) {
+      const r = await pool.query<{ tenant_id: string; request_id: string }>(
+        'select * from wma_resolve_captcha_token($1)',
+        [tokenHash],
+      );
+      const row = r.rows[0];
+      return row ? { tenantId: row.tenant_id, requestId: row.request_id } : null;
+    },
     async emailExists(email) {
       const r = await pool.query<{ exists: boolean }>('select wma_email_exists($1) as exists', [
         email,
       ]);
       return r.rows[0]?.exists === true;
+    },
+    async runRoster() {
+      const r = await pool.query<{ tenant_id: string; user_id: string; run_hour: number }>(
+        'select * from wma_run_roster()',
+      );
+      return r.rows.map((x) => ({
+        tenantId: x.tenant_id,
+        userId: x.user_id,
+        runHour: x.run_hour,
+      }));
+    },
+    async tenantsWithRunsBefore(cutoff) {
+      const r = await pool.query<{ tenant_id: string }>(
+        'select distinct tenant_id from wma_stale_runs($1::date)',
+        [cutoff],
+      );
+      return r.rows.map((x) => x.tenant_id);
     },
     close: () => pool.end(),
   };

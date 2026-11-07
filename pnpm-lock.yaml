@@ -41,6 +41,9 @@ importers:
       '@wma/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@wma/discovery':
+        specifier: workspace:*
+        version: link:../../packages/discovery
       '@wma/google':
         specifier: workspace:*
         version: link:../../packages/google
@@ -151,6 +154,9 @@ importers:
       '@wma/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@wma/discovery':
+        specifier: workspace:*
+        version: link:../../packages/discovery
       '@wma/google':
         specifier: workspace:*
         version: link:../../packages/google
@@ -163,9 +169,15 @@ importers:
       dotenv:
         specifier: ^16.0.0
         version: 16.6.1
+      pdf-parse:
+        specifier: ^2.4.5
+        version: 2.4.5
       pg-boss:
         specifier: ^12.0.0
         version: 12.38.1(@opentelemetry/api@1.10.0)
+      playwright:
+        specifier: ^1.64.0
+        version: 1.64.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -173,6 +185,12 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      drizzle-orm:
+        specifier: ^0.45.0
+        version: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(pg@8.23.1)
+      msw:
+        specifier: 2.15.0
+        version: 2.15.0(@types/node@22.20.5)(typescript@5.9.3)
       pg:
         specifier: ^8.23.1
         version: 8.23.1
@@ -205,11 +223,20 @@ importers:
         specifier: ^4.0.0
         version: 4.23.15
 
+  packages/discovery:
+    dependencies:
+      '@wma/shared':
+        specifier: workspace:*
+        version: link:../shared
+
   packages/google:
     dependencies:
       '@wma/db':
         specifier: workspace:*
         version: link:../db
+      '@wma/shared':
+        specifier: workspace:*
+        version: link:../shared
       drizzle-orm:
         specifier: ^0.45.0
         version: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(pg@8.23.1)
@@ -2249,6 +2276,16 @@ packages:
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
+
+  playwright-core@1.64.0:
+    resolution: {integrity: sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.64.0:
+    resolution: {integrity: sha512-kVzTnYFYEyQ9RGzBjNCd2+yEqWmVbxl3AHPynv3qQ6JTjv4a+kwRcnqQwIpuP3NnrnIrE/Q6wWAIAvMfIE2/Yg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   postcss@8.5.32:
     resolution: {integrity: sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==}
@@ -4501,6 +4538,12 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  playwright-core@1.64.0: {}
+
+  playwright@1.64.0:
+    dependencies:
+      playwright-core: 1.64.0
 
   postcss@8.5.32:
     dependencies:

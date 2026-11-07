@@ -1,0 +1,11 @@
+{
+  "apply": true,
+  "rationale": "Senior backend role on data pipelines in the EU with remote work and no on-call; salary EUR 110-140k is above the 90k floor.",
+  "fit": 5,
+  "pay_min": 110000,
+  "pay_max": 140000,
+  "currency": "EUR",
+  "location_mode": "remote",
+  "seniority": "Senior",
+  "application_deadline": "2026-11-20"
+}

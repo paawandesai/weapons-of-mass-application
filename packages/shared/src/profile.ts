@@ -62,6 +62,13 @@ export const educationEntrySchema = z.object({
   sources: sourcesSchema,
 });
 
+/** A certification the user holds, as stated in a source. Optional in the document: older profiles have none. */
+export const certificationSchema = z.object({
+  name: z.string().min(1),
+  issuer: z.string().nullable().optional(),
+  sources: sourcesSchema,
+});
+
 export const remotePreferenceSchema = z.enum(['remote', 'hybrid', 'onsite', 'any']);
 
 export const preferencesSchema = z.object({
@@ -123,6 +130,8 @@ export const profileDocumentSchema = z.object({
   projects: z.array(projectEntrySchema),
   skills: z.array(skillSchema),
   education: z.array(educationEntrySchema),
+  /** Certifications the profile positively states; a resume may claim only these. */
+  certifications: z.array(certificationSchema).optional(),
   preferences: preferencesSchema,
   survey: surveySchema,
   standard_answers: standardAnswersSchema,
@@ -169,6 +178,7 @@ export type SurveySubmission = z.infer<typeof surveySubmissionSchema>;
 export type ProfileDocument = z.infer<typeof profileDocumentSchema>;
 export type WorkHistoryEntry = z.infer<typeof workHistoryEntrySchema>;
 export type ProjectEntry = z.infer<typeof projectEntrySchema>;
+export type Certification = z.infer<typeof certificationSchema>;
 export type EducationEntry = z.infer<typeof educationEntrySchema>;
 export type ProfileFlag = z.infer<typeof flagSchema>;
 export type Survey = z.infer<typeof surveySchema>;

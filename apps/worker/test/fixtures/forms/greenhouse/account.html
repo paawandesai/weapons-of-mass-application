@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Create an account to apply</title>
+  </head>
+  <body>
+    <div id="account_wall">
+      <h1>Create an account to apply</h1>
+      <form id="account_form" data-mode="sign-up">
+        <label for="account_email">Email</label>
+        <input type="email" id="account_email" name="email" required />
+        <label for="account_password">Password</label>
+        <input type="password" id="account_password" name="password" minlength="12" required />
+        <label for="account_password_confirmation">Confirm password</label>
+        <input
+          type="password"
+          id="account_password_confirmation"
+          name="password_confirmation"
+          required
+        />
+        <label
+          ><input type="checkbox" id="account_terms" name="terms" required /> I agree to the terms
+          of service</label
+        >
+        <button type="submit" id="create_account">Create account</button>
+        <p class="switch">
+          Already have an account? <a href="signin.html" id="show_signin">Sign in</a>
+        </p>
+        <p class="error" role="alert" hidden></p>
+      </form>
+    </div>
+    <script>
+      document.getElementById('account_form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var f = e.target;
+        if (f.password.value !== f.password_confirmation.value) {
+          var err = f.querySelector('.error');
+          err.textContent = 'Passwords do not match.';
+          err.hidden = false;
+          return;
+        }
+        location.href = 'check-email.html';
+      });
+    </script>
+  </body>
+</html>

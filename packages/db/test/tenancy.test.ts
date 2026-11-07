@@ -58,21 +58,32 @@ describe('role and RLS configuration (rules 3, 4)', () => {
          from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r'`,
     );
-    const names = r.rows.map((x) => x.relname).sort();
+    // companies is the global ATS board cache: no tenant_id, deliberately without RLS.
+    const tenantTables = r.rows.filter((x) => x.relname !== 'companies');
+    const names = tenantTables.map((x) => x.relname).sort();
     expect(names).toEqual(
       [
         'activity_log',
+        'applications',
+        'ats_credentials',
+        'captcha_requests',
+        'jobs',
         'profile_builds',
         'profiles',
+        'run_candidates',
+        'runs',
         'secrets',
         'sessions',
         'source_connections',
         'tenants',
+        'user_companies',
         'users',
         'vault_keys',
       ].sort(),
     );
-    for (const row of r.rows) {
+    const companiesRow = r.rows.find((x) => x.relname === 'companies');
+    expect(companiesRow?.relrowsecurity).toBe(false);
+    for (const row of tenantTables) {
       expect(row.relrowsecurity, row.relname).toBe(true);
       expect(row.relforcerowsecurity, row.relname).toBe(true);
       expect(Number(row.cmds), row.relname).toBe(4);

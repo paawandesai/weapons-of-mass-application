@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import mammoth from 'mammoth';
 import {
+  deleteStoredFile,
   disconnectConnection,
+  resolveInStore,
   upsertConnection,
   withUserLock,
   type SourceConnectionRow,
@@ -151,17 +153,4 @@ export async function disconnectSource(args: {
     if (previous?.fileRef) await deleteStoredFile(storeDir, previous.fileRef);
     return previous;
   });
-}
-
-/** Resolves a store-relative path, refusing anything that escapes the store directory. */
-export function resolveInStore(storeDir: string, fileRef: string): string {
-  const root = resolve(storeDir);
-  const abs = resolve(root, fileRef);
-  if (abs !== root && !abs.startsWith(root + sep))
-    throw new Error('file ref escapes the file store');
-  return abs;
-}
-
-export async function deleteStoredFile(storeDir: string, fileRef: string): Promise<void> {
-  await rm(resolveInStore(storeDir, fileRef), { force: true });
 }

@@ -12,6 +12,7 @@
   "dependencies": {
     "@hono/node-server": "^1.0.0",
     "@wma/db": "workspace:*",
+    "@wma/discovery": "workspace:*",
     "@wma/google": "workspace:*",
     "@wma/llm": "workspace:*",
     "@wma/shared": "workspace:*",

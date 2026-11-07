@@ -1,0 +1,11 @@
+{
+  "apply": false,
+  "rationale": "Sales role unrelated to the target backend roles.",
+  "fit": 1,
+  "pay_min": null,
+  "pay_max": null,
+  "currency": null,
+  "location_mode": null,
+  "seniority": null,
+  "application_deadline": null
+}
