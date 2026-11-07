@@ -8,6 +8,7 @@ import {
 } from '@wma/db';
 import type { StructuredLlm } from '@wma/llm';
 import { isActionable, NEGOTIATION_JOB, SKIPPED_NOT_ACTIONABLE } from '@wma/shared';
+import { meterLlm } from '../llm-usage';
 import { loadProfileDocument } from '../discovery/profile-view';
 import { loadVersionedPrompt } from '../discovery/prompts';
 import type { LevelsFetcher } from './levels';
@@ -118,7 +119,12 @@ export async function runNegotiation(
   try {
     const text = await deps.fetchPage(query);
     try {
-      comparables = await extractComparables(deps.llm, query, text, fetchedAt);
+      comparables = await extractComparables(
+        meterLlm(handle, input.userId, 'negotiation', deps.llm, input.applicationId),
+        query,
+        text,
+        fetchedAt,
+      );
       if (comparables.length === 0) {
         error = 'no_data';
         reason = 'the page showed no pay figures for this title and location';

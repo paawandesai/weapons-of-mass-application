@@ -71,8 +71,11 @@ export function createLlmClient(options: LlmClientOptions = {}): LlmClient {
         usage: {
           input_tokens: message.usage.input_tokens,
           output_tokens: message.usage.output_tokens,
+          cache_creation_input_tokens: message.usage.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: message.usage.cache_read_input_tokens ?? 0,
         },
         stopReason: message.stop_reason,
+        model: message.model,
       };
     },
   };

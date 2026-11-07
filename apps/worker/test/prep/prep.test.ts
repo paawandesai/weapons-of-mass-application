@@ -1,5 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { activity, getApplication, getInterview, updateApplication } from '@wma/db';
+import {
+  activity,
+  getApplication,
+  getInterview,
+  llmUsageByApplication,
+  llmUsageByPurpose,
+  updateApplication,
+} from '@wma/db';
 import { FakeLlm, loadPrompt, type StructuredRequest } from '@wma/llm';
 import profile from '../../../../packages/shared/test/fixtures/profile.full.json';
 import { profileDocumentSchema } from '@wma/shared';
@@ -96,6 +103,12 @@ describe('prep-plan job (task 6.2)', () => {
     expect(request.user).toContain('work_history');
     // the application's status is untouched
     expect((await getApplication(t.handle, s.applicationId))!.status).toBe('interviewing');
+    // the call is in the cost ledger against this application
+    const usage = await llmUsageByApplication(t.handle, t.userId);
+    expect(usage).toEqual([expect.objectContaining({ applicationId: s.applicationId, calls: 1 })]);
+    expect(await llmUsageByPurpose(t.handle, t.userId)).toEqual([
+      expect.objectContaining({ purpose: 'interview_prep', calls: 1 }),
+    ]);
   });
 
   it('still produces a plan when the board page cannot be read', async () => {

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import type { LlmUsageTotals } from '@wma/shared';
 import { api, errorMessage, formatTime, type InterviewView, type NegotiationView } from '../../api';
+import { formatUsd } from '../../pages/UsagePage';
 import { FeedbackForm } from './FeedbackForm';
 import { OfferPanel } from './OfferPanel';
 import { PrepPanel } from './PrepPanel';
@@ -28,6 +31,7 @@ export function CardExtras({ application }: { application: CardExtrasApplication
   const [loaded, setLoaded] = useState<{
     interviews: InterviewView[];
     negotiation: NegotiationView | null;
+    llm_usage?: LlmUsageTotals;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +89,13 @@ export function CardExtras({ application }: { application: CardExtrasApplication
           applicationId={application.id}
           onChanged={() => void load()}
         />
+      ) : null}
+      {loaded?.llm_usage && loaded.llm_usage.calls > 0 ? (
+        <p className="muted small usage-line">
+          Agent cost for this application: {formatUsd(loaded.llm_usage.cost_usd)} across{' '}
+          {loaded.llm_usage.calls} model {loaded.llm_usage.calls === 1 ? 'call' : 'calls'}.{' '}
+          <Link to="/usage">See all usage</Link>
+        </p>
       ) : null}
     </div>
   );

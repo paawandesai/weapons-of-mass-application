@@ -9,6 +9,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -869,5 +870,42 @@ export const pendingJobs = pgTable(
     unique('pending_jobs_tenant_dedupe_key').on(t.tenantId, t.dedupeKey),
     index('pending_jobs_undispatched_idx').on(t.tenantId, t.dispatchedAt),
     userRef(t),
+  ],
+);
+
+/**
+ * One row per model call the worker makes: who it was for, which part of the product, the prompt,
+ * the token counts and the estimated cost. Written by the LLM tracking wrapper; summed by the
+ * usage endpoint. `applicationId` is set when the call served one application.
+ */
+export const llmUsage = pgTable(
+  'llm_usage',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    applicationId: uuid('application_id'),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    purpose: text('purpose').notNull(),
+    prompt: text('prompt').notNull(),
+    model: text('model').notNull(),
+    inputTokens: integer('input_tokens').notNull(),
+    outputTokens: integer('output_tokens').notNull(),
+    cacheCreationInputTokens: integer('cache_creation_input_tokens').notNull().default(0),
+    cacheReadInputTokens: integer('cache_read_input_tokens').notNull().default(0),
+    /** Estimated USD from the price table at call time; null when the model had no known price. */
+    costUsd: numeric('cost_usd', { precision: 14, scale: 8 }),
+    durationMs: integer('duration_ms').notNull().default(0),
+  },
+  (t) => [
+    index('llm_usage_tenant_user_at_idx').on(t.tenantId, t.userId, t.at),
+    index('llm_usage_tenant_application_idx').on(t.tenantId, t.applicationId),
+    userRef(t),
+    foreignKey({
+      columns: [t.tenantId, t.applicationId],
+      foreignColumns: [applications.tenantId, applications.id],
+    }).onDelete('set null'),
   ],
 );

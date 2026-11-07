@@ -16,6 +16,7 @@ import {
   type ProfileModelOutput,
 } from '@wma/shared';
 import { loadPrompt, type StructuredLlm } from '@wma/llm';
+import { meterLlm } from '../llm-usage';
 import { gatherBundle, type DrivePort } from './bundle';
 import { postValidate } from './postvalidate';
 import { BuildError, BuildSupersededError, type SourceBundle } from './types';
@@ -176,7 +177,7 @@ export async function runProfileBuild(
   const resume = bundle.sources.find((s) => s.kind === 'resume');
   if (!resume || resume.text.trim() === '') throw new BuildError('profile_build_no_resume');
 
-  const model = await callModel(deps.llm, bundle);
+  const model = await callModel(meterLlm(handle, userId, 'onboarding', deps.llm), bundle);
   const { output, flags } = postValidate(model, bundle);
   const sources = bundle.sources.filter((s) => s.text.trim() !== '').map((s) => s.id);
 

@@ -8,9 +8,11 @@ import {
   getProfileVersion,
   getUserById,
   insertProfileVersion,
+  llmUsageByPurpose,
   requireApprovedProfile,
   setApprovedProfileVersion,
   startProfileBuild,
+  totalLlmUsage,
 } from '@wma/db';
 import { FakeLlm } from '@wma/llm';
 import type { ProfileDocument } from '@wma/shared';
@@ -90,6 +92,12 @@ describe('profile build', () => {
       sources: ['resume', 'linkedin', 'github'],
       flag_count: 0,
     });
+    // The model call is in the cost ledger as onboarding for this user.
+    const usage = await totalLlmUsage(t.handle, t.userId);
+    expect(usage.calls).toBe(1);
+    expect(await llmUsageByPurpose(t.handle, t.userId)).toEqual([
+      expect.objectContaining({ purpose: 'onboarding', calls: 1 }),
+    ]);
   });
 
   it('invented employer: dropped, flagged in the stored document', async () => {

@@ -186,7 +186,15 @@ describe('rule 1: mailbox sync', () => {
     const real = llm.generateStructured.bind(llm);
     llm.generateStructured = async (req) =>
       req.user.includes(bad.subject) && req.prompt === 'inbox-classify/v1'
-        ? { output: { classification: 'banana' }, usage: { input_tokens: 0, output_tokens: 0 } }
+        ? {
+            output: { classification: 'banana' },
+            usage: {
+              input_tokens: 0,
+              output_tokens: 0,
+              cache_creation_input_tokens: 0,
+              cache_read_input_tokens: 0,
+            },
+          }
         : real(req);
     const r = await runMailSync(t.handle, t.userId, deps);
     expect(r).toMatchObject({ status: 'ok', failed: 1, linked: 1 });

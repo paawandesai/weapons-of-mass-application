@@ -43,6 +43,7 @@ import { pollUntil } from './poll';
 import { planFill } from './fill';
 import { recordStep } from './record';
 import type { SubmissionContext, SubmitTrace } from './types';
+import { meterLlm } from '../llm-usage';
 import { guardedJob } from '../guarded';
 
 export interface SubmissionJobData {
@@ -306,7 +307,7 @@ async function attempt(
     clock: deps.clock,
     gmail: deps.gmail(handle, userId),
     mail: deps.sendMail(handle, userId),
-    llm: deps.llm,
+    llm: meterLlm(handle, userId, 'application', deps.llm, claim.id),
     files: {
       put: (key, bytes) => putFile(handle, key, bytes),
       get: (key) => getFile(handle, key),

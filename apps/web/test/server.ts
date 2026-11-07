@@ -2,6 +2,7 @@ import {
   unresolvedBlockingFlags,
   type BuildStatus,
   type Connection,
+  type LlmUsageResponse,
   type ProfileDocument,
   type SurveyAnswers,
 } from '@wma/shared';
@@ -91,7 +92,18 @@ export interface MockState {
   /** Versions sent in approve requests, in order. */
   approvedVersions: number[];
   signedOut: boolean;
+  usage: Pick<LlmUsageResponse, 'total' | 'by_purpose' | 'by_application' | 'recent'>;
 }
+
+const zeroTotals = {
+  calls: 0,
+  input_tokens: 0,
+  output_tokens: 0,
+  cache_creation_input_tokens: 0,
+  cache_read_input_tokens: 0,
+  cost_usd: 0,
+  unpriced_calls: 0,
+};
 
 function initial(): MockState {
   return {
@@ -116,6 +128,7 @@ function initial(): MockState {
     approveCalls: 0,
     approvedVersions: [],
     signedOut: false,
+    usage: { total: zeroTotals, by_purpose: [], by_application: [], recent: [] },
   };
 }
 
@@ -248,6 +261,15 @@ export const handlers = [
   }),
 
   http.get('*/api/survey', () => HttpResponse.json({ answers: state.survey })),
+  http.get('*/api/usage', ({ request }) =>
+    HttpResponse.json({
+      since: new URL(request.url).searchParams.get('window') === 'all' ? null : NOW,
+      total: state.usage.total,
+      by_purpose: state.usage.by_purpose,
+      by_application: state.usage.by_application,
+      recent: state.usage.recent,
+    }),
+  ),
   http.put('*/api/survey', async ({ request }) => {
     const { answers } = (await request.json()) as { answers: SurveyAnswers };
     state.survey = answers;

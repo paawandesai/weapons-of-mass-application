@@ -15,6 +15,7 @@ import {
 import type { StructuredLlm } from '@wma/llm';
 import { dedupeKey } from '@wma/shared';
 import { guardedJob } from '../guarded';
+import { meterLlm } from '../llm-usage';
 import { dropAlreadyApplied } from './applied';
 import { generateCompanyList } from './company-list';
 import { discover } from './discover';
@@ -238,10 +239,15 @@ async function claimRun(
 export async function executeDailyRun(
   handle: TenantHandle,
   p: RunParams,
-  deps: DailyRunDeps,
+  rawDeps: DailyRunDeps,
 ): Promise<RunOutcome> {
-  const now = deps.now ?? (() => new Date());
   const { userId } = p;
+  // Every model call of the run (company list, judgments) is metered to this user as discovery.
+  const deps: DailyRunDeps = {
+    ...rawDeps,
+    llm: meterLlm(handle, userId, 'discovery', rawDeps.llm),
+  };
+  const now = deps.now ?? (() => new Date());
   const user = await getUserById(handle, userId);
   const target = user.dailyTarget;
 

@@ -11,6 +11,7 @@ import { ProfileReviewPage } from './pages/ProfileReviewPage';
 import { RunViewPage } from './pages/RunViewPage';
 import { SignInPage } from './pages/SignInPage';
 import { SurveyPage } from './pages/SurveyPage';
+import { UsagePage } from './pages/UsagePage';
 
 export function App() {
   return (
@@ -26,6 +27,7 @@ export function App() {
         <Route path="/demo/inbox" element={<DemoInboxPage />} />
         <Route path="/connections" element={<ConnectionsPage />} />
         <Route path="/survey" element={<SurveyPage />} />
+        <Route path="/usage" element={<UsagePage />} />
         <Route path="/profile/review" element={<ProfileReviewPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

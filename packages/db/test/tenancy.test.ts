@@ -74,6 +74,7 @@ describe('role and RLS configuration (rules 3, 4)', () => {
         'interview_slots',
         'interviews',
         'jobs',
+        'llm_usage',
         'mail_sync_state',
         'outgoing_messages',
         'pending_jobs',

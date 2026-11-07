@@ -17,6 +17,7 @@ import { searchRoutes } from './routes/search';
 import { settingsRoutes } from './routes/settings';
 import { sourcesRoutes } from './routes/sources';
 import { surveyRoutes } from './routes/survey';
+import { usageRoutes } from './routes/usage';
 
 export interface AppOptions {
   db?: Db;
@@ -46,6 +47,7 @@ export function createApp(opts: AppOptions = {}) {
   app.route('/api/runs', runsRoutes);
   app.route('/api/applications', applicationsRoutes);
   app.route('/api/settings', settingsRoutes);
+  app.route('/api/usage', usageRoutes);
   app.route('/api/board', boardRoutes);
   app.route('/api/search', searchRoutes);
   app.route('/api/interviews', interviewsRoutes);

@@ -3,6 +3,9 @@ import type {
   BuildStatus,
   Connection,
   ConnectionKind,
+  LlmUsageResponse,
+  LlmUsageTotals,
+  LlmUsageWindow,
   MeResponse,
   DemoMailboxResponse,
   ProfileDocument,
@@ -288,6 +291,8 @@ export interface NegotiationView {
 export interface ApplicationExtras {
   interviews: InterviewView[];
   negotiation: NegotiationView | null;
+  /** What the agent spent on this application; absent from older servers. */
+  llm_usage?: LlmUsageTotals;
 }
 
 export const api = {
@@ -337,6 +342,8 @@ export const api = {
       { json: { from, to } },
     ),
 
+  usage: (window: LlmUsageWindow) =>
+    request<LlmUsageResponse>('GET', `/api/usage?window=${encodeURIComponent(window)}`),
   survey: () => request<{ answers: SurveyAnswers | null }>('GET', '/api/survey'),
   saveSurvey: (answers: SurveyAnswers) =>
     request<{ version: number }>('PUT', '/api/survey', { json: { answers } }),

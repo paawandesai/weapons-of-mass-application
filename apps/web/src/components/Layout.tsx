@@ -62,6 +62,7 @@ export function Layout() {
           <NavLink to="/connections">Connections</NavLink>
           <NavLink to="/survey">Survey</NavLink>
           <NavLink to="/profile/review">Profile review</NavLink>
+          <NavLink to="/usage">Usage</NavLink>
           {demo && <NavLink to="/demo/inbox">Inbox</NavLink>}
         </nav>
         <span className="spacer" />

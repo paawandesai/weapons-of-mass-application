@@ -484,3 +484,78 @@ describe('profile review', () => {
     expect(await screen.findByText(/No profile has been built yet/)).toBeInTheDocument();
   });
 });
+
+describe('usage', () => {
+  it('shows the spend per activity and per application, and an empty state', async () => {
+    const user = userEvent.setup();
+    const totals = {
+      calls: 3,
+      input_tokens: 12000,
+      output_tokens: 800,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 4000,
+      cost_usd: 0.1234,
+      unpriced_calls: 0,
+    };
+    state.usage = {
+      total: totals,
+      by_purpose: [
+        { ...totals, calls: 2, cost_usd: 0.1, purpose: 'application' },
+        { ...totals, calls: 1, cost_usd: 0.0034, purpose: 'onboarding' },
+      ],
+      by_application: [
+        {
+          ...totals,
+          calls: 2,
+          cost_usd: 0.1,
+          application_id: 'app-1',
+          company: 'Harbor Robotics',
+          title: 'Fleet Engineer',
+          status: 'applied',
+        },
+      ],
+      recent: [
+        {
+          id: 'c1',
+          at: NOW,
+          purpose: 'application',
+          application_id: 'app-1',
+          model: 'claude-opus-5-5',
+          prompt: 'resume-tailor/v1',
+          input_tokens: 6000,
+          output_tokens: 400,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          cost_usd: 0.032,
+          duration_ms: 9000,
+        },
+      ],
+    };
+    renderAt('/usage');
+    expect(await screen.findByText('$0.12')).toBeInTheDocument();
+    const byActivity = screen.getByRole('table', { name: 'Cost by activity' });
+    expect(within(byActivity).getByText('Applications')).toBeInTheDocument();
+    expect(within(byActivity).getByText('Onboarding (profile build)')).toBeInTheDocument();
+    expect(within(byActivity).getByText('$0.0034')).toBeInTheDocument();
+    const byApp = screen.getByRole('table', { name: 'Cost by application' });
+    expect(
+      within(byApp).getByRole('link', { name: 'Fleet Engineer at Harbor Robotics' }),
+    ).toHaveAttribute('href', '/applications/app-1');
+    expect(
+      within(screen.getByRole('table', { name: 'Recent model calls' })).getByText(
+        'resume-tailor/v1',
+      ),
+    ).toBeInTheDocument();
+
+    state.usage = {
+      ...state.usage,
+      total: { ...totals, calls: 0, cost_usd: 0 },
+      by_purpose: [],
+      by_application: [],
+      recent: [],
+    };
+    await user.click(screen.getByRole('button', { name: 'All time' }));
+    expect(await screen.findByText('No model calls in this period.')).toBeInTheDocument();
+    expect(screen.getByText('$0.00')).toBeInTheDocument();
+  });
+});

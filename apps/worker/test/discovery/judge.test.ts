@@ -236,7 +236,15 @@ describe('judgeAll', () => {
         max = Math.max(max, ++active);
         await new Promise((r) => setTimeout(r, 15));
         active--;
-        return { output: applyJson, usage: { input_tokens: 0, output_tokens: 0 } };
+        return {
+          output: applyJson,
+          usage: {
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+          },
+        };
       },
     };
     await judgeAll(

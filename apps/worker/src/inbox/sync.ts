@@ -18,6 +18,7 @@ import {
 import { markRevoked } from '@wma/google';
 import { negotiationKey, NEGOTIATION_JOB, type ProposedSlot } from '@wma/shared';
 import { CalendarUnavailableError } from '../scheduling/offer';
+import { meterLlm } from '../llm-usage';
 import { classifyMessage } from './classify';
 import type { InboxDeps, OfferToSend } from './deps';
 import { isAuthError, type InboxMessage } from './gmail-reader';
@@ -57,8 +58,10 @@ const senderOf = (from: string) => /<([^<>\s]+@[^<>\s]+)>/.exec(from)?.[1] ?? fr
 export async function runMailSync(
   handle: TenantHandle,
   userId: string,
-  deps: InboxDeps,
+  rawDeps: InboxDeps,
 ): Promise<SyncResult> {
+  // Linking and classification calls are metered to this user as inbox work.
+  const deps: InboxDeps = { ...rawDeps, llm: meterLlm(handle, userId, 'inbox', rawDeps.llm) };
   try {
     return await sync(handle, userId, deps);
   } catch (e) {
@@ -213,6 +216,7 @@ export async function processMessage(
     const result = await classifyMessage(deps.llm, msg, {
       companyName: target.companyName,
       jobTitle: target.job.title,
+      applicationId: link.applicationId,
     });
 
     let offerToSend: OfferToSend | null = null;

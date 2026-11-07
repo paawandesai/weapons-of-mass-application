@@ -9,6 +9,8 @@ const MAX_BODY = 8000;
 export interface ClassifyContext {
   companyName: string;
   jobTitle: string;
+  /** For cost attribution of the call; not shown to the model. */
+  applicationId?: string | null;
 }
 
 export interface Classified extends InboxClassification {
@@ -65,6 +67,7 @@ export async function classifyMessage(
         user,
         schema: InboxClassification,
         maxTokens: 2000,
+        applicationId: ctx.applicationId ?? null,
       });
       const parsed = InboxClassification.safeParse(res.output);
       if (!parsed.success) {

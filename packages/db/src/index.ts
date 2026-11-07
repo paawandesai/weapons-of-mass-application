@@ -40,3 +40,4 @@ export * from './seed/catalog';
 export * from './seed/demo';
 export * from './seed/scenarios';
 export * from './repos/board-queries';
+export * from './repos/llm_usage';

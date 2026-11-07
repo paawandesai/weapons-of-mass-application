@@ -1327,3 +1327,33 @@ button.link.card-title:hover {
 .content:has(.board-page) {
   max-width: none;
 }
+
+/* Usage page. */
+.usage-windows {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+button.chip {
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+button.chip.active {
+  background: var(--action);
+  color: var(--bone);
+  border-color: var(--action);
+}
+.usage-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1rem;
+}
+.usage-amount {
+  font-size: 2rem;
+  font-weight: 700;
+}
+.usage-line {
+  margin-top: 0.75rem;
+}

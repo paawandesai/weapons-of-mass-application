@@ -1,4 +1,12 @@
-import type { StructuredLlm, StructuredRequest, StructuredResponse } from './types';
+import type { LlmUsage, StructuredLlm, StructuredRequest, StructuredResponse } from './types';
+
+/** Zero usage: tests never pay. Tests of the ledger inject their own numbers through a responder. */
+const FAKE_USAGE: LlmUsage = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cache_creation_input_tokens: 0,
+  cache_read_input_tokens: 0,
+};
 
 export type FakeResponder = unknown | ((request: StructuredRequest) => unknown);
 
@@ -23,6 +31,6 @@ export class FakeLlm implements StructuredLlm {
         ? (r as (q: StructuredRequest) => unknown)(request as StructuredRequest)
         : r;
     if (value instanceof Error) throw value;
-    return { output: value, usage: { input_tokens: 0, output_tokens: 0 }, stopReason: 'end_turn' };
+    return { output: value, usage: FAKE_USAGE, stopReason: 'end_turn' };
   }
 }

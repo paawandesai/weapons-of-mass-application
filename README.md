@@ -10,6 +10,7 @@ Hackathon MVP of a multi-tenant SaaS.
 |---|---|
 | [docs/PRD.md](docs/PRD.md) | Product requirements: decisions, assumptions, requirements per module, data model, demo plan, acceptance criteria. The behavioral source of truth. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, daily-run and scheduling sequences, boundaries. |
+| [docs/llm-cost.md](docs/llm-cost.md) | LLM cost ledger: what each model call records, the purposes, how jobs are wired, how to read it. |
 | [openspec/](openspec/) | [OpenSpec](https://openspec.dev) specs and changes. Each change has a proposal, delta specs in SHALL / WHEN / THEN form, a design and a task list. |
 
 ## OpenSpec

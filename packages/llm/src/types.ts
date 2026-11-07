@@ -1,9 +1,7 @@
+import type { LlmTokenUsage } from '@wma/shared';
 import type { z } from 'zod';
 
-export interface LlmUsage {
-  input_tokens: number;
-  output_tokens: number;
-}
+export type LlmUsage = LlmTokenUsage;
 
 /** An image sent with the user message (for example a CAPTCHA challenge). */
 export interface StructuredImage {
@@ -27,6 +25,11 @@ export interface StructuredRequest<T = unknown> {
    * (instructions plus a profile) and only `user` varies between calls.
    */
   cacheSystem?: boolean;
+  /**
+   * The application this call is made for, for cost attribution only (see `trackLlm`). Never sent
+   * to the model.
+   */
+  applicationId?: string | null;
 }
 
 export interface StructuredResponse {
@@ -34,6 +37,8 @@ export interface StructuredResponse {
   output: unknown;
   usage: LlmUsage;
   stopReason?: string | null;
+  /** The model id the API reports (what was billed); absent from test doubles. */
+  model?: string;
 }
 
 /** The port the rest of the system codes against. Tests use FakeLlm. */

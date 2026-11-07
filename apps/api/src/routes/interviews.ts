@@ -3,6 +3,7 @@ import {
   getApplication,
   getInterview,
   listInterviewsForApplication,
+  llmUsageForApplication,
   type TenantHandle,
 } from '@wma/db';
 import type { AppEnv } from '../middleware/session';
@@ -55,10 +56,15 @@ export function createInterviewsRoutes(deps: InterviewsDeps = {}): Hono<AppEnv> 
     const application = isUuid(id) ? await getApplication(handle, id) : null;
     if (!application || application.userId !== userId)
       return c.json({ code: 'not_found', message: 'Application not found.' }, 404);
-    const interviews = await listInterviewsForApplication(handle, application.id);
+    const [interviews, llmUsage] = await Promise.all([
+      listInterviewsForApplication(handle, application.id),
+      llmUsageForApplication(handle, application.id),
+    ]);
     return c.json({
       interviews: interviews.map(toInterviewView),
       negotiation: negotiationView(application.negotiation),
+      // What the agent spent on this application so far (tokens and estimated USD).
+      llm_usage: llmUsage,
     });
   });
 

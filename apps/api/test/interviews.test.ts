@@ -277,6 +277,7 @@ describe('card extras', () => {
       feedback: null,
     });
     expect(body.negotiation).toMatchObject({ posted_min: 200000, floor: 180000, error: 'no_data' });
+    expect(body.llm_usage).toMatchObject({ calls: 0, cost_usd: 0 });
     expect((await getApplication(t.handle, application.id))!.status).toBe('offer');
 
     const res = await setup(other).app.request(`/interviews/for-application/${application.id}`);

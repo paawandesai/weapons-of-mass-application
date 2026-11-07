@@ -18,6 +18,7 @@ import {
 import { loadVersionedPrompt } from '../discovery/prompts';
 import { loadProfileDocument, profileForPrompt } from '../discovery/profile-view';
 import { PrepPlan } from './schema';
+import { meterLlm } from '../llm-usage';
 import { gatherResearch } from './research';
 
 export { PREP_PLAN_JOB };
@@ -94,6 +95,7 @@ export async function generatePrepPlan(
   const application = await getApplication(handle, interview.applicationId);
   if (!application) return { status: 'not_found' };
   const base = { userId: input.userId, applicationId: application.id, actor: 'agent' as const };
+  const llm = meterLlm(handle, input.userId, 'interview_prep', deps.llm, application.id);
 
   if (!isActionable(application)) {
     if (interview.prepPlanStatus === 'pending')
@@ -132,7 +134,7 @@ export async function generatePrepPlan(
   let lastError = 'unknown';
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const res = await deps.llm.generateStructured({
+      const res = await llm.generateStructured({
         prompt: 'prep-plan/v1',
         system: prompt.body,
         user,
@@ -156,7 +158,7 @@ export async function generatePrepPlan(
         detail: {
           interview_id: interview.id,
           prompt_version: prompt.id,
-          model: deps.llm.model,
+          model: llm.model,
           attempt,
           board_page_read: research.boardText !== null,
         },
