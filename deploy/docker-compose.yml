@@ -1,0 +1,78 @@
+# Production stack: one host runs everything (PRD "Deployment"). Secrets come from the .env file
+# next to this compose file on the host; scripts/deploy.sh writes it.
+#   docker compose -f deploy/docker-compose.yml --env-file /opt/wma/.env up -d --build
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wma
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: wma
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U wma -d wma']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: { context: .., dockerfile: deploy/Dockerfile, target: api }
+    image: wma-api
+    command: ['pnpm', 'db:migrate']
+    environment:
+      DATABASE_URL: postgres://wma:${POSTGRES_PASSWORD}@postgres:5432/wma
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    image: wma-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: postgres://wma:${POSTGRES_PASSWORD}@postgres:5432/wma
+      FILE_STORE_DIR: /data/files
+    volumes:
+      - files:/data/files
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    build: { context: .., dockerfile: deploy/Dockerfile.worker }
+    image: wma-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://wma:${POSTGRES_PASSWORD}@postgres:5432/wma
+      FILE_STORE_DIR: /data/files
+    volumes:
+      - files:/data/files
+    shm_size: 1g
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    build: { context: .., dockerfile: deploy/Dockerfile, target: web }
+    image: wma-web
+    restart: unless-stopped
+    environment:
+      SITE_HOST: ${SITE_HOST}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  files:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,15 @@
+# SITE_HOST is the public hostname; Caddy obtains and renews its certificate.
+# The four prefixes the web dev proxy forwards (docs/setup/local-dev.md) plus /health go to the
+# API; everything else is the built single-page app.
+{$SITE_HOST} {
+	encode gzip
+	@api path /api/* /auth/* /confirm* /captcha* /health
+	handle @api {
+		reverse_proxy api:3000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

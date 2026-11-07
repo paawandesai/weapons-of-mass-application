@@ -1,0 +1,11 @@
+# Worker image: Playwright's image ships Node 22 and Chromium with its system libraries.
+# Keep the tag in step with the playwright version in apps/worker/package.json.
+FROM mcr.microsoft.com/playwright:v1.64.0-noble
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=true NODE_ENV=production
+RUN corepack enable
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY apps ./apps
+COPY packages ./packages
+RUN pnpm install --frozen-lockfile
+CMD ["pnpm", "--filter", "@wma/worker", "start"]
