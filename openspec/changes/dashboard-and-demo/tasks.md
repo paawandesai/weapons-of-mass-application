@@ -57,7 +57,7 @@
 
 ## 9. Demo rehearsal
 
-- [ ] 9.1 Run the PRD section 12 demo end to end on a fresh database: seed, sign in, trigger a run, watch the run view and board, resolve the CAPTCHA fixture, receive the simulated proposal, confirm a slot, see the card reach Interviewing with calendar event and plan, open the digest and activity log; verify each step within the acceptance timings in PRD section 13 and record the run time in docs/DEMO.md
+- [x] 9.1 Run the PRD section 12 demo end to end on a fresh database: seed, sign in, trigger a run, watch the run view and board, resolve the CAPTCHA fixture, receive the simulated proposal, confirm a slot, see the card reach Interviewing with calendar event and plan, open the digest and activity log; verify each step within the acceptance timings in PRD section 13 and record the run time in docs/DEMO.md
 - [x] 9.2 Run the full test suite and the tenant isolation checks across all new endpoints; verify `pnpm test` and `pnpm test:e2e` pass
 
 ## Workflow follow-up

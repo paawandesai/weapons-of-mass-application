@@ -21,6 +21,8 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   reasons_for_change: 'standard_answers.reasons_for_change',
   current_company: 'work_history.0.employer',
   current_title: 'work_history.0.title',
+  relocation: 'survey.willing_to_relocate',
+  consent: 'standard_answers.consent',
 };
 
 function currentRole(p: ProfileDocument) {
@@ -81,6 +83,11 @@ export function profileValue(
       return nonEmpty(currentRole(p)?.employer);
     case 'current_title':
       return nonEmpty(currentRole(p)?.title);
+    case 'relocation':
+      return p.survey.willing_to_relocate;
+    case 'consent':
+      // Acknowledgements are answered in the affirmative; see docs/design/live-loop-fixes.md rule 10.
+      return true;
   }
 }
 
@@ -220,7 +227,7 @@ export function resolveStandardFields(
   for (const f of fields) {
     if (f.classification !== 'standard') continue;
     const base = { fieldId: f.id, question: f.label };
-    const key = f.standardKey ?? standardKeyFor(f.label);
+    const key = f.standardKey ?? standardKeyFor(f.label, f.type);
     if (!key) {
       out.push(
         f.required

@@ -28,6 +28,8 @@ export interface DiscoverResult {
   inRunDuplicates: number;
   /** HN and LinkedIn postings dropped because the user removed the company. Not part of `fetched`. */
   removedCompany: number;
+  /** Dedupe keys of candidates that came from the seeded source (their `source` is the form's vendor). */
+  seededKeys: Set<string>;
 }
 
 const isBoardSource = (c: Candidate) =>
@@ -79,6 +81,7 @@ export async function discover(deps: DiscoverDeps): Promise<DiscoverResult> {
   const sourceStatus: Record<string, SourceStatusEntry> = {};
   const unique = new Map<string, Candidate>();
   let fetched = 0;
+  const seededKeys = new Set<string>();
   for (const [id, r] of results) {
     const all = r.candidates;
     const kept = all.filter((c) => isBoardSource(c) || !isRemoved(c));
@@ -92,6 +95,7 @@ export async function discover(deps: DiscoverDeps): Promise<DiscoverResult> {
     fetched += kept.length;
     for (const c of kept) {
       const key = dedupeKey(c);
+      if (id === 'seeded') seededKeys.add(key);
       const have = unique.get(key);
       if (!have || (isBoardSource(c) && !isBoardSource(have)))
         unique.set(key, withCompanyId(c, deps.boards));
@@ -103,6 +107,7 @@ export async function discover(deps: DiscoverDeps): Promise<DiscoverResult> {
     fetched,
     inRunDuplicates: fetched - unique.size,
     removedCompany,
+    seededKeys,
   };
 }
 

@@ -22,6 +22,8 @@ export const STANDARD_KEYS = [
   'reasons_for_change',
   'current_company',
   'current_title',
+  'relocation',
+  'consent',
 ] as const;
 export type StandardKey = (typeof STANDARD_KEYS)[number];
 
@@ -54,8 +56,27 @@ const AUTHORIZED_WITHOUT_SPONSORSHIP = new RegExp(
 );
 const NO_SPONSORSHIP_NEEDED = new RegExp(NEGATED_SPONSORSHIP);
 
+// A label that acknowledges / agrees to / accepts / consents to / certifies / confirms a policy,
+// terms, data processing, or the accuracy of the application. Both a verb and a subject are needed
+// in the same label, and an accuracy word alone is not a subject ("confirm your correct legal name"
+// is a name field). Applies to checkbox, radio and select fields only (see CONSENT_TYPES).
+const CONSENT_VERB =
+  '(?:acknowledg\\w*|agree\\w*|accept\\w*|consent\\w*|certif\\w*|confirm\\w*|i have read)';
+const CONSENT_SUBJECT =
+  '(?:privacy (?:policy|notice|statement)|\\bterms\\b|\\bconditions\\b|data (?:processing|protection)|processing of (?:my|your) (?:personal )?data|\\b(?:information|answers?|statements?|application|details)\\b[^.?]*\\b(?:accurate|true|correct|complete|truthful)\\b|\\b(?:accuracy|truth\\w*)\\b[^.?]*\\b(?:information|answers?|statements?|application)\\b)';
+const CONSENT = new RegExp(`^(?=.*\\b${CONSENT_VERB}\\b)(?=.*${CONSENT_SUBJECT})`);
+const CONSENT_TYPES: ReadonlySet<string> = new Set(['checkbox', 'radio', 'select']);
+
+// Relocation willingness: a relocation word with a willingness word, or a bare "Relocation?" label.
+// Assistance / package / cost questions are not willingness and fall to the remaining rules.
+const RELOCATION_WILLINGNESS = new RegExp(
+  '^(?!.*\\b(?:assist\\w*|package|support|reimburs\\w*|bonus|costs?|expenses?)\\b)' +
+    '(?:(?=.*\\brelocat)(?=.*\\b(?:willing\\w*|open|able|prepared|ready|consider\\w*|(?:would|can|could|will) you (?:\\w+ )?relocate)\\b)|(?:relocation|relocate|relocating)\\s*\\??$)',
+);
+
 const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
-  // Order matters: reasons for change and sponsorship before the generic patterns.
+  // Order matters: consent, reasons for change and sponsorship before the generic patterns.
+  ['consent', CONSENT],
   [
     'reasons_for_change',
     /reasons? for (leaving|changing|change|looking|seeking)|why (are you|do you want to) (leaving|leave|looking|change|move)|why (are you )?(looking|leaving)/,
@@ -67,6 +88,7 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
     'work_authorization',
     /(authori[sz]ed|eligible|right|permitted|legally able) to work|work authori[sz]ation|work permit|employment eligibility/,
   ],
+  ['relocation', RELOCATION_WILLINGNESS],
   ['notice_period', /notice period/],
   [
     'start_date',
@@ -95,9 +117,14 @@ const FREE_TEXT =
   /\b(why|describe|tell us|tell me|explain|what (interests|excites|motivates|attracts)|how did you (hear|find)|cover letter|additional information|anything else|share|experience (with|in)|have you (ever )?(worked|used|built)|years of|what is your (favorite|biggest|greatest))\b/;
 
 /** Standard-field key for a label, or null (rules only; no LLM). */
-export function standardKeyFor(label: string): StandardKey | null {
+export function standardKeyFor(label: string, type?: string): StandardKey | null {
   const l = norm(label);
-  for (const [key, re] of STANDARD_RULES) if (re.test(l)) return key;
+  for (const [key, re] of STANDARD_RULES) {
+    // Consent is an acknowledgement control; a text box is never one. Without a type (label-only
+    // callers) the label alone decides.
+    if (key === 'consent' && type !== undefined && !CONSENT_TYPES.has(type)) continue;
+    if (re.test(l)) return key;
+  }
   return null;
 }
 
@@ -120,7 +147,7 @@ export function classifyByRules(
       ? { classification: 'resume' }
       : { classification: 'free-text' };
   }
-  const key = standardKeyFor(f.label);
+  const key = standardKeyFor(f.label, f.type);
   if (key) return { classification: 'standard', standardKey: key };
   if (FREE_TEXT.test(l) || f.type === 'textarea') return { classification: 'free-text' };
   return null;

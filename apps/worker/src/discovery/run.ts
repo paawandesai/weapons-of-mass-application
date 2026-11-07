@@ -1,5 +1,6 @@
 import {
   activity,
+  getCurrentTenant,
   getUserById,
   insertRun,
   insertRunCandidates,
@@ -23,6 +24,7 @@ import { judgeAll, type Judged, type JudgeResult } from './judge';
 import { loadProfileDocument } from './profile-view';
 import { rank, selectTopN } from './rank';
 import type { BoardRef, RemovedCompany, SourceAdapter } from './types';
+import type { Candidate } from '@wma/shared';
 
 /** Runs left in `running` longer than this belong to a dead worker and are replaced. */
 export const STALE_RUN_MS = 60 * 60 * 1000;
@@ -47,6 +49,35 @@ export interface DailyRunDeps {
   now?: () => Date;
   adapters?: SourceAdapter[];
   judgeConcurrency?: number;
+  /** Most postings one run judges (`JUDGE_CAP_PER_RUN`). */
+  judgeCap?: number;
+}
+
+export const DEFAULT_JUDGE_CAP = 120;
+
+/**
+ * The postings a run may judge: seeded source first (the seeded adapter reports candidates under the
+ * form's vendor, so the caller says which are seeded), then newest `postedAt` first, undated last,
+ * ties in the order the sources returned them. The first `cap` are kept.
+ */
+export function applyJudgeCap(
+  candidates: Candidate[],
+  cap: number,
+  isSeeded: (c: Candidate) => boolean = () => false,
+): { kept: Candidate[]; dropped: number } {
+  const time = (c: Candidate) => (c.postedAt ? new Date(c.postedAt).getTime() : Number.NaN);
+  const ordered = [...candidates].sort((a, b) => {
+    const sa = isSeeded(a) ? 0 : 1;
+    const sb = isSeeded(b) ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    const ta = time(a);
+    const tb = time(b);
+    const na = Number.isNaN(ta);
+    const nb = Number.isNaN(tb);
+    if (na || nb) return na === nb ? 0 : na ? 1 : -1;
+    return tb - ta;
+  });
+  return { kept: ordered.slice(0, cap), dropped: Math.max(0, ordered.length - cap) };
 }
 
 export interface RunParams {
@@ -70,6 +101,8 @@ export interface RunCounts {
   skipped: number;
   approved: number;
   unjudged: number;
+  /** Postings beyond the per-run judge cap: not judged, no `run_candidates` row. */
+  over_cap: number;
   deadline_passed: number;
   selected: number;
   over_target: number;
@@ -89,6 +122,7 @@ const emptyCounts = (): RunCounts => ({
   skipped: 0,
   approved: 0,
   unjudged: 0,
+  over_cap: 0,
   deadline_passed: 0,
   selected: 0,
   over_target: 0,
@@ -218,8 +252,18 @@ export async function executeDailyRun(
     const gated = await guardedJob('daily-run', async ({ approvedVersion }) => {
       const profile = await loadProfileDocument(handle, userId, approvedVersion);
 
+      const isDemo = (await getCurrentTenant(handle)).demo;
+
       await setStep('companies');
-      if ((await listUserCompanies(handle, userId, { includeRemoved: true })).length === 0) {
+      if (isDemo) {
+        // The seeded companies are the demo's company list; nothing is generated.
+        await activity.logActivity(handle, {
+          userId,
+          actor: 'agent',
+          action: 'company_list_skipped',
+          detail: { reason: 'demo_tenant' },
+        });
+      } else if ((await listUserCompanies(handle, userId, { includeRemoved: true })).length === 0) {
         try {
           await generateCompanyList(handle, userId, { llm: deps.llm, http: deps.http, now });
         } catch {
@@ -269,9 +313,21 @@ export async function executeDailyRun(
       const { kept, dropped } = await dropAlreadyApplied(handle, userId, found.candidates);
       counts.already_applied = dropped.length;
 
+      const cap = deps.judgeCap ?? DEFAULT_JUDGE_CAP;
+      const capped = applyJudgeCap(kept, cap, (c) => found.seededKeys.has(dedupeKey(c)));
+      counts.over_cap = capped.dropped;
+      if (capped.dropped > 0) {
+        await activity.logActivity(handle, {
+          userId,
+          actor: 'agent',
+          action: 'judge_capped',
+          detail: { run_id: run.id, cap, dropped: capped.dropped },
+        });
+      }
+
       await setStep('judge', { counts });
       const results: JudgeResult[] = await judgeAll(
-        kept,
+        capped.kept,
         { llm: deps.llm, profile, today: p.date },
         deps.judgeConcurrency,
       );

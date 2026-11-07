@@ -54,13 +54,22 @@ Run status (`runs.status`):
 
 ## Counts
 
-`runs.counts` is `{fetched, deduped, already_applied, judged, approved, unjudged, selected}` plus `in_run_duplicates`, `skipped`, `deadline_passed`, `over_target`, `requeued`, `removed_company` and `hand_off_conflicts`. `removed_company` counts HN and LinkedIn postings dropped because the user removed that company; they are not part of `fetched`. `hand_off_conflicts` counts selected postings that another run (for a different date) had already turned into an application. They add up:
+`runs.counts` is `{fetched, deduped, already_applied, judged, approved, unjudged, selected}` plus `in_run_duplicates`, `skipped`, `over_cap`, `deadline_passed`, `over_target`, `requeued`, `removed_company` and `hand_off_conflicts`. `over_cap` counts postings left unjudged because the run reached its judge cap (below); they get no `run_candidates` row. `removed_company` counts HN and LinkedIn postings dropped because the user removed that company; they are not part of `fetched`. `hand_off_conflicts` counts selected postings that another run (for a different date) had already turned into an application. They add up:
 
 - `fetched = deduped + in_run_duplicates`
-- `fetched = in_run_duplicates + already_applied + unjudged + judged`
+- `deduped = already_applied + over_cap + unjudged + judged`
+- `fetched = in_run_duplicates + already_applied + over_cap + unjudged + judged`
 - `judged = skipped + approved`
 
 Every judged and unjudged candidate has a `run_candidates` row (`judged + unjudged` rows). `exclusion_reason` is one of `unjudged`, `not_approved`, `deadline_passed`, `over_target` or `already_applied` (selected, but another run's hand-off got the posting first; its `selected` flag is cleared). A selected row has none, and `counts.selected` always equals the number of selected rows and of applications created by the run.
+
+## Judge cap
+
+Every run judges at most `JUDGE_CAP_PER_RUN` postings (default 120; a value that is not an integer of 1 or more falls back to 120 and is logged once when the worker starts). The cap applies after already-applied postings are dropped and before judging. Postings are ordered seeded source first, then newest `postedAt` first, undated last, ties in the order the sources returned them; the first `JUDGE_CAP_PER_RUN` are judged and the rest are counted in `over_cap`. When any are dropped the run writes one `judge_capped` activity entry `{run_id, cap, dropped}`.
+
+## Demo tenant
+
+A tenant flagged `demo` searches only its seeded postings (no board, HN or LinkedIn source) and never generates a company list: the `companies` step writes `company_list_skipped` with reason `demo_tenant` instead. Judging, ranking and hand-off are unchanged.
 
 ## Hand-off contract
 
@@ -80,7 +89,7 @@ The judgment (including facts such as pay and deadline) stays readable to the su
 
 ## Activity log
 
-`run_started`, `handed_off`, `run_finished` (status and counts), or `run_failed` (step and error). Also `profile_not_approved`, `run_skipped`, `company_list_generated`, `company_list_skipped`, `company_list_failed`, `handoff_enqueue_failed`, and the user actions `company_added` and `company_removed`.
+`run_started`, `handed_off`, `run_finished` (status and counts), or `run_failed` (step and error). Also `profile_not_approved`, `run_skipped`, `company_list_generated`, `company_list_skipped` (reason `profile_not_approved`, or `demo_tenant` for a demo tenant), `judge_capped`, `company_list_failed`, `handoff_enqueue_failed`, and the user actions `company_added` and `company_removed`.
 
 ## API
 

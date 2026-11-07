@@ -3,7 +3,7 @@ import { deleteRunsBefore, type Db } from '@wma/db';
 import { createLlmClient, type StructuredLlm } from '@wma/llm';
 import { bossSubmitQueue, type SubmitQueue } from '../discovery/handoff';
 import type { Http } from '@wma/discovery';
-import { executeDailyRun, type DailyRunDeps } from '../discovery/run';
+import { DEFAULT_JUDGE_CAP, executeDailyRun, type DailyRunDeps } from '../discovery/run';
 import { utcDate } from '../discovery/text';
 import { adaptersFor } from '../discovery/adapters';
 import type { SourceAdapter } from '../discovery/types';
@@ -14,6 +14,17 @@ export const DAILY_RUN_TICK_JOB = 'daily-run-tick';
 /** Nightly: deletes runs older than RUN_RETENTION_DAYS. */
 export const DAILY_RUN_CLEANUP_JOB = 'daily-run-cleanup';
 export const RUN_RETENTION_DAYS = 7;
+
+/** `JUDGE_CAP_PER_RUN`: an integer >= 1, else the default (the caller logs the fallback). */
+export function parseJudgeCap(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return DEFAULT_JUDGE_CAP;
+  const n = /^\d+$/.test(value.trim()) ? Number(value.trim()) : Number.NaN;
+  if (Number.isSafeInteger(n) && n >= 1) return n;
+  console.warn(
+    `JUDGE_CAP_PER_RUN=${JSON.stringify(value)} is not an integer >= 1; using ${DEFAULT_JUDGE_CAP}`,
+  );
+  return DEFAULT_JUDGE_CAP;
+}
 
 export interface DailyRunJobData {
   tenantId: string;
@@ -123,6 +134,7 @@ export async function registerDailyRun(
   options: DailyRunRegistration = {},
 ): Promise<void> {
   const now = options.now ?? (() => new Date());
+  const judgeCap = parseJudgeCap(process.env.JUDGE_CAP_PER_RUN);
   const roster = options.roster ?? dbRoster(db);
   const queue = options.queue ?? bossSubmitQueue(boss);
   let llm = options.llm;
@@ -132,6 +144,7 @@ export async function registerDailyRun(
     http: options.http,
     now,
     adapters,
+    judgeCap,
   });
 
   await boss.createQueue(DAILY_RUN_JOB, { policy: 'exclusive' });
@@ -142,7 +155,7 @@ export async function registerDailyRun(
     for (const job of jobs) {
       const { tenantId, userId, date, trigger } = job.data;
       const handle = db.forTenant(tenantId);
-      // The demo tenant also searches its seeded postings; an explicit adapter list wins (tests).
+      // The demo tenant searches only its seeded postings; an explicit adapter list wins (tests).
       const adapters = options.adapters ?? (await adaptersFor(handle));
       await executeDailyRun(
         handle,

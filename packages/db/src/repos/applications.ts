@@ -137,7 +137,9 @@ export async function lockForAttempt(
       .select()
       .from(applications)
       .where(and(eq(applications.tenantId, handle.tenantId), eq(applications.id, id)))
-      .for('update', { skipLocked: true }),
+      // NO KEY UPDATE: a concurrent duplicate's activity-log insert holds a KEY SHARE lock on this row
+      // (foreign key); FOR UPDATE would skip the row and drop a legitimate attempt as a duplicate.
+      .for('no key update', { skipLocked: true }),
   );
   return rows[0] ?? null;
 }

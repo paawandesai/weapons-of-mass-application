@@ -27,6 +27,13 @@ function profileForModel(p: ProfileDocument) {
     projects: p.projects.map(({ sources: _s, ...x }) => x),
     skills: p.skills,
     education: p.education.map(({ sources: _s, ...x }) => x),
+    preferences: p.preferences,
+    // Never salary_floor or family_constraints.
+    survey: {
+      willing_to_relocate: p.survey.willing_to_relocate,
+      career_direction: p.survey.career_direction,
+      work_life_balance: p.survey.work_life_balance,
+    },
   };
 }
 

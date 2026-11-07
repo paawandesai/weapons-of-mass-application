@@ -43,7 +43,7 @@ pnpm test
 
 ```bash
 pnpm --filter @wma/api dev      # http://localhost:3000/health
-pnpm --filter @wma/web dev      # http://localhost:5173
+pnpm --filter @wma/web dev      # http://localhost:5173 (proxies /api, /auth, /confirm and /captcha to the API; a production reverse proxy must route the same four prefixes)
 pnpm --filter @wma/worker dev
 ```
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve as resolve_ } from 'node:path';
 import { FakeLlm } from '@wma/llm';
 import { describe, expect, it } from 'vitest';
 import {
@@ -597,5 +599,157 @@ describe('grouped checkboxes resolve to option arrays', () => {
     const lone = field({ label: 'I agree to the terms', type: 'checkbox', required: true });
     const llm = scripted({ 'answer-form-question/v1': [grounded('Yes')] });
     expect(await resolveFreeText(makeCtx(llm), lone)).toMatchObject({ value: true });
+  });
+});
+
+describe('relocation and consent (live-loop rules 9-12)', () => {
+  const YN = ['Yes', 'No'];
+  const std = (label: string, over: Partial<FieldDescriptor> = {}) =>
+    field({ label, classification: 'standard', required: true, ...over });
+  const withSurvey = (willing: boolean | null) => ({
+    ...PROFILE,
+    survey: { ...PROFILE.survey, willing_to_relocate: willing },
+  });
+  const resolve = (profile: typeof PROFILE, f: FieldDescriptor) =>
+    resolveStandardFields({ profile }, [f])[0];
+
+  it('classifies the three fixture labels (rules 9, 10)', async () => {
+    expect(standardKeyFor('Are you open to relocation?')).toBe('relocation');
+    expect(standardKeyFor('I acknowledge the privacy policy')).toBe('consent');
+    const out = await classifyFields([
+      field({ label: 'Are you open to relocation?', type: 'radio', options: YN }),
+      field({ label: 'I acknowledge the privacy policy', type: 'checkbox' }),
+      field({
+        label: 'Which of these have you used in production?',
+        type: 'checkbox',
+        options: ['Kubernetes', 'Terraform', 'Postgres'],
+      }),
+    ]);
+    expect(out.map((f) => f.classification)).toEqual(['standard', 'standard', 'free-text']);
+    expect(out[0]?.standardKey).toBe('relocation');
+    expect(out[1]?.standardKey).toBe('consent');
+  });
+
+  it('recognises the consent wordings', () => {
+    for (const l of [
+      'I agree to the Terms and Conditions',
+      'I consent to the processing of my personal data',
+      'I certify that the information in this application is true and accurate',
+      'Please confirm you accept our privacy notice',
+    ]) {
+      expect(standardKeyFor(l), l).toBe('consent');
+    }
+    expect(standardKeyFor('Are you authorized to work in the US?')).toBe('work_authorization');
+  });
+
+  it('answers relocation from the survey against a radio and a select (rule 9)', () => {
+    for (const type of ['radio', 'select'] as const) {
+      const f = std('Are you open to relocation?', { type, options: YN });
+      expect(resolve(withSurvey(false), f)).toMatchObject({ status: 'filled', value: 'No' });
+      expect(resolve(withSurvey(true), f)).toMatchObject({ status: 'filled', value: 'Yes' });
+      expect(resolve(withSurvey(null), f)).toEqual({
+        fieldId: f.id,
+        question: f.label,
+        status: 'missing-profile-field',
+        profileField: 'survey.willing_to_relocate',
+      });
+    }
+  });
+
+  it('maps relocation onto Yes/No/Depends options by meaning, and parks null (rule 9)', () => {
+    const f = std('Would you relocate?', { type: 'radio', options: ['Yes', 'No', 'Depends'] });
+    expect(resolve(withSurvey(true), f)).toMatchObject({ value: 'Yes' });
+    expect(resolve(withSurvey(null), f)).toMatchObject({ status: 'missing-profile-field' });
+  });
+
+  it('answers consent affirmatively on a lone checkbox, a Yes/No select and a text box (rule 10)', () => {
+    const label = 'I acknowledge the privacy policy';
+    expect(resolve(PROFILE, std(label, { type: 'checkbox' }))).toMatchObject({
+      status: 'filled',
+      value: true,
+      source: 'profile',
+    });
+    expect(resolve(PROFILE, std(label, { type: 'select', options: ['No', 'Yes'] }))).toMatchObject({
+      value: 'Yes',
+    });
+    // A text box is never a consent control: it is not classified as consent at all.
+    expect(standardKeyFor(label, 'text')).toBeNull();
+    expect(standardKeyFor(label, 'checkbox')).toBe('consent');
+  });
+
+  it('narrowed consent: verb plus subject, checkbox/radio/select only (review P2)', async () => {
+    expect(standardKeyFor('Please confirm your correct legal name', 'text')).toBe('full_name');
+    expect(standardKeyFor('Please confirm your correct legal name')).toBe('full_name');
+    expect(standardKeyFor('I confirm the information provided is accurate', 'checkbox')).toBe(
+      'consent',
+    );
+    expect(standardKeyFor('I agree to the privacy policy', 'text')).not.toBe('consent');
+    const out = await classifyFields([
+      field({ label: 'Please confirm your correct legal name', type: 'text' }),
+      field({ label: 'I confirm the information provided is accurate', type: 'checkbox' }),
+      field({ label: 'I agree to the privacy policy', type: 'text' }),
+    ]);
+    expect(out[0]).toMatchObject({ classification: 'standard', standardKey: 'full_name' });
+    expect(out[1]).toMatchObject({ classification: 'standard', standardKey: 'consent' });
+    expect(out[2]?.standardKey).not.toBe('consent');
+  });
+
+  it('narrowed relocation: willingness questions only (review P2)', async () => {
+    expect(standardKeyFor('Are you willing to relocate?')).toBe('relocation');
+    expect(standardKeyFor('Open to relocation?')).toBe('relocation');
+    expect(standardKeyFor('Relocation')).toBe('relocation');
+    expect(standardKeyFor('Do you require relocation assistance?')).not.toBe('relocation');
+    expect(standardKeyFor('Is a relocation package required?')).not.toBe('relocation');
+    const [f] = await classifyFields([
+      field({ label: 'Do you require relocation assistance?', type: 'radio', options: YN }),
+    ]);
+    expect(f?.standardKey).toBeUndefined();
+    expect(f?.classification).toBe('free-text');
+  });
+
+  it('a self-identification label that says "acknowledge" stays self-identification (rule 10)', async () => {
+    const [a, b] = await classifyFields([
+      field({
+        label: 'I acknowledge the voluntary gender self-identification notice',
+        type: 'checkbox',
+      }),
+      field({
+        label: 'I accept the privacy policy',
+        type: 'select',
+        options: ['I agree', 'I decline to self-identify'],
+      }),
+    ]);
+    expect(a?.classification).toBe('self-identification');
+    expect(b?.classification).toBe('self-identification');
+  });
+
+  it('shows the model preferences and non-financial survey answers, never pay or family (rule 11)', async () => {
+    const llm = scripted({
+      'answer-form-question/v1': [
+        { answer: 'ok', grounded: true, unanswerable: false, ungrounded_claims: [] },
+      ],
+    });
+    await resolveFreeText(makeCtx(llm), field({ label: 'Where do you want to work?' }));
+    const user = llm.calls[0]?.user ?? '';
+    const profileBlock = /<profile>([\s\S]*?)<\/profile>/.exec(user)?.[1] ?? '';
+    expect(profileBlock).toContain('"preferences"');
+    expect(profileBlock).toContain('"target_titles"');
+    expect(profileBlock).toContain('"willing_to_relocate"');
+    expect(profileBlock).toContain('"career_direction"');
+    expect(profileBlock).toContain('"work_life_balance"');
+    expect(profileBlock).not.toContain('salary_floor');
+    expect(profileBlock).not.toContain('family_constraints');
+  });
+
+  it('the prompt carries the checkbox-group rule (rule 12)', () => {
+    const text = readFileSync(
+      resolve_(__dirname, '../../../../packages/llm/prompts/answer-form-question/v1.md'),
+      'utf8',
+    );
+    expect(text).toMatch(/checkbox group/);
+    expect(text).toMatch(/lists every option the profile supports/);
+    expect(text).toMatch(/qualifier \(in production, professionally/);
+    expect(text).toMatch(/Postgres is PostgreSQL/);
+    expect(text).toMatch(/`select` or `radio`, `answer` must be exactly one/);
   });
 });

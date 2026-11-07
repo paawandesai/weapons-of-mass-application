@@ -132,3 +132,11 @@ The demo mailbox and calendar stand in for what a real deployment does with Goog
   `X-WMA-Simulated: 1` header. The inbox sync, booking and reminder code is the same code.
 - Leave `DEMO_LOGIN_TOKEN` unset and `NODE_ENV=production` on any real deployment; both disable
   demo sign-in.
+
+## Measured run (2026-11-07)
+
+Real model, fresh database, plain seed, fixture forms: the run judged the 12 postings in 10 s, the
+10 approved applications were applied 126 s after the run ended (CAPTCHA fixture included), the
+simulated recruiter's proposals and the slot-offer emails arrived within three minutes, confirming a
+slot booked the interview in 2 s, and the prep plan was ready 30 s later. The acceptance timings in
+PRD section 13 are met with room to spare.

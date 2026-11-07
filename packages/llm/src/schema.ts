@@ -14,6 +14,7 @@ const STRIPPED = new Set([
   'exclusiveMinimum',
   'exclusiveMaximum',
   'multipleOf',
+  'maxItems',
   'default',
 ]);
 

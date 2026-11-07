@@ -25,11 +25,11 @@ export const defaultAdapters = (): SourceAdapter[] => [
   linkedinAdapter,
 ];
 
-/** The adapters for one tenant's run: the defaults, plus the seeded postings for the demo tenant. */
+/** The adapters for one tenant's run: only the seeded postings for the demo tenant, else the defaults. */
 export async function adaptersFor(
   handle: TenantHandle,
   base: SourceAdapter[] = defaultAdapters(),
 ): Promise<SourceAdapter[]> {
   const tenant = await getCurrentTenant(handle);
-  return tenant.demo ? [...base, createSeededAdapter(handle)] : base;
+  return tenant.demo ? [createSeededAdapter(handle)] : base;
 }

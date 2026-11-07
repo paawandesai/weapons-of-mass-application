@@ -26,11 +26,11 @@ describe('seeded discovery source', () => {
 
   it('is registered for a demo tenant and for no other', async () => {
     const demo = await adaptersFor(env.handle);
-    expect(demo.map((a) => a.id)).toContain('seeded');
-    expect(demo.length).toBe(defaultAdapters().length + 1);
+    expect(demo.map((a) => a.id)).toEqual(['seeded']);
 
     const real = await env.makeTenant();
     const plain = await adaptersFor(real.handle);
+    expect(plain.map((a) => a.id)).toEqual(defaultAdapters().map((a) => a.id));
     expect(plain.map((a) => a.id)).not.toContain('seeded');
     // Even called directly it only ever sees its own tenant's rows.
     expect((await createSeededAdapter(real.handle).fetch(ctx)).candidates).toEqual([]);

@@ -13,5 +13,17 @@ describe('submission prompts', () => {
     expect(loadPrompt('tailor-resume', 'v1')).toMatch(/Never add degrees or certifications/);
     expect(loadPrompt('answer-form-question', 'v1')).toMatch(/compensation, salary or pay/);
     expect(loadPrompt('answer-form-question', 'v1')).toMatch(/race, ethnicity, gender/);
+    expect(loadPrompt('answer-form-question', 'v1')).toMatch(
+      /lists every option the profile supports/,
+    );
+    expect(loadPrompt('answer-form-question', 'v1')).toMatch(
+      /"have you used", "are you familiar with"/,
+    );
+    expect(loadPrompt('answer-form-question', 'v1')).toMatch(
+      /qualifier \(in production, professionally, N\+ years/,
+    );
+    expect(loadPrompt('answer-form-question', 'v1')).toMatch(
+      /leave the option out\. When no option is supported, the question is unanswerable/,
+    );
   });
 });
