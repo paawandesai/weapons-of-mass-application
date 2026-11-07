@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CurrentRun, RunCandidateView, RunSummary } from '../src/api';
@@ -192,5 +192,65 @@ describe('run view', () => {
     );
     render(<RunViewPage />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+  });
+
+  it('posts to start a run and then shows the queued run', async () => {
+    let started = false;
+    let posts = 0;
+    server.use(
+      http.get('*/api/runs/current', () =>
+        HttpResponse.json(
+          started
+            ? page({ run: run({ step: 'queued', counts: {} }) })
+            : page({ run: null, next_run_at: '2026-11-08T08:00:00.000Z' }),
+        ),
+      ),
+      http.post('*/api/runs', () => {
+        posts++;
+        started = true;
+        return HttpResponse.json(
+          { run: run({ step: 'queued', counts: {} }), candidates: [] },
+          { status: 202 },
+        );
+      }),
+    );
+    render(<RunViewPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Run today' }));
+    expect(await screen.findByText('Running')).toBeInTheDocument();
+    expect(posts).toBe(1);
+    expect(screen.getByRole('button', { name: 'Running…' })).toBeDisabled();
+  });
+
+  it('disables the button while a run is running', async () => {
+    server.use(http.get('*/api/runs/current', () => HttpResponse.json(page({}))));
+    render(<RunViewPage />);
+    expect(await screen.findByRole('button', { name: 'Running…' })).toBeDisabled();
+  });
+
+  it('says the run already happened when today has a finished run', async () => {
+    const finished = run({ status: 'finished', counts: { judged: 1, approved: 1, selected: 1 } });
+    server.use(
+      http.get('*/api/runs/current', () => HttpResponse.json(page({ run: finished }))),
+      http.post('*/api/runs', () => HttpResponse.json({ run: finished, candidates: [] })),
+    );
+    render(<RunViewPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Run today' }));
+    expect(await screen.findByText("Today's run already happened.")).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows the error banner when the run cannot be started', async () => {
+    server.use(
+      http.get('*/api/runs/current', () => HttpResponse.json(page({ run: null }))),
+      http.post('*/api/runs', () =>
+        HttpResponse.json(
+          { code: 'dispatch_failed', message: 'Try again in a moment.' },
+          { status: 503 },
+        ),
+      ),
+    );
+    render(<RunViewPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Run today' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Try again in a moment.');
   });
 });

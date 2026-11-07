@@ -344,6 +344,7 @@ export const api = {
       'GET',
       cursor ? `/api/runs/current?cursor=${encodeURIComponent(cursor)}` : '/api/runs/current',
     ),
+  startRun: () => request<{ run: RunSummary; candidates: RunCandidateView[] }>('POST', '/api/runs'),
   interview: (id: string) =>
     request<{ interview: InterviewView }>('GET', `/api/interviews/${encodeURIComponent(id)}`),
   applicationExtras: (applicationId: string) =>

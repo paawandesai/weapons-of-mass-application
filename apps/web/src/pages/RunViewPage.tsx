@@ -37,6 +37,9 @@ export function RunViewPage() {
   const [error, setError] = useState<string | null>(null);
   const cursor = useRef<string | null>(null);
   const runId = useRef<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
   const runningRef = useRef(false);
   const running = run?.status === 'running';
 
@@ -85,13 +88,37 @@ export function RunViewPage() {
       live = false;
       if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [reload]);
+
+  const startRun = async () => {
+    setStarting(true);
+    setNotice(null);
+    try {
+      const r = await api.startRun();
+      if (r.run.status === 'finished' || r.run.status === 'short_day') {
+        setNotice("Today's run already happened.");
+      }
+      setError(null);
+      // Restart the load/poll loop so a queued run is picked up and followed to the end.
+      setReload((n) => n + 1);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setStarting(false);
+    }
+  };
 
   if (!loaded) return <p className="muted">Loading…</p>;
 
   return (
     <section>
-      <h1>Runs</h1>
+      <div className="row">
+        <h1 className="grow">Runs</h1>
+        <button type="button" onClick={() => void startRun()} disabled={running || starting}>
+          {running ? 'Running…' : 'Run today'}
+        </button>
+      </div>
+      {notice ? <p className="muted">{notice}</p> : null}
       {error ? (
         <p role="alert" className="banner error">
           {error}
