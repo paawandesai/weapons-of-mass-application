@@ -10,6 +10,7 @@ import {
   setSessionCookie,
   type AppEnv,
 } from '../middleware/session';
+import { demoAuthRoutes } from './demo';
 import { syncGoogleConnections } from './connections';
 import { endSession, startSession } from './sessions';
 
@@ -34,6 +35,8 @@ export function webOrigin(): string {
 const fail = (c: Context, code: string) => c.redirect(`${webOrigin()}/signin?error=${code}`, 302);
 
 export const authRoutes = new Hono<AppEnv>();
+
+authRoutes.route('/demo', demoAuthRoutes);
 
 authRoutes.get('/google/start', async (c) => {
   const state = randomBytes(24).toString('base64url');

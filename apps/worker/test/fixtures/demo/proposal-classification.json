@@ -1,0 +1,25 @@
+{
+  "classification": "interview",
+  "compensation_flag": false,
+  "booking_link": null,
+  "proposed_slots": [
+    {
+      "start": "{{start1}}",
+      "end": "{{end1}}",
+      "tz_hint": "America/Los_Angeles",
+      "ambiguous": false
+    },
+    {
+      "start": "{{start2}}",
+      "end": "{{end2}}",
+      "tz_hint": "America/Los_Angeles",
+      "ambiguous": false
+    },
+    {
+      "start": "{{start3}}",
+      "end": "{{end3}}",
+      "tz_hint": "America/Los_Angeles",
+      "ambiguous": false
+    }
+  ]
+}

@@ -4,6 +4,14 @@ import {
   incrementCaptchaAttempt,
   insertApplication,
   insertCaptchaRequest,
+  insertDemoMessage,
+  insertInterview,
+  insertInterviewSlot,
+  insertOutgoingMessage,
+  insertRun,
+  insertRunCandidates,
+  updateInterview,
+  upsertEmailThread,
   updateApplication,
   updateCaptchaRequest,
   upsertCompany,
@@ -29,6 +37,16 @@ afterAll(async () => {
 });
 
 const app = (t: TestTenant) => appFor(t, { '/applications': applicationsRoutes });
+
+/** The demo flag has no application write path; the owner role flags the tenant for a test. */
+async function setDemo(t: TestTenant, demo: boolean) {
+  const { default: pg } = await import('pg');
+  const owner = new pg.Pool({
+    connectionString: process.env.TEST_DATABASE_URL ?? 'postgres://wma:wma@localhost:5432/wma_test',
+  });
+  await owner.query('update tenants set demo = $2 where id = $1', [t.id, demo]);
+  await owner.end();
+}
 let n = 0;
 
 async function seed(t: TestTenant, title: string) {
@@ -183,5 +201,198 @@ describe('GET /applications/:id', () => {
     expect(
       (await app(t).request('/applications/00000000-0000-4000-8000-000000000000')).status,
     ).toBe(404);
+  });
+});
+
+describe('GET /applications/:id sections', () => {
+  it('returns decision, threads, interviews with slot state, prep plan, feedback and negotiation', async () => {
+    const t = await env.makeTenant();
+    const co = await upsertCompany(t.handle, {
+      name: 'Acme Robotics',
+      ats: 'greenhouse',
+      boardSlug: slug,
+      createdBy: 'llm',
+    });
+    const { job } = await upsertJob(t.handle, {
+      companyId: co.id,
+      ats: 'greenhouse',
+      atsJobId: `detail-${Date.now()}`,
+      title: 'Principal Engineer',
+      url: `https://boards.greenhouse.io/${slug}/jobs/detail-${Date.now()}`,
+      locationMode: 'hybrid',
+      payMin: 180000,
+      payMax: 220000,
+      currency: 'USD',
+    });
+    const { run } = await insertRun(t.handle, { userId: t.userId, date: '2026-11-05', targetN: 5 });
+    await insertRunCandidates(t.handle, run.id, [
+      {
+        title: job.title,
+        companyName: 'Acme Robotics',
+        url: job.url,
+        ats: 'greenhouse',
+        atsJobId: job.atsJobId,
+        rank: 1,
+        selected: true,
+        judgment: { apply: true, rationale: 'Strong platform match', fit: 5, seniority: 'staff' },
+      },
+    ]);
+    const { application } = await insertApplication(t.handle, {
+      userId: t.userId,
+      jobId: job.id,
+      runId: run.id,
+      status: 'offer',
+    });
+    await updateApplication(t.handle, application.id, {
+      negotiation: {
+        posted_min: 180000,
+        posted_max: 220000,
+        floor: 170000,
+        comparables: [],
+        error: null,
+      },
+    } as never);
+    const thread = await upsertEmailThread(t.handle, {
+      userId: t.userId,
+      gmailThreadId: `thr-${Date.now()}`,
+      kind: 'interview',
+      applicationId: application.id,
+      subject: 'Interview times for Principal Engineer',
+    });
+    await insertDemoMessage(t.handle, {
+      userId: t.userId,
+      threadId: thread.gmailThreadId,
+      fromAddress: 'rae@acme.test',
+      fromName: 'Rae Recruiter',
+      toAddress: 'mara@example.test',
+      subject: 'Interview times for Principal Engineer',
+      bodyText: 'Here are three times.',
+    });
+    await insertOutgoingMessage(t.handle, {
+      userId: t.userId,
+      applicationId: application.id,
+      kind: 'follow_up',
+      toAddress: 'rae@acme.test',
+      subject: 'Following up',
+      bodyText: 'Checking in.',
+    });
+    const { interview } = await insertInterview(t.handle, {
+      userId: t.userId,
+      applicationId: application.id,
+      threadId: thread.id,
+    });
+    const day = 24 * 3600 * 1000;
+    const s1 = await insertInterviewSlot(t.handle, {
+      interviewId: interview.id,
+      startsAt: new Date(Date.now() + day),
+      endsAt: new Date(Date.now() + day + 3600e3),
+      tokenHash: `h1-${Date.now()}`,
+    });
+    await insertInterviewSlot(t.handle, {
+      interviewId: interview.id,
+      startsAt: new Date(Date.now() + 2 * day),
+      endsAt: new Date(Date.now() + 2 * day + 3600e3),
+      tokenHash: `h2-${Date.now()}`,
+      ttlSeconds: 1,
+    });
+    await updateInterview(t.handle, interview.id, {
+      prepPlan: 'Likely questions: system design.',
+      prepPlanStatus: 'ready',
+      feedback: { notes: 'Went well', relayed: null, rating: 4 },
+    });
+    await new Promise((r) => setTimeout(r, 1200));
+
+    const res = await app(t).request(`/applications/${application.id}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.job).toMatchObject({
+      title: 'Principal Engineer',
+      company: 'Acme Robotics',
+      location_mode: 'hybrid',
+      pay_min: 180000,
+      pay_max: 220000,
+      currency: 'USD',
+    });
+    expect(body.decision).toEqual({ rationale: 'Strong platform match', seniority: 'staff' });
+    expect(JSON.stringify(body)).not.toContain('"fit"');
+    expect(body.threads).toHaveLength(1);
+    expect(body.threads[0]).toMatchObject({
+      subject: 'Interview times for Principal Engineer',
+      kind: 'interview',
+      compensation_flag: false,
+    });
+    // a real tenant's mail is not read from the simulated mailbox, even if rows exist for it
+    expect(body.threads[0].messages).toEqual([]);
+    await setDemo(t, true);
+    try {
+      const demoBody = await (await app(t).request(`/applications/${application.id}`)).json();
+      expect(demoBody.threads[0].messages[0]).toMatchObject({
+        from: 'Rae Recruiter <rae@acme.test>',
+        body: 'Here are three times.',
+      });
+    } finally {
+      await setDemo(t, false);
+    }
+    expect(body.outgoing[0]).toMatchObject({ kind: 'follow_up', subject: 'Following up' });
+    expect(body.interviews).toHaveLength(1);
+    expect(body.interviews[0].slots.map((x: { state: string }) => x.state)).toEqual([
+      'open',
+      'expired',
+    ]);
+    expect(body.interviews[0].slots[0].id).toBe(s1.id);
+    expect(JSON.stringify(body)).not.toContain('h1-');
+    expect(body.prep_plan).toEqual({
+      interview_id: interview.id,
+      status: 'ready',
+      text: 'Likely questions: system design.',
+    });
+    expect(body.feedback).toMatchObject({ notes: 'Went well', rating: 4 });
+    expect(body.negotiation).toMatchObject({ floor: 170000 });
+  });
+
+  it('returns empty sections and a null prep plan for a bare application', async () => {
+    const t = await env.makeTenant();
+    const { application } = await seed(t, 'Bare');
+    const body = await (await app(t).request(`/applications/${application.id}`)).json();
+    expect(body).toMatchObject({
+      decision: null,
+      threads: [],
+      interviews: [],
+      prep_plan: null,
+      feedback: null,
+      negotiation: null,
+      activity_next: null,
+    });
+  });
+
+  it('pages activity newest-first by cursor and rejects a bad cursor', async () => {
+    const t = await env.makeTenant();
+    const { application } = await seed(t, 'Busy');
+    for (let i = 0; i < 55; i++) {
+      await activity.logActivity(t.handle, {
+        userId: t.userId,
+        applicationId: application.id,
+        actor: 'agent',
+        action: `step-${i}`,
+      });
+    }
+    const first = await (await app(t).request(`/applications/${application.id}`)).json();
+    expect(first.activity).toHaveLength(50);
+    expect(first.activity.at(-1).action).toBe('step-54');
+    expect(first.activity_next).toEqual(expect.any(String));
+    const second = await (
+      await app(t).request(`/applications/${application.id}?activity_before=${first.activity_next}`)
+    ).json();
+    expect(second.activity.map((e: { action: string }) => e.action)).toEqual([
+      'step-0',
+      'step-1',
+      'step-2',
+      'step-3',
+      'step-4',
+    ]);
+    expect(second.activity_next).toBeNull();
+    expect(
+      (await app(t).request(`/applications/${application.id}?activity_before=garbage`)).status,
+    ).toBe(400);
   });
 });

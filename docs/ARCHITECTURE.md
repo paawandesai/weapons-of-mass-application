@@ -136,6 +136,44 @@ sequenceDiagram
     M->>DB: interview row, status INTERVIEWING
 ```
 
+## Dashboard
+
+The board is a read model over `applications`; there is no board table. Four columns map from the
+status in `apps/api/src/services/board.ts` (`columnOf`):
+
+| Status | Column | Badge |
+| --- | --- | --- |
+| `pending` | Applied | `pending` |
+| `applied` | Applied | none |
+| `interviewing` | Interviewing | none |
+| `offer` | Offer | none |
+| `closed` | Closed | none |
+
+`GET /api/board` returns `{columns: {applied, interviewing, offer, closed}}`, each a list of cards
+(company, title, location mode, posted pay range, date applied, last activity), newest activity
+first. A pending application sits inside Applied with `badge: 'pending'` and moves out of the badge
+state when the agent or the user changes its status. Cards without a posted range show the pay as
+not listed.
+
+A user move is `POST /api/applications/:id/stage` with `{from, to}`, where `from` is the status the
+client saw. In one transaction it updates `applications.status` only while the row still has `from`,
+inserts a `stage_overrides` row and writes a user-actor `stage_changed` activity entry. A mismatch
+returns 409 with the current status and writes nothing; an unknown or other-tenant id is 404.
+Moving to Closed sets `closed_reason = 'user'`. The agent never reopens a closed card: its own
+status writes are conditional on the current status, and jobs that act on an application check
+`isActionable` first.
+
+`GET /api/applications/:id` is the card detail: job summary, the decision rationale from the
+run's candidate (null once the run is purged), resume reference, form answers, unmet requirements,
+linked email threads, sent messages, interviews with slot state (`open`, `confirmed`, `expired`,
+`invalidated`), prep plan, feedback, offer data, a captcha summary and the activity log. Activity
+is cursor-paged newest first (`activity_before` with the `activity_next` value). A request for
+another tenant's application is 404.
+
+`GET /api/search/companies?q=` is the panic search: a case-insensitive substring match on company
+names of the signed-in user's applications, at most 20, minimum two characters (otherwise 400).
+Selecting a result opens the card and highlights it on the board.
+
 ## Boundaries
 
 - **Read-only sources:** LinkedIn public profile and job search, GitHub, HN, the three ATS board APIs, levels.fyi.

@@ -6,11 +6,12 @@ import {
   getInterviewSlot,
   getEmailThread,
   lockInterview,
+  recordFollowOnJob,
   updateInterviewIfGeneration,
   type InterviewRow,
   type TenantHandle,
 } from '@wma/db';
-import { sendEmailRecovering } from '@wma/shared';
+import { PREP_PLAN_JOB, prepPlanKey, sendEmailRecovering } from '@wma/shared';
 import { isGoogleAuthError } from './auth';
 import { loadApplicationContext } from './offer';
 import { eventDetails, recruiterReply } from './templates';
@@ -258,6 +259,19 @@ export async function bookInterview(
         detail: { from: change.from, to: change.to, source: 'interview_booked' },
       });
     }
+    // The prep plan follows the booking: recorded with it, sent to the queue by the reconciler.
+    // A plan that already exists is left alone. Never holds back or undoes the booking.
+    await recordFollowOnJob(h, {
+      userId: input.userId,
+      kind: PREP_PLAN_JOB,
+      payload: {
+        tenantId: h.tenantId,
+        userId: input.userId,
+        interviewId: interview.id,
+        onlyIfMissing: true,
+      },
+      dedupeKey: prepPlanKey(interview.id),
+    });
     const alreadyBooked = locked.bookedGeneration === generation;
     await updateInterviewIfGeneration(h, interview.id, generation, {
       bookedGeneration: generation,
@@ -280,5 +294,6 @@ export async function bookInterview(
     return true;
   });
   if (!finished) return { status: 'stale' };
+
   return { status: 'booked', eventId: eventId!, created };
 }

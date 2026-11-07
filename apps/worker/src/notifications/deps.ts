@@ -1,8 +1,7 @@
 import type { PgBoss } from 'pg-boss';
-import { createGmailSender } from '@wma/google';
 import { createBlockedLogger, createOutgoingStore, type TenantHandle } from '@wma/db';
 import { defaultGuards, type MailDeps } from '@wma/shared';
-import { createSentLookup } from '../submission/gmail';
+import { portFactory } from '../demo/factory';
 import { bossNotificationQueue, type NotificationQueue } from './queue';
 
 export interface NotificationDeps {
@@ -13,17 +12,20 @@ export interface NotificationDeps {
   webOrigin: string;
 }
 
-/** Production wiring: Gmail sender, the money guard, the database store, the system clock. */
+/** Production wiring: Gmail sender (the local mailbox for the demo tenant), the money guard, the database store, the system clock. */
 export function createNotificationDeps(boss: PgBoss): NotificationDeps {
   return {
     queue: bossNotificationQueue(boss),
-    mail: (handle, userId) => ({
-      sender: createGmailSender(handle),
-      guards: defaultGuards,
-      store: createOutgoingStore(handle, userId),
-      onBlocked: createBlockedLogger(handle, userId),
-      lookup: createSentLookup(handle, userId),
-    }),
+    mail: (handle, userId) => {
+      const ports = portFactory(handle, userId);
+      return {
+        sender: ports.sender,
+        guards: defaultGuards,
+        store: createOutgoingStore(handle, userId),
+        onBlocked: createBlockedLogger(handle, userId),
+        lookup: ports.sentLookup,
+      };
+    },
     now: () => new Date(),
     webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   };

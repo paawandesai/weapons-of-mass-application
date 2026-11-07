@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
-import { getUserById, schema } from '@wma/db';
+import { getCurrentTenant, getUserById, schema } from '@wma/db';
 import type { MeResponse } from '@wma/shared';
 import type { AppEnv } from '../middleware/session';
 import { toListedConnection } from '../services/connections';
@@ -31,6 +31,7 @@ meRoutes.get('/', async (c) => {
       digest_hour: user.digestHour,
     },
     connections: rows.map(toListedConnection),
+    demo: (await getCurrentTenant(handle)).demo,
   };
   return c.json(body);
 });

@@ -5,6 +5,7 @@ import { bossSubmitQueue, type SubmitQueue } from '../discovery/handoff';
 import type { Http } from '@wma/discovery';
 import { executeDailyRun, type DailyRunDeps } from '../discovery/run';
 import { utcDate } from '../discovery/text';
+import { adaptersFor } from '../discovery/adapters';
 import type { SourceAdapter } from '../discovery/types';
 
 export const DAILY_RUN_JOB = 'daily-run';
@@ -125,12 +126,12 @@ export async function registerDailyRun(
   const roster = options.roster ?? dbRoster(db);
   const queue = options.queue ?? bossSubmitQueue(boss);
   let llm = options.llm;
-  const deps = (): DailyRunDeps => ({
+  const deps = (adapters: SourceAdapter[] | undefined): DailyRunDeps => ({
     llm: (llm ??= createLlmClient()),
     queue,
     http: options.http,
     now,
-    adapters: options.adapters,
+    adapters,
   });
 
   await boss.createQueue(DAILY_RUN_JOB, { policy: 'exclusive' });
@@ -140,10 +141,13 @@ export async function registerDailyRun(
   await boss.work<DailyRunJobData>(DAILY_RUN_JOB, async (jobs) => {
     for (const job of jobs) {
       const { tenantId, userId, date, trigger } = job.data;
+      const handle = db.forTenant(tenantId);
+      // The demo tenant also searches its seeded postings; an explicit adapter list wins (tests).
+      const adapters = options.adapters ?? (await adaptersFor(handle));
       await executeDailyRun(
-        db.forTenant(tenantId),
+        handle,
         { userId, date, trigger: trigger ?? 'scheduled' },
-        deps(),
+        deps(adapters),
       );
     }
   });

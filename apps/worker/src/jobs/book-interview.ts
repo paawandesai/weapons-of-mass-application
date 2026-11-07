@@ -60,10 +60,11 @@ export async function registerBookInterview(
   const notifications = createNotificationDeps(boss);
   const factory: SchedulingDepsFactory =
     makeDeps ??
-    ((handle, userId) =>
-      createSchedulingDeps(handle, userId, async (h, interviewId) => {
+    ((handle, userId) => ({
+      ...createSchedulingDeps(handle, userId, async (h, interviewId) => {
         await scheduleReminders(h, interviewId, notifications);
-      }));
+      }),
+    }));
   await boss.work<BookInterviewJobData>(BOOK_INTERVIEW_JOB, async (jobs) => {
     for (const job of jobs) {
       try {

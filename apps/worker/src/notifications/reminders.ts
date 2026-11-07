@@ -204,9 +204,7 @@ export async function runReminder(
     now: deps.now(),
     cardUrl: cardUrl(deps.webOrigin, interview.applicationId),
     prepUrl:
-      interview.prepPlanStatus === 'ready'
-        ? prepPlanUrl(deps.webOrigin, interview.applicationId)
-        : null,
+      interview.prepPlanStatus === 'ready' ? prepPlanUrl(deps.webOrigin, interview.id) : null,
   });
   const result = await sendEmailRecovering(mailDeps, {
     userId: interview.userId,

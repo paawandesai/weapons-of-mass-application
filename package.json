@@ -14,16 +14,20 @@
     "db:generate": "pnpm --filter @wma/db db:generate",
     "db:migrate": "pnpm --filter @wma/db db:migrate",
     "db:check": "pnpm --filter @wma/db db:check",
-    "db:test-reset": "scripts/db-test-reset.sh"
+    "db:test-reset": "scripts/db-test-reset.sh",
+    "dev": "concurrently -k -n api,worker,web -c blue,green,magenta \"pnpm -F @wma/api dev\" \"pnpm -F @wma/worker dev\" \"pnpm -F @wma/web dev\"",
+    "test:e2e": "pnpm -F @wma/web test:e2e",
+    "seed:demo": "pnpm --filter @wma/db seed:demo"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "concurrently": "^10.0.7",
     "eslint": "^9.0.0",
     "globals": "^16.0.0",
     "prettier": "^3.0.0",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.0.0",
-    "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
+    "vitest": "^3.0.0"
   }
 }

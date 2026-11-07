@@ -13,9 +13,10 @@ import {
   upsertEmailThread,
   upsertMailSyncState,
   type TenantHandle,
+  recordFollowOnJob,
 } from '@wma/db';
 import { markRevoked } from '@wma/google';
-import type { ProposedSlot } from '@wma/shared';
+import { negotiationKey, NEGOTIATION_JOB, type ProposedSlot } from '@wma/shared';
 import { CalendarUnavailableError } from '../scheduling/offer';
 import { classifyMessage } from './classify';
 import type { InboxDeps, OfferToSend } from './deps';
@@ -215,6 +216,7 @@ export async function processMessage(
     });
 
     let offerToSend: OfferToSend | null = null;
+    let movedToOffer = false;
     await handle.transaction(async (h) => {
       const app = await getApplication(h, link.applicationId);
       if (!app) throw new Error('linked application no longer exists');
@@ -223,7 +225,19 @@ export async function processMessage(
       // The transition is computed from the stored status, not the earlier snapshot.
       const change = await applyTransition(h, app.id, result.classification, {
         appliedAt: msg.receivedAt,
+        onTransition: (t) => {
+          if (t.to === 'offer') movedToOffer = true;
+        },
       });
+      // Recorded in this transaction: the pay-data job survives a crash after the commit.
+      if (movedToOffer) {
+        await recordFollowOnJob(h, {
+          userId,
+          kind: NEGOTIATION_JOB,
+          payload: { tenantId: h.tenantId, userId, applicationId: app.id },
+          dedupeKey: negotiationKey(app.id),
+        });
+      }
       const existing = await getEmailThreadByGmailId(h, msg.threadId);
       const thread = await upsertEmailThread(h, {
         userId,
@@ -232,6 +246,7 @@ export async function processMessage(
         applicationId: link.applicationId,
         compensationFlag: result.compensation_flag,
         bookingLink: result.booking_link,
+        subject: msg.subject,
         promptVersion: result.promptVersion,
         // The repo applies this chronologically: an older message never overwrites a newer one.
         lastMessageAt: msg.receivedAt,

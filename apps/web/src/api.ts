@@ -1,8 +1,10 @@
 import type {
+  ApplicationStatus,
   BuildStatus,
   Connection,
   ConnectionKind,
   MeResponse,
+  DemoMailboxResponse,
   ProfileDocument,
   ProfileResponse,
   SurveyAnswers,
@@ -72,14 +74,224 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
   return body as T;
 }
 
+export type BoardColumnId = 'applied' | 'interviewing' | 'offer' | 'closed';
+
+export interface BoardCardData {
+  id: string;
+  status: ApplicationStatus;
+  badge: 'pending' | null;
+  company: string | null;
+  title: string | null;
+  location_mode: string | null;
+  pay_min: number | null;
+  pay_max: number | null;
+  currency: string | null;
+  applied_at: string | null;
+  last_activity_at: string;
+}
+
+export interface BoardData {
+  columns: Record<BoardColumnId, BoardCardData[]>;
+}
+
+export interface SearchResult {
+  application_id: string;
+  company: string;
+  title: string | null;
+  status: ApplicationStatus;
+  column: BoardColumnId;
+  badge: 'pending' | null;
+}
+
+export interface SlotDetail {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  state: 'confirmed' | 'invalidated' | 'expired' | 'open';
+}
+
+export interface InterviewDetail {
+  id: string;
+  thread_id: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  confirmed_at: string | null;
+  booked: boolean;
+  slots: SlotDetail[];
+  prep_plan_status: 'pending' | 'ready' | 'failed' | null;
+  prep_plan: string | null;
+  feedback: unknown;
+}
+
+export interface ThreadDetail {
+  id: string;
+  subject: string | null;
+  kind: string;
+  compensation_flag: boolean;
+  booking_link: string | null;
+  last_message_at: string;
+  messages: { id: string; from: string; at: string; body: string }[];
+}
+
+export interface ActivityEntryData {
+  id: string;
+  at: string;
+  actor: 'agent' | 'user';
+  action: string;
+  detail: Record<string, unknown>;
+}
+
+export interface ApplicationDetail {
+  id: string;
+  status: ApplicationStatus;
+  pending_reason: string | null;
+  closed_reason: string | null;
+  applied_at: string | null;
+  last_activity_at: string;
+  job: {
+    id: string;
+    title: string;
+    url: string;
+    ats: string | null;
+    company: string | null;
+    location: string | null;
+    location_mode: string | null;
+    pay_min: number | null;
+    pay_max: number | null;
+    currency: string | null;
+    posted_at: string | null;
+  } | null;
+  decision: { rationale: string; seniority: string | null } | null;
+  resume: { ref: string } | null;
+  form_answers: {
+    question: string;
+    status: 'filled' | 'blank' | 'skipped' | 'attached';
+    value: unknown;
+    skipped?: string;
+  }[];
+  unmet_requirements: string[];
+  threads: ThreadDetail[];
+  outgoing: { id: string; kind: string; subject: string; state: string; sent_at: string | null }[];
+  activity: ActivityEntryData[];
+  activity_next: string | null;
+  interviews: InterviewDetail[];
+  prep_plan: {
+    interview_id: string;
+    status: 'pending' | 'ready' | 'failed' | null;
+    text: string | null;
+  } | null;
+  feedback: unknown;
+  negotiation: unknown;
+}
+
 export interface DriveFolder {
   id: string;
   name: string;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Run view, interviews (feedback, prep plan) and negotiation
+// ---------------------------------------------------------------------------------------------
+
+export type RunStatus = 'running' | 'finished' | 'short_day' | 'failed' | 'skipped_no_profile';
+
+export interface RunSummary {
+  id: string;
+  date: string;
+  trigger: string;
+  status: RunStatus;
+  step: string | null;
+  target: number;
+  started_at: string;
+  ended_at: string | null;
+  counts: Record<string, number | undefined>;
+  short_day: boolean;
+  shortfall: number;
+  error: string | null;
+}
+
+export interface RunCandidateView {
+  rank: number | null;
+  title: string;
+  company: string;
+  url: string;
+  apply: boolean | null;
+  rationale: string | null;
+  selected: boolean;
+  exclusion_reason: string | null;
+}
+
+export interface CurrentRun {
+  run: RunSummary | null;
+  candidates: RunCandidateView[];
+  next_cursor: string | null;
+  has_more: boolean;
+  /** When no run exists yet: the next scheduled start, or null when the profile is not approved. */
+  next_run_at: string | null;
+}
+
+export interface Feedback {
+  notes: string;
+  relayed: string;
+  rating: number | null;
+  submitted_at: string;
+  updated_at: string;
+}
+export interface FeedbackInput {
+  notes: string;
+  relayed: string;
+  rating: number | null;
+}
+
+export interface PrepPlan {
+  likely_questions: { question: string; answer_outline: string }[];
+  topics: string[];
+  company_research: string;
+  interviewer_background: string | null;
+}
+export type PrepPlanStatus = 'pending' | 'ready' | 'failed';
+
+export interface InterviewView {
+  id: string;
+  application_id: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  confirmed: boolean;
+  prep_plan_status: PrepPlanStatus | null;
+  prep_plan: PrepPlan | null;
+  feedback: Feedback | null;
+}
+
+export interface Comparable {
+  source: string;
+  title: string;
+  level: string | null;
+  location: string | null;
+  currency: string | null;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  sample_size: number | null;
+  retrieved_at: string;
+}
+export interface NegotiationView {
+  posted_min: number | null;
+  posted_max: number | null;
+  currency: string | null;
+  floor: number | null;
+  comparables: Comparable[];
+  fetched_at: string | null;
+  error: string | null;
+}
+export interface ApplicationExtras {
+  interviews: InterviewView[];
+  negotiation: NegotiationView | null;
+}
+
 export const api = {
   me: () => request<MeResponse>('GET', '/api/me'),
   signOut: () => request<void>('POST', '/auth/signout'),
+  demoMailbox: () => request<DemoMailboxResponse>('GET', '/api/admin/demo-mailbox'),
 
   uploadResume: (file: File) => {
     const form = new FormData();
@@ -106,12 +318,86 @@ export const api = {
       json: { version },
     }),
 
+  board: () => request<BoardData>('GET', '/api/board'),
+  searchCompanies: (q: string) =>
+    request<{ results: SearchResult[] }>('GET', `/api/search/companies?q=${encodeURIComponent(q)}`),
+  application: (id: string, activityBefore?: string | null) =>
+    request<ApplicationDetail>(
+      'GET',
+      `/api/applications/${encodeURIComponent(id)}${
+        activityBefore ? `?activity_before=${encodeURIComponent(activityBefore)}` : ''
+      }`,
+    ),
+  moveStage: (id: string, from: ApplicationStatus, to: ApplicationStatus) =>
+    request<{ id: string; status: ApplicationStatus }>(
+      'POST',
+      `/api/applications/${encodeURIComponent(id)}/stage`,
+      { json: { from, to } },
+    ),
+
   survey: () => request<{ answers: SurveyAnswers | null }>('GET', '/api/survey'),
   saveSurvey: (answers: SurveyAnswers) =>
     request<{ version: number }>('PUT', '/api/survey', { json: { answers } }),
+
+  currentRun: (cursor?: string | null) =>
+    request<CurrentRun>(
+      'GET',
+      cursor ? `/api/runs/current?cursor=${encodeURIComponent(cursor)}` : '/api/runs/current',
+    ),
+  interview: (id: string) =>
+    request<{ interview: InterviewView }>('GET', `/api/interviews/${encodeURIComponent(id)}`),
+  applicationExtras: (applicationId: string) =>
+    request<ApplicationExtras>(
+      'GET',
+      `/api/interviews/for-application/${encodeURIComponent(applicationId)}`,
+    ),
+  submitFeedback: (id: string, input: FeedbackInput) =>
+    request<{ feedback: Feedback }>('POST', `/api/interviews/${encodeURIComponent(id)}/feedback`, {
+      json: input,
+    }),
+  editFeedback: (id: string, input: FeedbackInput) =>
+    request<{ feedback: Feedback }>('PUT', `/api/interviews/${encodeURIComponent(id)}/feedback`, {
+      json: input,
+    }),
+  requestNegotiation: (applicationId: string) =>
+    request<{ status: 'queued'; enqueued: boolean }>(
+      'POST',
+      `/api/interviews/for-application/${encodeURIComponent(applicationId)}/negotiation`,
+    ),
+  requestPrepPlan: (id: string) =>
+    request<{ status: PrepPlanStatus; enqueued: boolean }>(
+      'POST',
+      `/api/interviews/${encodeURIComponent(id)}/prep-plan`,
+    ),
 };
 
 export function formatTime(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+export function formatPay(
+  min: number | null,
+  max: number | null,
+  currency: string | null,
+): string | null {
+  if (min === null && max === null) return null;
+  const fmt = (n: number) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: currency ?? 'USD',
+        maximumFractionDigits: 0,
+      }).format(n);
+    } catch {
+      return String(n);
+    }
+  };
+  if (min !== null && max !== null && min !== max) return `${fmt(min)} – ${fmt(max)}`;
+  return fmt((min ?? max)!);
+}
+
+export function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
 }

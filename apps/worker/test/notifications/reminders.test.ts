@@ -201,9 +201,7 @@ describe('rule 13: reminders', () => {
     ready.deps.clock.set(new Date(START.getTime() - 24 * H));
     await runReminder(ready.t.handle, data(ready), ready.deps);
     const r = ready.deps.sender.sent[0]!;
-    expect(r.text).toContain(
-      `https://app.example.test/applications/${ready.s.application.id}/prep`,
-    );
+    expect(r.text).toContain(`https://app.example.test/interviews/${ready.interview.id}/prep`);
     expect(r.html).toContain('Read the prep plan');
   });
 

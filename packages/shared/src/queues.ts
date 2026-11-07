@@ -23,3 +23,30 @@ export const SCHEDULE_REMINDERS_QUEUE_OPTIONS = {
   retryDelay: 30,
   retryBackoff: true,
 } as const;
+
+/**
+ * Prep-plan generation, one queued-or-running job per interview (singleton key). A job that is
+ * interrupted by a worker crash is redelivered; the handler is idempotent (it rewrites the plan).
+ */
+export const PREP_PLAN_JOB = 'prep-plan';
+
+export const PREP_PLAN_QUEUE_OPTIONS = {
+  policy: 'exclusive',
+  retryLimit: 3,
+  retryDelay: 30,
+  retryBackoff: true,
+} as const;
+
+/** Offer pay-data gathering, one queued-or-running job per application (singleton key). */
+export const NEGOTIATION_JOB = 'negotiation';
+
+export const NEGOTIATION_QUEUE_OPTIONS = {
+  policy: 'exclusive',
+  retryLimit: 2,
+  retryDelay: 60,
+  retryBackoff: true,
+} as const;
+
+/** Outbox dedupe keys for follow-on work: the same key means the same unit of work. */
+export const prepPlanKey = (interviewId: string) => `prep-plan:${interviewId}`;
+export const negotiationKey = (applicationId: string) => `negotiation:${applicationId}`;

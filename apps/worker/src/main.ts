@@ -3,6 +3,7 @@ import { createLlmClient } from '@wma/llm';
 import { createBoss } from './boss';
 import { createAppDb } from './db';
 import { googleDrivePort } from './drive';
+import { startFormsServerFromEnv } from './demo/forms-server';
 import { registerJobs } from './register';
 import { closeSharedBrowser } from './submission/browser';
 
@@ -16,9 +17,12 @@ boss.on('error', (err) => console.error('pg-boss error', err));
 await boss.start();
 const db = createAppDb();
 await registerJobs(boss, db, { llm, drive: googleDrivePort });
+const forms = await startFormsServerFromEnv();
+if (forms) console.log(`demo forms served at ${forms.origin}/forms/`);
 console.log('worker started');
 
 const stop = async () => {
+  await forms?.close();
   await boss.stop();
   await closeSharedBrowser();
   await db.close();

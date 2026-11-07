@@ -3,13 +3,17 @@ import type { Db } from '@wma/db';
 import { authRoutes } from './auth/routes';
 import { getDb } from './db';
 import { requireSession, type AppEnv } from './middleware/session';
+import { adminRoutes } from './routes/admin';
 import { applicationsRoutes } from './routes/applications';
+import { boardRoutes } from './routes/board';
 import { captchaRoutes } from './routes/captcha';
 import { companiesRoutes } from './routes/companies';
 import { confirmRoutes } from './routes/confirm';
+import { interviewsRoutes } from './routes/interviews';
 import { meRoutes } from './routes/me';
 import { profileRoutes } from './routes/profile';
 import { runsRoutes } from './routes/runs';
+import { searchRoutes } from './routes/search';
 import { settingsRoutes } from './routes/settings';
 import { sourcesRoutes } from './routes/sources';
 import { surveyRoutes } from './routes/survey';
@@ -42,6 +46,10 @@ export function createApp(opts: AppOptions = {}) {
   app.route('/api/runs', runsRoutes);
   app.route('/api/applications', applicationsRoutes);
   app.route('/api/settings', settingsRoutes);
+  app.route('/api/board', boardRoutes);
+  app.route('/api/search', searchRoutes);
+  app.route('/api/interviews', interviewsRoutes);
+  app.route('/api/admin', adminRoutes);
   // Public: the visitor holds only a single-use token, so this is outside requireSession.
   app.route('/captcha', captchaRoutes);
   app.route('/confirm', confirmRoutes);

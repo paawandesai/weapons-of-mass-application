@@ -1,0 +1,15 @@
+{
+  "likely_questions": [
+    {
+      "question": "Tell us about a time you scaled a platform under load.",
+      "answer_outline": "Use the Analytical Engines Ltd work where you wrote the first program and describe how you measured throughput."
+    },
+    {
+      "question": "How do you decide what to build next on a platform team?",
+      "answer_outline": "Describe how you weighed user pain against effort in your most recent role."
+    }
+  ],
+  "topics": ["Kubernetes operations", "Fleet software release practices"],
+  "company_research": "Harbor Robotics builds warehouse robots and is hiring a Staff Platform Engineer. The board page says it ships weekly on Kubernetes.",
+  "interviewer_background": null
+}

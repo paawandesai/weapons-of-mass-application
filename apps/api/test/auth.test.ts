@@ -366,6 +366,7 @@ describe('sessions', () => {
         },
         { kind: 'gmail', status: 'connected', config: {}, connected_at: expect.any(String) },
       ],
+      demo: false,
     });
   });
 

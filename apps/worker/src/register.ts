@@ -9,6 +9,10 @@ import { registerDailyRun } from './jobs/daily-run';
 import { registerBookInterview } from './jobs/book-interview';
 import { registerDigest } from './jobs/digest';
 import { registerFollowUp } from './jobs/follow-up';
+import { registerNegotiation } from './jobs/negotiation';
+import { registerPrepPlan } from './jobs/prep-plan';
+import { startPendingJobDispatcher } from './jobs/pending-jobs';
+import { registerSimulatedRecruiter } from './jobs/simulated-recruiter';
 import { registerMailSync } from './jobs/mail-sync';
 import { registerReminders } from './jobs/reminders';
 import { registerSubmitApplication } from './jobs/submit-application';
@@ -29,6 +33,13 @@ export async function registerWave3Jobs(boss: PgBoss, db: Db): Promise<void> {
   await registerDigest(boss, db);
 }
 
+/** Wave 4 job registration (prep plan, negotiation, simulated recruiter). */
+export async function registerWave4Jobs(boss: PgBoss, db: Db): Promise<void> {
+  await registerPrepPlan(boss, db);
+  await registerNegotiation(boss, db);
+  await registerSimulatedRecruiter(boss, db);
+}
+
 /** Registers every job handler. New jobs other than profile.build go through guardedJob. */
 export async function registerJobs(boss: PgBoss, db: Db, deps: BuildDeps): Promise<void> {
   await boss.createQueue(PROFILE_BUILD_JOB);
@@ -40,4 +51,7 @@ export async function registerJobs(boss: PgBoss, db: Db, deps: BuildDeps): Promi
   });
   await registerWave2Jobs(boss, db);
   await registerWave3Jobs(boss, db);
+  await registerWave4Jobs(boss, db);
+  // Last, so every queue a pending row can name already exists.
+  await startPendingJobDispatcher(boss, db);
 }

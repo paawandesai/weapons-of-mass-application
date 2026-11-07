@@ -1,6 +1,6 @@
 import { and, asc, eq, gt, isNotNull, sql } from 'drizzle-orm';
 import type { TenantHandle } from '../client';
-import { interviews } from '../schema';
+import { interviews, pendingJobs } from '../schema';
 
 export type InterviewRow = typeof interviews.$inferSelect;
 export type InterviewPatch = Partial<
@@ -196,4 +196,71 @@ export async function clearConfirmationForReschedule(
       .returning(),
   );
   return rows[0] ?? null;
+}
+
+export interface FollowOnJobInput {
+  userId: string;
+  /** The queue the reconciler sends it to. */
+  kind: string;
+  payload: Record<string, unknown>;
+  /** One row per key and tenant; recording the same key again re-arms the row for dispatch. */
+  dedupeKey: string;
+}
+
+/**
+ * Records follow-on work in the caller's transaction (the outbox). The reconciler sends it to the
+ * queue afterwards, so a crash between the parent commit and the send loses nothing. A key that
+ * was already dispatched is re-armed with the new payload.
+ */
+export async function recordFollowOnJob(
+  handle: TenantHandle,
+  input: FollowOnJobInput,
+): Promise<void> {
+  await handle.run((tx) =>
+    tx
+      .insert(pendingJobs)
+      .values({
+        tenantId: handle.tenantId,
+        userId: input.userId,
+        kind: input.kind,
+        payload: input.payload,
+        dedupeKey: input.dedupeKey,
+      })
+      .onConflictDoUpdate({
+        target: [pendingJobs.tenantId, pendingJobs.dedupeKey],
+        set: { kind: input.kind, payload: input.payload, dispatchedAt: null },
+      }),
+  );
+}
+
+/** Marks an outbox row as sent after a direct enqueue succeeded (the reconciler skips it). */
+export async function markFollowOnDispatched(
+  handle: TenantHandle,
+  dedupeKey: string,
+): Promise<void> {
+  await handle.run((tx) =>
+    tx
+      .update(pendingJobs)
+      .set({ dispatchedAt: new Date() })
+      .where(and(eq(pendingJobs.tenantId, handle.tenantId), eq(pendingJobs.dedupeKey, dedupeKey))),
+  );
+}
+
+/** Interviews whose prep plan is marked pending; the repair pass re-records their outbox rows. */
+export function listInterviewsPrepPending(
+  handle: TenantHandle,
+  userId: string,
+): Promise<InterviewRow[]> {
+  return handle.run((tx) =>
+    tx
+      .select()
+      .from(interviews)
+      .where(
+        and(
+          eq(interviews.tenantId, handle.tenantId),
+          eq(interviews.userId, userId),
+          eq(interviews.prepPlanStatus, 'pending'),
+        ),
+      ),
+  );
 }

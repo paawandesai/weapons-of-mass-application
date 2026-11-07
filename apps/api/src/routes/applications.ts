@@ -1,18 +1,32 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import {
   activity,
+  changeStageByUser,
   getApplication,
+  getCurrentTenant,
   getJob,
   listApplications,
   listCaptchaRequestsForApplication,
   listCompaniesByIds,
+  listDemoThread,
+  listEmailThreadsForApplication,
+  listInterviewsForApplication,
   listJobsByIds,
+  listOutgoingMessagesForApplication,
+  listRunCandidates,
+  listSlotsForInterview,
+  recordFollowOnJob,
   type ApplicationRow,
+  type InterviewRow,
+  type InterviewSlotRow,
   type CaptchaRequestRow,
   type JobRow,
+  type TenantHandle,
 } from '@wma/db';
-import { ApplicationStatus } from '@wma/shared';
+import { ApplicationStatus, negotiationKey, NEGOTIATION_JOB } from '@wma/shared';
 import type { AppEnv } from '../middleware/session';
+import { invalidJson, readJson, validationError } from '../services/http';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
@@ -29,7 +43,86 @@ function summary(row: ApplicationRow, job: JobRow | undefined, company: string |
     applied_at: iso(row.appliedAt),
     last_activity_at: row.lastActivityAt.toISOString(),
     created_at: row.createdAt.toISOString(),
-    job: job ? { id: job.id, title: job.title, url: job.url, ats: job.ats, company } : null,
+    job: job
+      ? {
+          id: job.id,
+          title: job.title,
+          url: job.url,
+          ats: job.ats,
+          company,
+          location: job.location,
+          location_mode: job.locationMode,
+          pay_min: job.payMin,
+          pay_max: job.payMax,
+          currency: job.currency,
+          posted_at: iso(job.postedAt),
+        }
+      : null,
+  };
+}
+
+const ACTIVITY_PAGE = 50;
+
+function encodeCursor(c: activity.ActivityCursor): string {
+  return Buffer.from(JSON.stringify(c)).toString('base64url');
+}
+function decodeCursor(raw: string): activity.ActivityCursor | null {
+  try {
+    const v = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Record<string, unknown>;
+    if (typeof v.at !== 'string' || typeof v.id !== 'string' || !UUID_RE.test(v.id)) return null;
+    if (Number.isNaN(Date.parse(v.at))) return null;
+    return { at: v.at, id: v.id };
+  } catch {
+    return null;
+  }
+}
+
+type SlotState = 'confirmed' | 'invalidated' | 'expired' | 'open';
+function slotView(s: InterviewSlotRow, now: Date) {
+  const state: SlotState = s.confirmedAt
+    ? 'confirmed'
+    : s.invalidatedAt
+      ? 'invalidated'
+      : s.expiresAt.getTime() <= now.getTime()
+        ? 'expired'
+        : 'open';
+  // The token hash never leaves the server.
+  return { id: s.id, starts_at: s.startsAt.toISOString(), ends_at: s.endsAt.toISOString(), state };
+}
+
+function interviewView(row: InterviewRow, slots: InterviewSlotRow[], now: Date) {
+  return {
+    id: row.id,
+    thread_id: row.threadId,
+    starts_at: iso(row.startsAt),
+    ends_at: iso(row.endsAt),
+    confirmed_at: iso(row.confirmedAt),
+    booked: row.bookedGeneration !== null,
+    slots: slots.map((s) => slotView(s, now)),
+    prep_plan_status: row.prepPlanStatus,
+    prep_plan: row.prepPlan,
+    feedback: row.feedback ?? null,
+  };
+}
+
+/** The judgment's rationale from the run that selected the job; null once the run is purged. */
+async function decisionFor(
+  handle: TenantHandle,
+  row: ApplicationRow,
+  job: JobRow | null,
+): Promise<{ rationale: string; seniority: string | null } | null> {
+  if (!row.runId || !job) return null;
+  const candidates = await listRunCandidates(handle, row.runId);
+  const match = candidates.find(
+    (c) =>
+      c.url === job.url ||
+      (!!job.ats && !!job.atsJobId && c.ats === job.ats && c.atsJobId === job.atsJobId),
+  );
+  const j = match?.judgment as { rationale?: unknown; seniority?: unknown } | null | undefined;
+  if (!j || typeof j.rationale !== 'string') return null;
+  return {
+    rationale: j.rationale,
+    seniority: typeof j.seniority === 'string' ? j.seniority : null,
   };
 }
 
@@ -101,18 +194,70 @@ applicationsRoutes.get('/:id', async (c) => {
   if (!row || row.userId !== userId) {
     return c.json({ code: 'not_found', message: 'Application not found' }, 404);
   }
+  const rawBefore = c.req.query('activity_before');
+  let before: activity.ActivityCursor | undefined;
+  if (rawBefore) {
+    before = decodeCursor(rawBefore) ?? undefined;
+    if (!before) return c.json({ code: 'bad_request', message: 'Invalid activity cursor' }, 400);
+  }
+  const now = c.get('now')?.() ?? new Date();
   const job = await getJob(handle, row.jobId);
   const company = job?.companyId
     ? (await listCompaniesByIds(handle, [job.companyId]))[0]
     : undefined;
-  const entries = (await activity.listByApplication(handle, row.id, { limit: 200 })).reverse();
+  const page = await activity.listByApplication(handle, row.id, { limit: ACTIVITY_PAGE, before });
+  const entries = [...page].reverse();
   const captcha = (await listCaptchaRequestsForApplication(handle, row.id)).reverse();
+  const decision = await decisionFor(handle, row, job);
+
+  const threads = await listEmailThreadsForApplication(handle, row.id);
+  // Bodies are only held locally for the simulated mailbox, which only the flagged demo tenant
+  // reads; every other tenant's mail stays in Gmail and card detail shows the stored subject only.
+  const isDemo = threads.length > 0 && (await getCurrentTenant(handle)).demo;
+  const threadViews = await Promise.all(
+    threads.map(async (t) => {
+      const messages = isDemo ? await listDemoThread(handle, t.gmailThreadId) : [];
+      return {
+        id: t.id,
+        subject: t.subject ?? messages[0]?.subject ?? null,
+        kind: t.kind,
+        compensation_flag: t.compensationFlag,
+        booking_link: t.bookingLink,
+        last_message_at: t.lastMessageAt.toISOString(),
+        messages: messages.map((m) => ({
+          id: m.gmailMessageId,
+          from: m.fromName ? `${m.fromName} <${m.fromAddress}>` : m.fromAddress,
+          at: m.internalDate.toISOString(),
+          body: m.bodyText,
+        })),
+      };
+    }),
+  );
+  const sent = (await listOutgoingMessagesForApplication(handle, row.id)).reverse();
+
+  const interviewRows = await listInterviewsForApplication(handle, row.id);
+  const interviews = await Promise.all(
+    interviewRows.map(async (i) =>
+      interviewView(i, await listSlotsForInterview(handle, i.id), now),
+    ),
+  );
+  const planned = [...interviews].reverse().find((i) => i.prep_plan_status !== null);
+
   return c.json({
     ...summary(row, job ?? undefined, company?.name ?? null),
     confirmation_source: row.confirmationSource,
+    decision,
     resume: row.resumePdfRef ? { ref: row.resumePdfRef } : null,
     form_answers: answerList(row.formAnswers),
     unmet_requirements: Array.isArray(row.unmetRequirements) ? row.unmetRequirements : [],
+    threads: threadViews,
+    outgoing: sent.map((m) => ({
+      id: m.id,
+      kind: m.kind,
+      subject: m.subject,
+      state: m.state,
+      sent_at: iso(m.sentAt),
+    })),
     activity: entries.map((e) => ({
       id: e.id,
       at: e.at.toISOString(),
@@ -120,6 +265,64 @@ applicationsRoutes.get('/:id', async (c) => {
       action: e.action,
       detail: e.detail,
     })),
+    activity_next:
+      page.length === ACTIVITY_PAGE ? encodeCursor(page[page.length - 1]!.cursor) : null,
+    interviews,
+    prep_plan: planned
+      ? { interview_id: planned.id, status: planned.prep_plan_status, text: planned.prep_plan }
+      : null,
+    feedback: [...interviews].reverse().find((i) => i.feedback)?.feedback ?? null,
+    negotiation: row.negotiation ?? null,
     captcha: captcha.map(captchaSummary),
   });
+});
+
+const StageBody = z.object({
+  from: ApplicationStatus,
+  to: ApplicationStatus.refine((s) => s !== 'pending', 'a card cannot be moved back to pending'),
+});
+
+/** A user's board move (design rule 2): conditional on the status the client saw. */
+applicationsRoutes.post('/:id/stage', async (c) => {
+  const { handle, userId } = c.get('session');
+  const id = c.req.param('id');
+  if (!UUID_RE.test(id))
+    return c.json({ code: 'not_found', message: 'Application not found' }, 404);
+  const raw = await readJson(c);
+  if (raw === undefined) return invalidJson(c);
+  const body = StageBody.safeParse(raw);
+  if (!body.success) return validationError(c, body.error);
+  // A move into Offer records the pay-data job in the same transaction as the move; the
+  // reconciler sends it to the queue.
+  const intoOffer = body.data.to === 'offer' && body.data.from !== 'offer';
+  const data = { tenantId: handle.tenantId, userId, applicationId: id };
+  const result = await handle.transaction(async (h) => {
+    const r = await changeStageByUser(h, {
+      userId,
+      applicationId: id,
+      from: body.data.from,
+      to: body.data.to,
+    });
+    if (r.ok && intoOffer) {
+      await recordFollowOnJob(h, {
+        userId,
+        kind: NEGOTIATION_JOB,
+        payload: data,
+        dedupeKey: negotiationKey(id),
+      });
+    }
+    return r;
+  });
+  if (result.ok) return c.json({ id, status: body.data.to });
+  if (result.current === null) {
+    return c.json({ code: 'not_found', message: 'Application not found' }, 404);
+  }
+  return c.json(
+    {
+      code: 'stage_conflict',
+      message: 'This card was updated elsewhere. The board has been refreshed.',
+      current: result.current,
+    },
+    409,
+  );
 });

@@ -1,0 +1,24 @@
+{
+  "comparables": [
+    {
+      "title": "Software Engineer",
+      "level": "Staff (L6)",
+      "location": "San Francisco Bay Area",
+      "currency": "USD",
+      "p25": 310000,
+      "p50": 365000,
+      "p75": 430000,
+      "sample_size": 212
+    },
+    {
+      "title": "Software Engineer",
+      "level": "Senior (L5)",
+      "location": "San Francisco Bay Area",
+      "currency": "USD",
+      "p25": 235000,
+      "p50": 270000,
+      "p75": 315000,
+      "sample_size": 864
+    }
+  ]
+}

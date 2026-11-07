@@ -2,7 +2,8 @@ import type { AtsId, BoardRegion, Candidate, Judgment } from '@wma/shared';
 import type { ProfileDocument } from '@wma/shared';
 import type { Http } from '@wma/discovery';
 
-export type SourceId = 'ashby' | 'greenhouse' | 'lever' | 'hn-who-is-hiring' | 'linkedin-public';
+export type SourceId =
+  'ashby' | 'greenhouse' | 'lever' | 'hn-who-is-hiring' | 'linkedin-public' | 'seeded';
 export type SourceStatusValue = 'ok' | 'partial' | 'unavailable';
 
 /** A resolved board on the user's list. */

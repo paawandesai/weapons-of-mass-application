@@ -1,5 +1,4 @@
 import type { PgBoss } from 'pg-boss';
-import { createGmailSender } from '@wma/google';
 import { createLlmClient } from '@wma/llm';
 import { createBlockedLogger, createOutgoingStore, getInterview } from '@wma/db';
 import { defaultGuards } from '@wma/shared';
@@ -11,9 +10,8 @@ import { createSchedulingDeps } from '../scheduling/ports';
 import { requeueUnbookedInterviews } from '../scheduling/requeue';
 import type { InboxDeps } from './deps';
 import { systemInboxClock } from './deps';
-import { createSentLookup } from '../submission/gmail';
+import { portFactory } from '../demo/factory';
 import { flagDigest } from './flags';
-import { createInboxGmailPort } from './gmail-reader';
 
 /** The production dependencies: the user's Gmail, the Anthropic client, the guarded sender, scheduling. */
 export function createInboxDeps(boss: PgBoss): InboxDeps {
@@ -23,15 +21,19 @@ export function createInboxDeps(boss: PgBoss): InboxDeps {
       await scheduleReminders(h, interviewId, notifications);
     });
   return {
-    gmail: (handle, userId) => createInboxGmailPort(handle, userId),
+    // Demo tenants read and write their local mailbox; real tenants get Gmail (see demo/factory).
+    gmail: (handle, userId) => portFactory(handle, userId).inbox,
     llm: createLlmClient(),
-    mail: (handle, userId) => ({
-      sender: createGmailSender(handle),
-      guards: defaultGuards,
-      store: createOutgoingStore(handle, userId),
-      onBlocked: createBlockedLogger(handle, userId),
-      lookup: createSentLookup(handle, userId),
-    }),
+    mail: (handle, userId) => {
+      const ports = portFactory(handle, userId);
+      return {
+        sender: ports.sender,
+        guards: defaultGuards,
+        store: createOutgoingStore(handle, userId),
+        onBlocked: createBlockedLogger(handle, userId),
+        lookup: ports.sentLookup,
+      };
+    },
     recordOffer: async (handle, input) => {
       const recorded = await recordOffer(handle, input, scheduling(handle, input.userId));
       return {

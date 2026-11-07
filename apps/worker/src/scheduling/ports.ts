@@ -1,7 +1,7 @@
-import { getCalendarClient, getGmailClient, createGmailSender } from '@wma/google';
+import { getCalendarClient, getGmailClient } from '@wma/google';
 import { createBlockedLogger, createOutgoingStore, type TenantHandle } from '@wma/db';
 import { defaultGuards } from '@wma/shared';
-import { createSentLookup } from '../submission/gmail';
+import { portFactory } from '../demo/factory';
 import {
   systemClock,
   type CalendarEventInput,
@@ -139,22 +139,27 @@ export function createMailboxPort(handle: TenantHandle, userId: string): Mailbox
   };
 }
 
-/** Production collaborators for one user; `scheduleReminders` comes from the notifications workstream. */
+/**
+ * Collaborators for one user; `scheduleReminders` comes from the notifications workstream. Demo
+ * tenants get the local calendar and mailbox, every other tenant Google's (see demo/factory).
+ * The factory and this module import each other, but only call each other inside functions.
+ */
 export function createSchedulingDeps(
   handle: TenantHandle,
   userId: string,
   scheduleReminders: SchedulingDeps['scheduleReminders'],
 ): SchedulingDeps {
+  const ports = portFactory(handle, userId);
   return {
     clock: systemClock,
-    calendar: createCalendarPort(handle, userId),
-    mailbox: createMailboxPort(handle, userId),
+    calendar: ports.calendar,
+    mailbox: ports.mailbox,
     mail: {
-      sender: createGmailSender(handle),
+      sender: ports.sender,
       guards: defaultGuards,
       store: createOutgoingStore(handle, userId),
       onBlocked: createBlockedLogger(handle, userId),
-      lookup: createSentLookup(handle, userId),
+      lookup: ports.sentLookup,
     },
     webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
     scheduleReminders,

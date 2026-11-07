@@ -14,3 +14,6 @@ data/
 playwright-report/
 test-results/
 *.log
+
+# e2e session state
+apps/web/e2e/.auth/

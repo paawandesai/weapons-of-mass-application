@@ -12,6 +12,8 @@ export interface EmailThreadInput {
   applicationId?: string | null;
   compensationFlag?: boolean;
   bookingLink?: string | null;
+  /** Subject of the thread's first message; kept once stored. */
+  subject?: string | null;
   promptVersion?: string | null;
   lastMessageAt?: Date;
 }
@@ -35,6 +37,7 @@ export async function upsertEmailThread(
     kind: sql`CASE WHEN ${newer} THEN excluded.kind ELSE ${t.kind} END`,
     lastMessageAt: sql`GREATEST(${t.lastMessageAt}, excluded.last_message_at)`,
     compensationFlag: sql`(${t.compensationFlag} OR excluded.compensation_flag)`,
+    subject: sql`COALESCE(${t.subject}, excluded.subject)`,
     ...(input.applicationId !== undefined ? { applicationId: input.applicationId } : {}),
     ...(input.bookingLink !== undefined
       ? {
@@ -58,6 +61,7 @@ export async function upsertEmailThread(
         applicationId: input.applicationId ?? null,
         compensationFlag: input.compensationFlag ?? false,
         bookingLink: input.bookingLink ?? null,
+        subject: input.subject ?? null,
         promptVersion: input.promptVersion ?? null,
         ...(input.lastMessageAt ? { lastMessageAt: input.lastMessageAt } : {}),
       })

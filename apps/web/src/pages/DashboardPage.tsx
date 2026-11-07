@@ -1,6 +1,6 @@
 import type { MeResponse } from '@wma/shared';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { api, errorMessage, formatTime } from '../api';
 
 interface Step {
@@ -38,8 +38,11 @@ export function DashboardPage() {
     );
   if (!me) return <p className="muted">Loading…</p>;
 
-  const resume = me.connections.find((c) => c.kind === 'resume');
   const approved = me.user.approved_profile_version !== null;
+  // Once the profile is approved the board is the home page.
+  if (approved) return <Navigate to="/board" replace />;
+
+  const resume = me.connections.find((c) => c.kind === 'resume');
   const steps: Step[] = [
     { label: 'Signed in with Google', done: true, to: '/connections', action: 'View connections' },
     {

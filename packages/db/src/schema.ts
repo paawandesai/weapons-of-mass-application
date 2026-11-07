@@ -40,6 +40,10 @@ export const secretKind = pgEnum('secret_kind', ['google_refresh_token', 'ats_pa
 /** The tenant row itself has no tenant_id; its RLS policy keys on `id`. */
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
+  /** Server-set only (seed script or migration); no API writes it. */
+  demo: boolean('demo').notNull().default(false),
+  /** Natural key of seeded tenants (`demo`); null for every tenant created through sign-in. */
+  slug: text('slug').unique(),
   createdAt: createdAt(),
 });
 
@@ -396,6 +400,8 @@ export const jobs = pgTable(
     currency: text('currency'),
     postedAt: timestamp('posted_at', { withTimezone: true }),
     raw: jsonb('raw'),
+    /** True for demo fixture postings the simulated recruiter answers; set only by the seed script. */
+    seeded: boolean('seeded').notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [
@@ -437,6 +443,8 @@ export const applications = pgTable(
     followedUpAt: timestamp('followed_up_at', { withTimezone: true }),
     confirmationSource: confirmationSource('confirmation_source'),
     lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Offer panel data `{posted_min, posted_max, currency, floor, comparables[], fetched_at, error}`. */
+    negotiation: jsonb('negotiation'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -562,6 +570,8 @@ export const emailThreads = pgTable(
     kind: threadKind('kind').notNull(),
     compensationFlag: boolean('compensation_flag').notNull().default(false),
     bookingLink: text('booking_link'),
+    /** Subject of the thread's first message, written at sync time. */
+    subject: text('subject'),
     promptVersion: text('prompt_version'),
     lastMessageAt: timestamp('last_message_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
@@ -744,4 +754,120 @@ export const digestState = pgTable(
     collectedThrough: timestamp('collected_through', { withTimezone: true }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.userId] }), userRef(t)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Wave 4: user stage moves and the per-tenant demo mailbox and calendar.
+// ---------------------------------------------------------------------------------------------
+
+/** One row per board move made by the user (the agent's own transitions never write here). */
+export const stageOverrides = pgTable(
+  'stage_overrides',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    applicationId: uuid('application_id').notNull(),
+    fromStatus: applicationStatus('from_status').notNull(),
+    toStatus: applicationStatus('to_status').notNull(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('stage_overrides_tenant_application_idx').on(t.tenantId, t.applicationId, t.at),
+    userRef(t),
+    foreignKey({
+      columns: [t.tenantId, t.applicationId],
+      foreignColumns: [applications.tenantId, applications.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+/** The demo tenant's mailbox: what Gmail would hold for the user, read by the same inbox code. */
+export const demoMailboxMessages = pgTable(
+  'demo_mailbox_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    threadId: text('thread_id').notNull(),
+    gmailMessageId: text('gmail_message_id').notNull(),
+    /** Per-tenant, strictly increasing (wma_demo_next_history_id). */
+    historyId: bigint('history_id', { mode: 'number' }).notNull(),
+    fromAddress: text('from_address').notNull(),
+    fromName: text('from_name'),
+    toAddress: text('to_address').notNull(),
+    subject: text('subject').notNull(),
+    bodyText: text('body_text').notNull(),
+    headers: jsonb('headers')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    labelIds: text('label_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    internalDate: timestamp('internal_date', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('demo_mailbox_tenant_message_key').on(t.tenantId, t.gmailMessageId),
+    unique('demo_mailbox_tenant_history_key').on(t.tenantId, t.historyId),
+    index('demo_mailbox_tenant_thread_idx').on(t.tenantId, t.threadId, t.internalDate),
+    userRef(t),
+  ],
+);
+
+/** The demo tenant's calendar: events the fake calendar port records. */
+export const demoCalendarEvents = pgTable(
+  'demo_calendar_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    /** The id the scheduling code uses to find the event again (a Google event id in production). */
+    clientId: text('client_id').notNull(),
+    summary: text('summary').notNull(),
+    description: text('description').notNull().default(''),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('demo_calendar_tenant_client_key').on(t.tenantId, t.clientId),
+    index('demo_calendar_tenant_user_starts_idx').on(t.tenantId, t.userId, t.startsAt),
+    userRef(t),
+  ],
+);
+
+/**
+ * Durable follow-on work, written inside the transaction of the parent change and dispatched to
+ * the queue by a reconciler. `dedupeKey` is unique per tenant so a repeated trigger is one row.
+ */
+export const pendingJobs = pgTable(
+  'pending_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    kind: text('kind').notNull(),
+    payload: jsonb('payload')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    dedupeKey: text('dedupe_key').notNull(),
+    createdAt: createdAt(),
+    dispatchedAt: timestamp('dispatched_at', { withTimezone: true }),
+  },
+  (t) => [
+    unique('pending_jobs_tenant_dedupe_key').on(t.tenantId, t.dedupeKey),
+    index('pending_jobs_undispatched_idx').on(t.tenantId, t.dispatchedAt),
+    userRef(t),
+  ],
 );

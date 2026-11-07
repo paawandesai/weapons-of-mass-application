@@ -43,7 +43,7 @@
 
 ## 7. Integration checks
 
-- [ ] 7.1 Run an end-to-end scenario on a seeded tenant with mocked Google APIs: application submitted, recruiter proposes times, user confirms via POST, recruiter reply sent, event created, status Interviewing, reminders scheduled; verify the Playwright e2e test passes and no outgoing message contains `$`, salary, compensation or equity
+- [x] 7.1 Run an end-to-end scenario on a seeded tenant with mocked Google APIs: application submitted, recruiter proposes times, user confirms via POST, recruiter reply sent, event created, status Interviewing, reminders scheduled; verify the Playwright e2e test passes and no outgoing message contains `$`, salary, compensation or equity
 - [x] 7.2 Run `openspec validate inbox-and-scheduling --strict` and the full Vitest suite; verify both pass clean
 
 ## Workflow follow-up

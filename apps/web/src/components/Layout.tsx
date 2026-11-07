@@ -5,6 +5,7 @@ import { ApiError, api } from '../api';
 export function Layout() {
   const navigate = useNavigate();
   const [email, setEmail] = useState<string | null>(null);
+  const [demo, setDemo] = useState(false);
   const [unauth, setUnauth] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -12,7 +13,11 @@ export function Layout() {
     let live = true;
     api
       .me()
-      .then((m) => live && setEmail(m.user.email))
+      .then((m) => {
+        if (!live) return;
+        setEmail(m.user.email);
+        setDemo(m.demo === true);
+      })
       .catch((e) => {
         if (!live) return;
         if (e instanceof ApiError && e.status === 401) setUnauth(true);
@@ -48,9 +53,12 @@ export function Layout() {
           <NavLink to="/" end>
             Dashboard
           </NavLink>
+          <NavLink to="/board">Board</NavLink>
+          <NavLink to="/runs">Runs</NavLink>
           <NavLink to="/connections">Connections</NavLink>
           <NavLink to="/survey">Survey</NavLink>
           <NavLink to="/profile/review">Profile review</NavLink>
+          {demo && <NavLink to="/demo/inbox">Inbox</NavLink>}
         </nav>
         <span className="spacer" />
         <span className="muted">{email}</span>

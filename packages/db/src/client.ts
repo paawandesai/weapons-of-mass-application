@@ -66,6 +66,12 @@ export interface Db {
   runRoster(): Promise<RosterEntry[]>;
   /** Tenants that own runs dated before `cutoff` (`YYYY-MM-DD`); the nightly cleanup visits them. */
   tenantsWithRunsBefore(cutoff: string): Promise<string[]>;
+  /** Tenants with undispatched `pending_jobs` rows (the reconciler opens one handle per tenant). */
+  tenantsWithPendingJobs(): Promise<string[]>;
+  /** Number of tenants flagged `demo` (startup check; more than one is a configuration error). */
+  demoTenantCount(): Promise<number>;
+  /** The single demo tenant's user, or null unless exactly one tenant is flagged (demo sign-in). */
+  demoUser(): Promise<{ tenantId: string; userId: string } | null>;
   close(): Promise<void>;
 }
 
@@ -185,6 +191,21 @@ export function createDb(url: string): Db {
         [cutoff],
       );
       return r.rows.map((x) => x.tenant_id);
+    },
+    async tenantsWithPendingJobs() {
+      const r = await pool.query<{ tenant_id: string }>('select * from wma_pending_job_tenants()');
+      return r.rows.map((x) => x.tenant_id);
+    },
+    async demoTenantCount() {
+      const r = await pool.query<{ n: number }>('select wma_demo_tenant_count() as n');
+      return Number(r.rows[0]?.n ?? 0);
+    },
+    async demoUser() {
+      const r = await pool.query<{ tenant_id: string; user_id: string }>(
+        'select * from wma_demo_user()',
+      );
+      const row = r.rows[0];
+      return row ? { tenantId: row.tenant_id, userId: row.user_id } : null;
     },
     close: () => pool.end(),
   };

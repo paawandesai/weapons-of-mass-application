@@ -229,7 +229,14 @@ export function applyTransition(
   handle: TenantHandle,
   applicationId: string,
   classification: Classification,
-  extras: { appliedAt?: Date } = {},
+  extras: {
+    appliedAt?: Date;
+    /**
+     * Called with the change right after the row is updated, inside the transaction. Use it to
+     * remember what happened; start side effects only after the transaction commits.
+     */
+    onTransition?: (change: Extract<AppliedTransition, { changed: true }>) => void;
+  } = {},
 ): Promise<AppliedTransition> {
   return handle.run(async (tx) => {
     const rows = await tx
@@ -264,11 +271,29 @@ export function applyTransition(
       .returning({ id: applications.id });
     if (updated.length === 0)
       return { changed: false, reason: 'no_change', from: current.status } as const;
-    return {
+    const applied = {
       changed: true,
       from: current.status,
       to: change.status,
       closedReason: change.closedReason ?? null,
     } as const;
+    extras.onTransition?.(applied);
+    return applied;
   });
+}
+
+/** Stores the offer panel data. Leaves `last_activity_at` alone: gathering pay data is not card activity. */
+export async function setNegotiation(
+  handle: TenantHandle,
+  id: string,
+  negotiation: unknown,
+): Promise<ApplicationRow | null> {
+  const rows = await handle.run((tx) =>
+    tx
+      .update(applications)
+      .set({ negotiation })
+      .where(and(eq(applications.tenantId, handle.tenantId), eq(applications.id, id)))
+      .returning(),
+  );
+  return rows[0] ?? null;
 }

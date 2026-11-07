@@ -26,6 +26,27 @@ export interface MeUser {
 export interface MeResponse {
   user: MeUser;
   connections: Connection[];
+  /** True for the flagged demo tenant; gates the demo inbox in the web app. */
+  demo: boolean;
+}
+
+/** A piece of a demo mail body: plain text or a link to open. */
+export type DemoBodyPart = { type: 'text'; value: string } | { type: 'link'; value: string };
+
+export interface DemoMailboxMessage {
+  id: string;
+  thread_id: string;
+  direction: 'received' | 'sent';
+  subject: string;
+  from: string;
+  to: string;
+  date: string;
+  body_text: string;
+  body: DemoBodyPart[];
+}
+
+export interface DemoMailboxResponse {
+  messages: DemoMailboxMessage[];
 }
 
 export interface BuildStatus {
