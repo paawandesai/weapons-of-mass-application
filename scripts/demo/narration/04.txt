@@ -1,0 +1,1 @@
+One click starts today's run. Twelve postings from the seeded employers are judged live by the model. Each one appears with a verdict and a short rationale, and the declined ones say why. This view is a window on the day's work, not a queue: the agent decides, applies, and moves on.

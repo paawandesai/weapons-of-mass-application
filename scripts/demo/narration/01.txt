@@ -1,0 +1,1 @@
+Weapons of Mass Application is an agent that runs a job search end to end. It finds postings, decides which are worth applying to, writes a tailored resume for each, submits the application, reads the recruiter's reply, and books the interview. But it never picks a time for you.

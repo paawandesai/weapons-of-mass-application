@@ -1,0 +1,1 @@
+This is Jordan, the demo user. Their profile was built from a resume, LinkedIn and GitHub, and then reviewed and approved by them: work history, skills, preferences, and the standard answers the agent may give on an application form. Nothing goes out before this approval. Gmail and Calendar are connected so the agent can read recruiter mail and hold interview slots.

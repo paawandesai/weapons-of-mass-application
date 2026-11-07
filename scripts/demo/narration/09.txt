@@ -1,0 +1,1 @@
+Weapons of Mass Application. Built in a day with Claude, with more than twelve hundred tests, a suite of simulated employers to regress against, and eight real applications submitted on the first day it ran for real.
