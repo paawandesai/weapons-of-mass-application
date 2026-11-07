@@ -115,7 +115,12 @@ export function RunViewPage() {
     <section>
       <div className="row">
         <h1 className="grow">Runs</h1>
-        <button type="button" onClick={() => void startRun()} disabled={running || starting}>
+        <button
+          type="button"
+          className="primary"
+          onClick={() => void startRun()}
+          disabled={running || starting}
+        >
           {running ? 'Running…' : 'Run today'}
         </button>
       </div>
