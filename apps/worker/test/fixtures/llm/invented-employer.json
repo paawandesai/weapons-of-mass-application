@@ -1,0 +1,86 @@
+{
+  "identity": {
+    "full_name": "Mara Quill",
+    "headline": "Senior Backend Engineer",
+    "location": "Porto, Portugal",
+    "summary": "Backend engineer who moves batch pipelines to streaming."
+  },
+  "contact": {
+    "email": "mara.quill@example.com",
+    "phone": "+351 910 000 000",
+    "linkedin_url": "https://www.linkedin.com/in/mara-quill",
+    "github_url": "https://github.com/mara-quill",
+    "website_url": null
+  },
+  "work_history": [
+    {
+      "employer": "Google",
+      "title": "Staff Software Engineer",
+      "location": null,
+      "start_date": "2021-03",
+      "end_date": null,
+      "summary": null,
+      "highlights": ["Led the move of batch pipelines to streaming"],
+      "sources": ["resume", "linkedin"]
+    },
+    {
+      "employer": "Acme Corp",
+      "title": "Software Engineer",
+      "location": null,
+      "start_date": "2018-06",
+      "end_date": "2021-02",
+      "summary": null,
+      "highlights": ["Built the ingestion service"],
+      "sources": ["resume"]
+    },
+    {
+      "employer": "Initech",
+      "title": "Principal Engineer",
+      "location": null,
+      "start_date": "2016-01",
+      "end_date": "2018-05",
+      "summary": null,
+      "highlights": [],
+      "sources": ["resume"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "tinyqueue",
+      "description": "A small Postgres-backed job queue",
+      "url": null,
+      "technologies": ["TypeScript"],
+      "start_date": null,
+      "end_date": null,
+      "sources": ["github"]
+    }
+  ],
+  "skills": [
+    {
+      "name": "TypeScript",
+      "category": "language"
+    },
+    {
+      "name": "PostgreSQL",
+      "category": "database"
+    },
+    {
+      "name": "Kubernetes",
+      "category": null
+    },
+    {
+      "name": "Haskell",
+      "category": null
+    }
+  ],
+  "education": [
+    {
+      "institution": "University of Porto",
+      "degree": "BSc",
+      "field": "Computer Science",
+      "start_date": "2014-09",
+      "end_date": "2018-06",
+      "sources": ["resume"]
+    }
+  ]
+}

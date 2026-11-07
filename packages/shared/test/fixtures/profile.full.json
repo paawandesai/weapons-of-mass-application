@@ -1,0 +1,94 @@
+{
+  "identity": {
+    "full_name": "Ada Example",
+    "headline": "Senior backend engineer",
+    "location": "Lisbon, Portugal",
+    "summary": "Backend engineer focused on data pipelines and reliable services."
+  },
+  "contact": {
+    "email": "ada@example.com",
+    "phone": "+351 900 000 000",
+    "linkedin_url": "https://www.linkedin.com/in/ada-example",
+    "github_url": "https://github.com/ada-example",
+    "website_url": null
+  },
+  "work_history": [
+    {
+      "employer": "Acme Corp",
+      "title": "Senior Software Engineer",
+      "location": "Remote",
+      "start_date": "2021-03",
+      "end_date": null,
+      "summary": "Owns the ingestion platform.",
+      "highlights": ["Cut pipeline latency by 40 percent", "Led a team of four"],
+      "sources": ["resume:1", "linkedin"]
+    },
+    {
+      "employer": "Globex",
+      "title": "Software Engineer",
+      "location": "Lisbon, Portugal",
+      "start_date": "2018-06",
+      "end_date": "2021-02",
+      "summary": null,
+      "highlights": [],
+      "sources": ["resume:1"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "tinyqueue",
+      "description": "A small Postgres-backed job queue.",
+      "url": "https://github.com/ada-example/tinyqueue",
+      "technologies": ["TypeScript", "PostgreSQL"],
+      "start_date": "2022-01",
+      "end_date": null,
+      "sources": ["github"]
+    }
+  ],
+  "skills": [
+    { "name": "TypeScript", "category": "language" },
+    { "name": "PostgreSQL", "category": "database" },
+    { "name": "Mentoring", "category": null }
+  ],
+  "education": [
+    {
+      "institution": "University of Lisbon",
+      "degree": "BSc",
+      "field": "Computer Science",
+      "start_date": "2014-09",
+      "end_date": "2018-06",
+      "sources": ["resume:1"]
+    }
+  ],
+  "preferences": {
+    "target_titles": ["Senior Backend Engineer", "Staff Engineer"],
+    "locations": ["Lisbon", "Remote (EU)"],
+    "remote": "remote"
+  },
+  "survey": {
+    "target_roles": ["Senior Backend Engineer"],
+    "salary_floor": 90000,
+    "work_life_balance": "No on-call rotations",
+    "family_constraints": null,
+    "willing_to_relocate": false,
+    "career_direction": "Move toward platform engineering",
+    "daily_target": 12
+  },
+  "standard_answers": {
+    "work_authorization": "Authorized to work in the EU",
+    "visa_sponsorship_required": false,
+    "start_date": "Within 30 days",
+    "notice_period": "30 days",
+    "reasons_for_change": "Looking for broader platform ownership"
+  },
+  "flags": [
+    {
+      "id": "flag-1",
+      "kind": "date_conflict",
+      "path": "work_history.1.end_date",
+      "message": "Resume says 2021-02, LinkedIn says 2021-04. Resume date kept.",
+      "sources": ["resume:1", "linkedin"],
+      "resolved": false
+    }
+  ]
+}

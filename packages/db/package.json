@@ -1,0 +1,28 @@
+{
+  "name": "@wma/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/migrate-cli.ts",
+    "db:check": "drizzle-kit check"
+  },
+  "dependencies": {
+    "@wma/shared": "workspace:*",
+    "dotenv": "^16.0.0",
+    "drizzle-orm": "^0.45.0",
+    "pg": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.0.0",
+    "drizzle-kit": "^0.31.0",
+    "tsx": "^4.0.0"
+  }
+}

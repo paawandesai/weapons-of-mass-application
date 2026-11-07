@@ -1,0 +1,72 @@
+{
+  "identity": {
+    "full_name": "Mara Quill",
+    "headline": "Senior Backend Engineer",
+    "location": "Porto, Portugal",
+    "summary": "Senior Backend Engineer based in Porto, Portugal, working as a Staff Software Engineer at Google since 2021, where she led the move of batch pipelines to streaming. Previously built an ingestion service in TypeScript on PostgreSQL at Acme Corp. Holds a BSc in Computer Science from the University of Porto."
+  },
+  "contact": {
+    "email": "mara.quill@example.com",
+    "phone": "+351 910 000 000",
+    "linkedin_url": "https://linkedin.com/in/mara-quill",
+    "github_url": "https://github.com/mara-quill",
+    "website_url": null
+  },
+  "work_history": [
+    {
+      "employer": "Google",
+      "title": "Staff Software Engineer",
+      "start_date": "2021-03",
+      "highlights": ["Led the move of batch pipelines to streaming, cutting latency by half."],
+      "sources": ["resume", "linkedin"],
+      "location": null,
+      "end_date": null,
+      "summary": null
+    },
+    {
+      "employer": "Acme Corp",
+      "title": "Senior Software Engineer",
+      "start_date": "2019-01",
+      "end_date": "2021-06",
+      "highlights": [],
+      "sources": ["linkedin"],
+      "location": null,
+      "summary": null
+    },
+    {
+      "employer": "Acme Corp",
+      "title": "Software Engineer",
+      "start_date": "2018-06",
+      "end_date": "2021-02",
+      "highlights": ["Built the ingestion service in TypeScript on PostgreSQL."],
+      "sources": ["resume"],
+      "location": null,
+      "summary": null
+    }
+  ],
+  "projects": [],
+  "skills": [
+    {
+      "name": "TypeScript",
+      "category": "Programming Language"
+    },
+    {
+      "name": "PostgreSQL",
+      "category": "Database"
+    },
+    {
+      "name": "Kubernetes",
+      "category": "Infrastructure"
+    }
+  ],
+  "education": [
+    {
+      "institution": "University of Porto",
+      "degree": "BSc",
+      "field": "Computer Science",
+      "start_date": "2014-01",
+      "end_date": "2018-12",
+      "sources": ["resume"]
+    }
+  ]
+}

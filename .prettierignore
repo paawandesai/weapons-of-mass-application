@@ -1,0 +1,9 @@
+node_modules
+dist
+data
+pnpm-lock.yaml
+openspec
+docs
+.claude
+packages/db/drizzle
+README.md

@@ -1,0 +1,23 @@
+{
+  "name": "@wma/google",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@wma/db": "workspace:*",
+    "drizzle-orm": "^0.45.0",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.0.0",
+    "msw": "^2.15.0",
+    "pg": "^8.0.0"
+  }
+}
