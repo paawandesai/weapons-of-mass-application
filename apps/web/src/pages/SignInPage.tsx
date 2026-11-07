@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
+import { Mark } from '../components/Logo';
 
 const MESSAGES: Record<string, string> = {
   unverified_email:
@@ -16,7 +17,11 @@ export function SignInPage() {
 
   return (
     <main className="signin">
-      <h1>Weapons of Mass Application</h1>
+      <div className="hero">
+        <Mark size={96} />
+        <h1>Weapons of Mass Application</h1>
+        <p className="tagline">Apply at scale</p>
+      </div>
       <p className="muted">
         Sign in with Google once. The agent uses Gmail, Calendar and Drive on your behalf, and you
         review your profile before it applies anywhere.

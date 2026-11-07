@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../api';
+import { Mark, Wordmark } from './Logo';
 
 export function Layout() {
   const navigate = useNavigate();
@@ -48,7 +49,10 @@ export function Layout() {
   return (
     <div className="shell">
       <header className="topbar">
-        <strong>Weapons of Mass Application</strong>
+        <NavLink to="/" className="brand" aria-label="Weapons of Mass Application home">
+          <Mark />
+          <Wordmark />
+        </NavLink>
         <nav aria-label="Main">
           <NavLink to="/" end>
             Dashboard
