@@ -37,9 +37,9 @@ async function isFile(path: string): Promise<boolean> {
 
 /**
  * Resolves `/forms/<rest>` to a file under `root`. A path naming a file is served as is
- * (`/forms/greenhouse/form.html`, `/forms/_shared/fixture.js`); `/forms/<vendor>/<id>` with no
- * such file serves that vendor's `form.html` (a posting id), so a seeded job URL needs no file of
- * its own. Anything that would leave `root` resolves to nothing.
+ * (`/forms/greenhouse/form.html`, `/forms/_shared/fixture.js`); `/forms/<vendor>/<id>` serves
+ * `<vendor>/<id>.html` when the posting has its own page, else that vendor's `form.html`, so a
+ * seeded job URL needs no file of its own. Anything that would leave `root` resolves to nothing.
  */
 export async function resolveFormPath(root: string, urlPath: string): Promise<string | null> {
   if (!urlPath.startsWith('/forms/')) return null;
@@ -55,6 +55,9 @@ export async function resolveFormPath(root: string, urlPath: string): Promise<st
   if (await isFile(abs)) return abs;
   const parts = rest.split('/').filter(Boolean);
   if (parts.length === 2 && !parts[1]!.includes('.') && parts[0] !== '_shared') {
+    // A posting with its own page (`<vendor>/<id>.html`, e.g. Gauntlet Jobs) beats the shared form.
+    const own = normalize(join(root, parts[0]!, `${parts[1]}.html`));
+    if (own.startsWith(root + sep) && (await isFile(own))) return own;
     const form = normalize(join(root, parts[0]!, 'form.html'));
     if (form.startsWith(root + sep) && (await isFile(form))) return form;
   }

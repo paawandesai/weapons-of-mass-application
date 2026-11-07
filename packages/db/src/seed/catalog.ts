@@ -1,4 +1,5 @@
-import type { ProfileDocument } from '@wma/shared';
+import { readFileSync } from 'node:fs';
+import { profileDocumentSchema, type ProfileDocument } from '@wma/shared';
 
 /** Everything here is fictional: no real person, employer or contact detail. */
 export const DEMO_TENANT_SLUG = 'demo';
@@ -172,6 +173,29 @@ export const DEMO_POSTINGS: DemoPosting[] = [
   },
 ];
 
+/**
+ * Gauntlet Jobs: the one posting seeded when `GAUNTLET_SCENARIO` is set, replacing the twelve
+ * above. The simulated recruiter runs a scripted scenario for it (apps/worker/src/demo/gauntlet.ts)
+ * and its form is `forms/greenhouse/gauntlet-jobs-ai-engineer.html`.
+ */
+export const GAUNTLET_POSTING: DemoPosting = {
+  company: 'Gauntlet Jobs',
+  slug: 'gauntlet-jobs',
+  vendor: 'greenhouse',
+  title: 'AI Engineer',
+  location: 'Remote (US)',
+  mode: 'remote',
+  payMin: 200000,
+  payMax: 250000,
+  description:
+    'Build the platform behind our AI products: streaming data pipelines, PostgreSQL-backed services in TypeScript and Go, and the evaluation tooling our model teams rely on.',
+};
+
+/** The demo's postings: only Gauntlet Jobs when `GAUNTLET_SCENARIO` is set, else the twelve. */
+export function demoPostings(env: Record<string, string | undefined> = process.env): DemoPosting[] {
+  return env.GAUNTLET_SCENARIO?.trim() ? [GAUNTLET_POSTING] : DEMO_POSTINGS;
+}
+
 /** `<origin>/forms/<vendor>/<job slug>` with `?captcha` for the challenge variant. */
 export function postingUrl(p: DemoPosting, origin: string = DEMO_FORMS_ORIGIN): string {
   const slug = `${p.slug}-${p.title
@@ -279,3 +303,27 @@ export const DEMO_PROFILE: ProfileDocument = {
   },
   flags: [],
 };
+
+/**
+ * The demo user's profile: the JSON profile document at `DEMO_PROFILE_PATH` when set (for testing
+ * with a real profile), else the persona above, which in Gauntlet mode also targets AI Engineer
+ * roles so the judge approves the posting.
+ */
+export function demoProfile(
+  env: Record<string, string | undefined> = process.env,
+): ProfileDocument {
+  const path = env.DEMO_PROFILE_PATH?.trim();
+  if (path) return profileDocumentSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+  if (!env.GAUNTLET_SCENARIO?.trim()) return DEMO_PROFILE;
+  return {
+    ...DEMO_PROFILE,
+    preferences: {
+      ...DEMO_PROFILE.preferences,
+      target_titles: ['AI Engineer', ...DEMO_PROFILE.preferences.target_titles],
+    },
+    survey: {
+      ...DEMO_PROFILE.survey,
+      target_roles: ['AI Engineer', ...DEMO_PROFILE.survey.target_roles],
+    },
+  };
+}

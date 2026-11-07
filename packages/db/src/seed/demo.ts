@@ -16,7 +16,8 @@ import { seedScenarios, type ScenarioSummary } from './scenarios';
 import {
   demoFormsOrigin,
   DEMO_POSTINGS,
-  DEMO_PROFILE,
+  demoPostings,
+  demoProfile,
   DEMO_TENANT_SLUG,
   DEMO_USER_EMAIL,
   postingJobId,
@@ -104,13 +105,16 @@ export async function seedDemoWith(db: Db, options: SeedOptions = {}): Promise<S
   });
   const handle = tenant.handle;
   const origin = (options.formsOrigin ?? demoFormsOrigin()).replace(/\/+$/, '');
+  const profile = demoProfile();
+  const postings = demoPostings();
+  const gauntlet = postings !== DEMO_POSTINGS;
 
   let user = (await listUsers(handle)).find((u) => u.email === email);
   if (!user) {
     user = await createUser(handle, {
       email,
       googleSub: `demo-sub-${slug}`,
-      displayName: DEMO_PROFILE.identity.full_name,
+      displayName: profile.identity.full_name,
     });
   }
   await setNotificationSettings(handle, user.id, {
@@ -121,7 +125,7 @@ export async function seedDemoWith(db: Db, options: SeedOptions = {}): Promise<S
   if (user.approvedProfileVersion === null) {
     const row = await insertProfileVersion(handle, {
       userId: user.id,
-      document: { ...DEMO_PROFILE, contact: { ...DEMO_PROFILE.contact, email } },
+      document: { ...profile, contact: { ...profile.contact, email } },
       builtFrom: { seeded: true },
     });
     await setApprovedProfileVersion(handle, user.id, row.version);
@@ -140,7 +144,7 @@ export async function seedDemoWith(db: Db, options: SeedOptions = {}): Promise<S
   }
 
   const companyIds = new Map<string, string>();
-  for (const p of DEMO_POSTINGS) {
+  for (const p of postings) {
     const company = await upsertCompany(handle, {
       name: p.company,
       ats: p.vendor,
@@ -182,7 +186,9 @@ export async function seedDemoWith(db: Db, options: SeedOptions = {}): Promise<S
     }
   }
 
-  await seedRun(handle, user.id, origin);
+  // Gauntlet mode skips the finished run: its selected candidates could mark the one posting as
+  // already seen, and today's run would then apply to nothing.
+  if (!gauntlet) await seedRun(handle, user.id, origin);
   const scenarios = options.scenarios
     ? await seedScenarios(handle, { id: user.id, email: user.email }, origin)
     : undefined;

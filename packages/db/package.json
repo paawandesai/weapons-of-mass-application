@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate-cli.ts",
     "db:check": "drizzle-kit check",
-    "seed:demo": "tsx src/seed/cli.ts"
+    "seed:demo": "tsx src/seed/cli.ts",
+    "gauntlet:mail": "tsx src/seed/mailbox-cli.ts"
   },
   "dependencies": {
     "@wma/shared": "workspace:*",
