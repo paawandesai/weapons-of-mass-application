@@ -2,7 +2,7 @@
 
 An agent that runs a job search end to end: builds a profile from your connected accounts, finds postings, decides which are worth applying to, writes a tailored resume for each, submits the application, handles recruiter email, and books interviews only after you confirm a time.
 
-Hackathon MVP of a multi-tenant SaaS. No code yet; the repo currently holds the product and planning documents.
+Hackathon MVP of a multi-tenant SaaS.
 
 ## Documents
 
