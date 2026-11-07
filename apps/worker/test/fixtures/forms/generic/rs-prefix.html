@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>react-select option ids without option roles</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="react-select-2-input">Preferred shift</label>
+        <input
+          id="react-select-2-input"
+          type="text"
+          role="combobox"
+          aria-haspopup="true"
+          aria-expanded="false"
+          autocomplete="off"
+        />
+      </div>
+      <div class="entry">
+        <label for="question_123">Preferred tool</label>
+        <input
+          id="question_123"
+          type="text"
+          role="combobox"
+          aria-haspopup="true"
+          aria-expanded="false"
+          autocomplete="off"
+        />
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      function wire(input, instance, items) {
+        var menu = null;
+        function close() {
+          if (menu) menu.remove();
+          menu = null;
+          input.setAttribute('aria-expanded', 'false');
+        }
+        input.addEventListener('click', function () {
+          close();
+          menu = document.createElement('div');
+          menu.style.cssText = 'position:absolute;top:300px;left:20px';
+          items.forEach(function (t, n) {
+            var o = document.createElement('div');
+            o.id = 'react-select-' + instance + '-option-' + n;
+            o.textContent = t;
+            o.addEventListener('click', function () {
+              input.value = t;
+              document.getElementById('app').setAttribute('data-' + instance, t);
+              close();
+            });
+            menu.appendChild(o);
+          });
+          document.body.appendChild(menu);
+          input.setAttribute('aria-expanded', 'true');
+        });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') close();
+        });
+      }
+      wire(document.getElementById('react-select-2-input'), '2', ['Morning', 'Evening']);
+      wire(document.getElementById('question_123'), 'question_123', ['Hammer', 'Saw']);
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A phone field that keeps only the first digit</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="phone">Phone<span aria-hidden="true">*</span></label>
+        <input id="phone" type="tel" />
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      var p = document.getElementById('phone');
+      p.addEventListener('input', function () {
+        if (p.value.length > 1) p.value = p.value.slice(-1);
+      });
+    </script>
+  </body>
+</html>

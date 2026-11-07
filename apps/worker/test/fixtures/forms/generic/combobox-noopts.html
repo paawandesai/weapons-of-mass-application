@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A select-style combobox whose options never load</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label id="c-label" for="c">Team<span aria-hidden="true">*</span></label>
+        <div class="shell">
+          <div class="single-value"></div>
+          <input
+            id="c"
+            type="text"
+            role="combobox"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-labelledby="c-label"
+            autocomplete="off"
+          />
+          <input
+            required
+            tabindex="-1"
+            aria-hidden="true"
+            value=""
+            style="opacity: 0; height: 0; position: absolute"
+          />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

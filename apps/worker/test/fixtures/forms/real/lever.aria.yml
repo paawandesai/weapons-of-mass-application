@@ -1,0 +1,286 @@
+- dialog "cookieconsent":
+  - text: 🍪
+  - button "Deny"
+  - button "Accept"
+  - heading "Privacy Notice" [level=4]
+  - paragraph:
+    - text: This website uses cookies to improve your web experience. By clicking Accept, you agree to the use of cookies.
+    - link "Cookie Policy":
+      - /url: https://www.employinc.com/cookie-policy/
+- link "Palantir Technologies logo":
+  - /url: https://jobs.lever.co/palantir
+  - img "Palantir Technologies logo"
+- heading "Administrative Business Partner" [level=2]
+- text: Singapore, Singapore Administrative / Full-time / Hybrid
+- heading "Submit your application" [level=4]
+- list:
+  - listitem:
+    - text: Resume/CV ✱
+    - link "ATTACH RESUME/CV Resume/CV ✱":
+      - /url: "#"
+      - img
+      - text: ATTACH RESUME/CV
+      - button "Resume/CV ✱ ATTACH RESUME/CV"
+  - listitem:
+    - text: Full name ✱
+    - textbox "Full name ✱"
+  - listitem:
+    - text: Email ✱
+    - textbox "Email ✱"
+  - listitem:
+    - text: Phone
+    - textbox "Phone"
+  - listitem:
+    - text: Current location ✱
+    - textbox "Current location ✱"
+  - listitem:
+    - text: Current company
+    - textbox "Current company"
+- heading "Links" [level=4]
+- list:
+  - listitem:
+    - text: LinkedIn URL
+    - textbox "LinkedIn URL"
+  - listitem:
+    - text: GitHub URL
+    - textbox "GitHub URL"
+  - listitem:
+    - text: Portfolio URL
+    - textbox "Portfolio URL"
+- heading "Supplementary Questions" [level=4]
+- list:
+  - listitem:
+    - text: Language Skill(s) (Check all that apply) ✱
+    - list:
+      - listitem:
+        - checkbox "English (ENG)"
+        - text: English (ENG)
+      - listitem:
+        - checkbox "Spanish (SPA)"
+        - text: Spanish (SPA)
+      - listitem:
+        - checkbox "French (FRA)"
+        - text: French (FRA)
+      - listitem:
+        - checkbox "German (DEU)"
+        - text: German (DEU)
+      - listitem:
+        - checkbox "Japanese (JPN)"
+        - text: Japanese (JPN)
+      - listitem:
+        - checkbox "Cantonese (CANT)"
+        - text: Cantonese (CANT)
+      - listitem:
+        - checkbox "Mandarin (MAN)"
+        - text: Mandarin (MAN)
+      - listitem:
+        - checkbox "Dutch (NLD)"
+        - text: Dutch (NLD)
+      - listitem:
+        - checkbox "Hindi (HIN)"
+        - text: Hindi (HIN)
+      - listitem:
+        - checkbox "Arabic (ARA)"
+        - text: Arabic (ARA)
+      - listitem:
+        - checkbox "Danish (DAN)"
+        - text: Danish (DAN)
+      - listitem:
+        - checkbox "Turkish (TUR)"
+        - text: Turkish (TUR)
+      - listitem:
+        - checkbox "Portuguese (POR)"
+        - text: Portuguese (POR)
+      - listitem:
+        - checkbox "Hebrew (HEB)"
+        - text: Hebrew (HEB)
+      - listitem:
+        - checkbox "Swedish (SWE)"
+        - text: Swedish (SWE)
+      - listitem:
+        - checkbox "Norwegian (NOR)"
+        - text: Norwegian (NOR)
+      - listitem:
+        - checkbox "Italian (ITA)"
+        - text: Italian (ITA)
+      - listitem:
+        - checkbox "Vietnamese (VIE)"
+        - text: Vietnamese (VIE)
+      - listitem:
+        - checkbox "Tagalog (TGL)"
+        - text: Tagalog (TGL)
+      - listitem:
+        - checkbox "Khmer (KHM)"
+        - text: Khmer (KHM)
+      - listitem:
+        - checkbox "Hmong (HMN)"
+        - text: Hmong (HMN)
+      - listitem:
+        - checkbox "Telugu (TEL)"
+        - text: Telugu (TEL)
+      - listitem:
+        - checkbox "Bengali (BNE)"
+        - text: Bengali (BNE)
+      - listitem:
+        - checkbox "Marathi (MAR)"
+        - text: Marathi (MAR)
+      - listitem:
+        - checkbox "Urdu (URD)"
+        - text: Urdu (URD)
+      - listitem:
+        - checkbox "Gujarati (GUJ)"
+        - text: Gujarati (GUJ)
+      - listitem:
+        - checkbox "Lithuanian (LIT)"
+        - text: Lithuanian (LIT)
+      - listitem:
+        - checkbox "Korean (KOR)"
+        - text: Korean (KOR)
+      - listitem:
+        - checkbox "American Sign Language (ASL)"
+        - text: American Sign Language (ASL)
+      - listitem:
+        - checkbox "British Sign Language (BSL)"
+        - text: British Sign Language (BSL)
+      - listitem:
+        - checkbox "Choose not to disclose"
+        - text: Choose not to disclose
+      - listitem:
+        - checkbox "Polish"
+        - text: Polish
+      - listitem:
+        - checkbox "Other"
+        - text: Other
+  - listitem:
+    - text: Preferred Name | What would you like us to call you?
+    - textbox "Type your response"
+  - listitem:
+    - text: Name Pronunciation | How do you pronounce your name?
+    - textbox "Type your response"
+- heading "Work Authorization" [level=4]
+- list:
+  - listitem:
+    - text: Are you legally authorized to work in the country for which you are applying? ✱
+    - list:
+      - listitem:
+        - radio "Yes"
+        - text: "Yes"
+      - listitem:
+        - radio "No"
+        - text: "No"
+  - listitem:
+    - text: Will you now or in the future require sponsorship for employment visa status (e.g., H-1B, etc.)? ✱
+    - list:
+      - listitem:
+        - radio "Yes"
+        - text: "Yes"
+      - listitem:
+        - radio "No"
+        - text: "No"
+- heading "University" [level=4]
+- list:
+  - listitem:
+    - text: Which university are you currently attending or did you last attend? Please select "Other (School Not Listed)" if your school is not listed. ✱
+    - combobox:
+      - option "Click Here (If you encounter an issue, make sure your browser is updated and try clearing cache & cookies)" [selected]
+      - option "Aalborg University"
+      - option "Aalto University"
+      - option "Aarhus University"
+      - option "Abdullah Gul University"
+      - option "Abertay University"
+      - option "Aberystwyth University"
+      - option "Abilene Christian University"
+      - option "Abo Akademi University"
+      - option "Abubakar Tafawa Balewa University"
+      - option "Academy of Art University"
+      - option "Academy of Economic Studies of Moldova"
+      - option "Academy of Fine Arts in Warsaw"
+      - option "Academy of Information Technology"
+      - option "Academy of Technology - AOT"
+      - option "Acharya Nagarjuna University"
+      - option "Adam Mickiewicz University in Poznan"
+      - option "Adams State College"
+      - option "Adana Science and Technology University"
+      - option "Addis Ababa Institute of Technology"
+      - option "Addis Ababa University"
+      - option "Adelphi University"
+      - option "Adi Shankara Institute of Engineering and Technology"
+      - option "Adina Institute of Science and Technology - AIST"
+      - option "Adiyaman University"
+      - option "Adnan Menderes University"
+      - option "Other - School Not Listed"
+- heading "How did you hear about this opportunity?" [level=4]
+- list:
+  - listitem:
+    - text: Please tell us how you heard about this opportunity. ✱
+    - combobox:
+      - option "Select..." [selected]
+      - option "Agency or Non-Palantir Recruiter"
+      - option "America's Job Exchange"
+      - option "BuiltIn"
+      - option "Campus Ambassador"
+      - option "Friend or Family"
+      - option "Glassdoor"
+      - option "Hackajob"
+      - option "Hallo"
+      - option "Handshake"
+      - option "Job Board (Indeed, Monster, etc.)"
+      - option "LinkedIn"
+      - option "Palantir Event"
+      - option "Palantir Medium Blog"
+      - option "Palantir Recruiter"
+      - option "Palantir Website"
+      - option "Rewriting the Code"
+      - option "Tapia"
+      - option "University Job Board"
+      - option "University or University Organization"
+      - option "Other"
+- heading "Additional Questions" [level=4]
+- list:
+  - listitem:
+    - text: What has been your favorite project or proudest accomplishment? Why?
+    - textbox
+  - listitem:
+    - text: Why do you want to work at Palantir?
+    - textbox
+- heading "AI Notetaker" [level=4]
+- list:
+  - listitem:
+    - text: As part of our interview process, we may use AI notetakers to transcribe conversations for accuracy and efficiency. Please see our candidate privacy policy for more information on how we process your data. Your decision to opt in or out of this tooling will not impact your candidacy. ✱
+    - list:
+      - listitem:
+        - radio "Yes, I consent"
+        - text: Yes, I consent
+      - listitem:
+        - radio "No, I do not consent"
+        - text: No, I do not consent
+- heading "Singapore Custom Questions" [level=4]
+- list:
+  - listitem:
+    - text: Are you a Singapore citizen? ✱
+    - list:
+      - listitem:
+        - radio "Yes"
+        - text: "Yes"
+      - listitem:
+        - radio "No"
+        - text: "No"
+  - listitem:
+    - text: Are you a Singapore permanent resident? ✱
+    - list:
+      - listitem:
+        - radio "Yes"
+        - text: "Yes"
+      - listitem:
+        - radio "No"
+        - text: "No"
+- heading "Additional information" [level=4]
+- textbox "Additional information"
+- button "Submit application"
+- paragraph:
+  - link "Palantir Technologies Home Page":
+    - /url: https://www.palantir.com/
+- link "Jobs powered by Lever logo":
+  - /url: https://www.lever.co/job-seeker-support/
+  - text: Jobs powered by
+  - img "Lever logo"

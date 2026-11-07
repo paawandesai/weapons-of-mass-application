@@ -383,6 +383,29 @@ export class FakeCaptcha implements CaptchaHandle {
   }
 }
 
+/**
+ * An iframe challenge as the production handle models it (generic.ts findFrameCaptcha): the
+ * challenge lives in a cross-origin frame, so `enter` does nothing, and it is cleared only by the
+ * provider marking it solved (the response token), never by an answer typed by us.
+ */
+export class FrameCaptcha implements CaptchaHandle {
+  readonly challenge = 'frame' as const;
+  entered: string[] = [];
+  shots = 0;
+  /** Set from outside the handle: the person solved the challenge in the page. */
+  solved = false;
+  async screenshot() {
+    this.shots++;
+    return Buffer.concat([PNG, Buffer.from('#full-page')]);
+  }
+  async enter(answer: string) {
+    this.entered.push(answer);
+  }
+  async cleared() {
+    return this.solved;
+  }
+}
+
 export interface TestDeps extends SubmissionDeps {
   adapter: FakeAdapter;
   browser: FakeBrowser;

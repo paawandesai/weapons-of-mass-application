@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>International phone widget</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="country">Country</label>
+        <input id="country" type="text" />
+      </div>
+      <div class="entry">
+        <label for="phone">Phone</label>
+        <div class="iti">
+          <button type="button" class="iti__selected-country" title="United States +1">
+            <span class="iti__selected-dial-code">+1</span>
+          </button>
+          <ul class="iti__country-list" role="listbox" hidden>
+            <li role="option" data-dial-code="1">
+              <span class="iti__country-name">United States</span> <span>+1</span>
+            </li>
+            <li role="option" data-dial-code="44">
+              <span class="iti__country-name">United Kingdom</span> <span>+44</span>
+            </li>
+            <li role="option" data-dial-code="351">
+              <span class="iti__country-name">Portugal</span> <span>+351</span>
+            </li>
+          </ul>
+          <input id="phone" type="tel" />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      var list = document.querySelector('.iti__country-list');
+      var btn = document.querySelector('.iti__selected-country');
+      btn.addEventListener('click', function () {
+        list.hidden = !list.hidden;
+      });
+      Array.prototype.forEach.call(list.querySelectorAll('li'), function (li) {
+        li.addEventListener('click', function () {
+          document.querySelector('.iti__selected-dial-code').textContent =
+            '+' + li.getAttribute('data-dial-code');
+          btn.title =
+            li.querySelector('.iti__country-name').textContent +
+            ' +' +
+            li.getAttribute('data-dial-code');
+          list.hidden = true;
+        });
+      });
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

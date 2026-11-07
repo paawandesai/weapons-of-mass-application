@@ -1,6 +1,7 @@
 import type { Locator, Page } from 'playwright';
 import { applicationFileKey } from '@wma/db';
 import type { AtsId } from '@wma/shared';
+import { SubmissionFailure, sanitizeMessage } from '../failure';
 import type {
   Account,
   CaptchaHandle,
@@ -8,27 +9,23 @@ import type {
   FieldDescriptor,
   FieldValues,
   FormAdapter,
+  FormNotice,
   SignInOutcome,
   SubmissionContext,
 } from '../types';
-import { toDescriptor, toScanned, type RawField, type ScannedField } from './classify';
-import { SCAN_SCRIPT } from './scan-script';
-
-export interface ScanConfig {
-  /** The application form (or any ancestor of its questions). */
-  rootSel: string;
-  /** One element per question. */
-  fieldSel: string;
-  /** The question text inside a field element. */
-  labelSel: string;
-  /** Marker inside the label for required questions (removed from the label text). */
-  requiredMarkSel: string;
-  controlSel: string;
-  /** Ancestor whose id, class and heading identify a section (self-identification etc.). */
-  sectionSel: string;
-  /** Controls inside these are not form questions (CAPTCHA widget, account forms). */
-  ignoreSel: string;
-}
+import {
+  attachResumeGeneric,
+  describe,
+  enrichOptions,
+  fillPage,
+  findFrameCaptcha,
+  goToStep,
+  probePage,
+  readNotices,
+  recordBaseline,
+  scanPage,
+  settlePage,
+} from './generic';
 
 export interface AccountSpec {
   /** Present on the sign-up and sign-in pages. */
@@ -46,29 +43,28 @@ export interface AccountSpec {
   verificationSent: string;
 }
 
-export interface VendorSpec {
+/**
+ * What a vendor file may say about its hosted forms. Reading, filling and submitting the form is
+ * the generic page layer's job (generic.ts); there are no scan selectors here.
+ */
+export interface VendorHints {
   ats: AtsId;
   hosts: RegExp;
-  scan: ScanConfig;
-  /** Present once the application form is on the page. */
-  formReady: string;
-  resumeInput: string;
-  submitButton: string;
-  confirmation: { selector: string; url?: RegExp };
-  account: AccountSpec | null;
   /** Maps a posting URL to the page that holds the form. */
   applyUrl?(url: URL): string;
+  /** The vendor's own confirmation marker; the generic text check applies when it is absent. */
+  confirmation: { selector: string; url?: RegExp };
+  /** Candidate account pages (Greenhouse); null when the vendor has none. */
+  account: AccountSpec | null;
+  /** Optional override for the resume file input. */
+  resumeInput?: string;
 }
 
 export const CAPTCHA_SELECTOR = '[data-captcha], #captcha-widget, .captcha-widget';
 
 const LOAD_TIMEOUT_MS = 20_000;
-const CONFIRM_TIMEOUT_MS = 5_000;
-const SETTLE_TIMEOUT_MS = 4_000;
+const CONFIRM_TIMEOUT_MS = 2_500;
 const SIGN_IN_TIMEOUT_MS = 10_000;
-
-const attr = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The posting host is a hosted vendor form; non-http(s) URLs never are. */
 export function hostMatches(url: string, hosts: RegExp): boolean {
@@ -80,94 +76,6 @@ export function hostMatches(url: string, hosts: RegExp): boolean {
   } catch {
     return false;
   }
-}
-
-export async function scanFields(page: Page, cfg: ScanConfig): Promise<ScannedField[]> {
-  const raw = (await page.evaluate(`(${SCAN_SCRIPT})(${JSON.stringify(cfg)})`)) as RawField[];
-  return raw.map(toScanned);
-}
-
-function control(page: Page, f: ScannedField): Locator {
-  const id = attr(f.id);
-  if (f.type === 'radio' || (f.type === 'checkbox' && f.options)) {
-    return page.locator(`input[name="${id}"]`);
-  }
-  return page.locator(`[id="${id}"], [name="${id}"]`).first();
-}
-
-function optionLabel(page: Page, f: ScannedField, text: string): Locator {
-  const wanted = new RegExp(`^\\s*${escapeRegExp(text)}\\s*$`, 'i');
-  return page
-    .locator(`label:has(input[name="${attr(f.id)}"])`)
-    .filter({ hasText: wanted })
-    .first();
-}
-
-async function fillOne(page: Page, f: ScannedField, value: string | boolean | string[]) {
-  const loc = control(page, f);
-  const text = Array.isArray(value) ? value.join(', ') : String(value);
-  switch (f.type) {
-    case 'select':
-      try {
-        await loc.selectOption({ label: text }, { timeout: 3_000 });
-      } catch {
-        await loc.selectOption({ value: text }, { timeout: 3_000 });
-      }
-      return;
-    case 'radio': {
-      const byLabel = optionLabel(page, f, text);
-      if (await byLabel.count()) await byLabel.check();
-      else
-        await page
-          .locator(`input[name="${attr(f.id)}"][value="${attr(text)}"]`)
-          .first()
-          .check();
-      return;
-    }
-    case 'checkbox': {
-      if (!f.options) {
-        await loc.setChecked(value === true || value === 'true' || value === 'yes');
-        return;
-      }
-      const chosen = Array.isArray(value) ? value : [text];
-      for (const option of f.options) {
-        const box = optionLabel(page, f, option).locator('input');
-        await box.setChecked(chosen.some((c) => c.toLowerCase() === option.toLowerCase()));
-      }
-      return;
-    }
-    case 'file':
-      return; // only the resume input is ever filled, by attachResume
-    default:
-      await loc.fill(text);
-  }
-}
-
-/**
- * Fills the given scanned fields. Self-identification and file fields are never touched
- * (design rule 7), whatever `values` contains.
- */
-export async function fillScanned(
-  page: Page,
-  fields: ScannedField[],
-  values: FieldValues,
-): Promise<void> {
-  for (const f of fields) {
-    if (f.classification === 'self-identification' || f.type === 'file') continue;
-    const value = values[f.id];
-    if (value === undefined) continue;
-    await fillOne(page, f, value);
-  }
-}
-
-export async function attachResumeTo(
-  page: Page,
-  selector: string,
-  pdf: { filename: string; bytes: Buffer },
-): Promise<void> {
-  const input = page.locator(selector).first();
-  if ((await input.count()) === 0) return; // a form with no resume field proceeds without one
-  await input.setInputFiles({ name: pdf.filename, mimeType: 'application/pdf', buffer: pdf.bytes });
 }
 
 export function captchaHandle(page: Page, widget: Locator): CaptchaHandle {
@@ -262,52 +170,94 @@ export async function reportUnmappedFields(
   };
 }
 
-/** Wait for whichever comes first after a submit click: confirmation, CAPTCHA, or a quiet page. */
-async function settle(page: Page, spec: VendorSpec): Promise<void> {
-  await Promise.race([
-    page
-      .waitForSelector(spec.confirmation.selector, { timeout: SETTLE_TIMEOUT_MS })
-      .catch(() => null),
-    page
-      .waitForSelector(CAPTCHA_SELECTOR, { state: 'visible', timeout: SETTLE_TIMEOUT_MS })
-      .catch(() => null),
-  ]);
-}
+const SUBMIT_WINDOW_MS = 10_000;
+/** A validation error that was already showing before the click and is still there this long after. */
+const PERSISTING_ERROR_MS = 1_500;
+const POLL_MS = 250;
+const ENABLE_WAIT_MS = 1_500;
 
-/** Shared behaviour; a vendor supplies its selectors and overrides what its form does differently. */
+const unmapped = (field: { id: string; label: string }) =>
+  new SubmissionFailure('unmapped-field', { field: field.label, fields: [field] });
+
+/** The generic submitter: vendor hints plus the page layer in generic.ts. */
 export class VendorAdapter implements FormAdapter {
   readonly ats: AtsId;
 
-  constructor(protected readonly spec: VendorSpec) {
-    this.ats = spec.ats;
+  constructor(protected readonly hints: VendorHints) {
+    this.ats = hints.ats;
   }
 
   detect(url: string): boolean {
-    return hostMatches(url, this.spec.hosts);
+    return hostMatches(url, this.hints.hosts);
+  }
+
+  private async confirmationShown(page: Page): Promise<boolean> {
+    const { selector, url } = this.hints.confirmation;
+    if (url?.test(page.url())) return true;
+    return page
+      .locator(selector)
+      .first()
+      .isVisible()
+      .catch(() => false);
+  }
+
+  /** The form, an account page or a confirmation is on the page. */
+  private async pageReady(page: Page): Promise<boolean> {
+    try {
+      const account = this.hints.account?.form;
+      if (
+        account &&
+        (await page
+          .locator(account)
+          .first()
+          .isVisible()
+          .catch(() => false))
+      )
+        return true;
+      if (await this.confirmationShown(page)) return true;
+      const scan = await scanPage(page);
+      if (scan.questions.length > 0) return true;
+      const probe = await probePage(page);
+      return probe.thanks && !probe.controlsLeft;
+    } catch {
+      return false; // mid-navigation
+    }
+  }
+
+  private async waitForPage(page: Page, timeoutMs: number): Promise<boolean> {
+    const started = Date.now();
+    for (;;) {
+      if (await this.pageReady(page)) return true;
+      if (Date.now() - started >= timeoutMs) return false;
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
   }
 
   async load(page: Page, url: string): Promise<void> {
     let target = url;
     try {
       const u = new URL(url);
-      if (this.detect(url) && this.spec.applyUrl) target = this.spec.applyUrl(u);
+      if (this.detect(url) && this.hints.applyUrl) target = this.hints.applyUrl(u);
     } catch {
       // not a URL we can rewrite; navigate as given
     }
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: LOAD_TIMEOUT_MS });
-    const ready = [this.spec.formReady, this.spec.account?.form].filter(Boolean).join(', ');
-    await page.locator(ready).first().waitFor({ state: 'visible', timeout: LOAD_TIMEOUT_MS });
+    if (!(await this.waitForPage(page, LOAD_TIMEOUT_MS))) {
+      throw new Error('the application form did not appear');
+    }
+    // Rule 19: a React page is visible before it is interactive; act only once it has settled.
+    await settlePage(page);
   }
 
   async requiresAccount(page: Page): Promise<boolean> {
-    const account = this.spec.account;
+    const account = this.hints.account;
     if (!account) return false;
     return (await page.locator(account.form).count()) > 0;
   }
 
   protected account(): AccountSpec {
-    if (!this.spec.account) throw new Error(`${this.ats} forms do not use candidate accounts`);
-    return this.spec.account;
+    if (!this.hints.account) throw new Error(`${this.ats} forms do not use candidate accounts`);
+    return this.hints.account;
   }
 
   async signUp(page: Page, account: Account): Promise<void> {
@@ -351,49 +301,115 @@ export class VendorAdapter implements FormAdapter {
     await page.locator(a.password).first().fill(credential.password);
     await page.locator(a.signInSubmit).first().click();
     // Neither outcome showing within the timeout rejects: that is an error, not a bad password.
+    const formReady = async (): Promise<SignInOutcome> => {
+      const started = Date.now();
+      for (;;) {
+        const scan = await scanPage(page).catch(() => null);
+        if (scan && scan.questions.length > 0) {
+          await settlePage(page);
+          return 'ok';
+        }
+        if (Date.now() - started > SIGN_IN_TIMEOUT_MS) throw new Error('form did not appear');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    };
     return Promise.race([
       page
         .locator(a.error)
         .first()
         .waitFor({ state: 'visible', timeout: SIGN_IN_TIMEOUT_MS })
         .then((): SignInOutcome => 'rejected'),
-      page
-        .locator(this.spec.formReady)
-        .first()
-        .waitFor({ state: 'visible', timeout: SIGN_IN_TIMEOUT_MS })
-        .then((): SignInOutcome => 'ok'),
+      formReady(),
     ]);
   }
 
   async fields(page: Page): Promise<FieldDescriptor[]> {
-    return (await scanFields(page, this.spec.scan)).map(toDescriptor);
+    const scan = await enrichOptions(page, await scanPage(page));
+    return scan.questions.map(describe);
   }
 
+  /**
+   * Fills what has values, then rescans and compares (design rule 9). A required question whose
+   * value did not stick is an `unmapped-field`, raised before submit.
+   */
   async fill(page: Page, values: FieldValues): Promise<void> {
-    await fillScanned(page, await scanFields(page, this.spec.scan), values);
+    const failed = await fillPage(page, values);
+    if (failed.length > 0) {
+      throw new SubmissionFailure('unmapped-field', { field: failed[0]!.label, fields: failed });
+    }
   }
 
   async attachResume(page: Page, pdf: { filename: string; bytes: Buffer }): Promise<void> {
-    await attachResumeTo(page, this.spec.resumeInput, pdf);
+    await attachResumeGeneric(page, this.hints.resumeInput, pdf);
   }
 
   async submit(page: Page): Promise<void> {
-    await page.locator(this.spec.submitButton).first().click();
-    await settle(page, this.spec);
+    let scan = await scanPage(page);
+    if (!scan.submit) throw unmapped({ id: 'submit', label: 'Submit' });
+    if (scan.submit.step !== null && scan.steps.active !== scan.submit.step) {
+      scan = await goToStep(page, scan.submit.step);
+    }
+    // Rule 10: a submit that stays disabled after the fill is a field we could not map.
+    const button = page.locator('[data-wma-nav="submit"]').first();
+    const enabledBy = Date.now() + ENABLE_WAIT_MS;
+    for (;;) {
+      const disabled = await page
+        .evaluate(
+          `(() => {
+            const e = document.querySelector('[data-wma-nav="submit"]');
+            return !e || !!e.disabled || e.getAttribute('aria-disabled') === 'true';
+          })()`,
+        )
+        .catch(() => true);
+      if (!disabled) break;
+      if (Date.now() >= enabledBy) throw unmapped({ id: 'submit', label: 'Submit' });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    // What the page said before the click: only text that appears after it is evidence of this
+    // submission, and an error already showing that is still there afterwards is a rejection.
+    await recordBaseline(page);
+    const before = new Set((await probePage(page).catch(() => null))?.errors ?? []);
+    await button.click({ timeout: 5_000 });
+
+    // Rule 12, in order: confirmation, validation errors, a CAPTCHA; else leave it to the caller.
+    const started = Date.now();
+    while (Date.now() - started < SUBMIT_WINDOW_MS) {
+      if (await this.confirmationShown(page)) return;
+      let probe;
+      try {
+        probe = await probePage(page);
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+        continue;
+      }
+      if (probe.thanks && !probe.controlsLeft) return;
+      const persisted = Date.now() - started >= PERSISTING_ERROR_MS;
+      const errors = probe.errors.filter((e) => persisted || !before.has(e));
+      if (errors.length > 0)
+        throw new SubmissionFailure('form-rejected', {
+          errors: errors.map((e) => sanitizeMessage(e)),
+        });
+      if (probe.frame || (await findCaptchaOn(page))) return;
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    }
   }
 
   async confirmed(page: Page): Promise<boolean> {
-    const { selector, url } = this.spec.confirmation;
-    if (url?.test(page.url())) return true;
-    return page
-      .locator(selector)
-      .first()
-      .waitFor({ state: 'visible', timeout: CONFIRM_TIMEOUT_MS })
-      .then(() => true)
-      .catch(() => false);
+    const started = Date.now();
+    for (;;) {
+      if (await this.confirmationShown(page)) return true;
+      const probe = await probePage(page).catch(() => null);
+      if (probe && probe.thanks && !probe.controlsLeft) return true;
+      if (Date.now() - started >= CONFIRM_TIMEOUT_MS) return false;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   }
 
-  findCaptcha(page: Page): Promise<CaptchaHandle | null> {
-    return findCaptchaOn(page);
+  async findCaptcha(page: Page): Promise<CaptchaHandle | null> {
+    return (await findCaptchaOn(page)) ?? (await findFrameCaptcha(page));
+  }
+
+  notices(page: Page): Promise<FormNotice[]> {
+    return readNotices(page);
   }
 }

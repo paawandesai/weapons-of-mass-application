@@ -64,6 +64,7 @@ export const PendingReason = z.enum([
   'captcha-timeout',
   'unconfirmed',
   'browser-error',
+  'form-rejected',
 ]);
 export type PendingReason = z.infer<typeof PendingReason>;
 

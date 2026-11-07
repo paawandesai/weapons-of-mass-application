@@ -10,7 +10,7 @@ import {
   renderPosting,
 } from '../../src/discovery/judge';
 import { parsePrompt, loadVersionedPrompt } from '../../src/discovery/prompts';
-import { rank, selectTopN } from '../../src/discovery/rank';
+import { rank, selectWithCompanyCap } from '../../src/discovery/rank';
 import type { Judged } from '../../src/discovery/judge';
 import { candidate, fixtureJson, judgment, profile, TODAY } from './support';
 import { dedupeKey } from '@wma/shared';
@@ -333,13 +333,29 @@ describe('rank', () => {
   });
 });
 
-describe('selectTopN', () => {
-  const items = Array.from({ length: 25 }, (_, i) => i);
-  it('25 approved with target 12 selects the first 12 in order', () => {
-    expect(selectTopN(items, 12)).toEqual(items.slice(0, 12));
+describe('selectWithCompanyCap', () => {
+  const item = (i: number, companyName = `Co ${i}`) => ({
+    candidate: { companyId: null, companyName } as never,
+    i,
+  });
+  const items = Array.from({ length: 25 }, (_, i) => item(i));
+  it('25 approved at distinct companies with target 12 selects the first 12 in order', () => {
+    const r = selectWithCompanyCap(items, 12, 1);
+    expect(r.selected).toEqual(items.slice(0, 12));
+    expect(r.skipped).toEqual([]);
   });
   it('fewer approved than the target selects them all', () => {
-    expect(selectTopN([1, 2, 3, 4], 12)).toEqual([1, 2, 3, 4]);
-    expect(selectTopN([], 12)).toEqual([]);
+    expect(selectWithCompanyCap(items.slice(0, 4), 12, 1).selected).toEqual(items.slice(0, 4));
+    expect(selectWithCompanyCap([], 12, 1).selected).toEqual([]);
+  });
+  it('treats company names case- and punctuation-insensitively', () => {
+    const r = selectWithCompanyCap([item(0, 'Acme, Inc.'), item(1, 'acme inc')], 5, 1);
+    expect(r.selected.map((x) => x.i)).toEqual([0]);
+    expect(r.skipped.map((x) => x.i)).toEqual([1]);
+  });
+  it('keeps distinct non-Latin company names distinct under cap 1', () => {
+    const r = selectWithCompanyCap([item(0, '株式会社トヨタ'), item(1, '任天堂株式会社')], 5, 1);
+    expect(r.selected.map((x) => x.i)).toEqual([0, 1]);
+    expect(r.skipped).toEqual([]);
   });
 });

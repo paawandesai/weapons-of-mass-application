@@ -314,6 +314,18 @@ export async function resolveCaptcha(
     return row;
   });
 
+  // Rule 13: an iframe challenge (hCaptcha, reCAPTCHA) has no image the solvers could read, so
+  // it goes straight to the user with a full-page screenshot and no agent attempts.
+  if (captcha.challenge === 'frame') {
+    await log(ctx, 'captcha-stage', {
+      request_id: req.id,
+      from: 'agent1',
+      to: 'human',
+      skipped: 'frame',
+    });
+    return humanStage(ctx, captcha, req, opts);
+  }
+
   let image = png;
   for (const stage of ['agent1', 'agent2'] as const) {
     if (await agentStage(ctx, captcha, req, stage, image)) return markResolved(ctx, req, stage);

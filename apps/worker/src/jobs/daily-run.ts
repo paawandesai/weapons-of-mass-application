@@ -4,6 +4,7 @@ import { createLlmClient, type StructuredLlm } from '@wma/llm';
 import { bossSubmitQueue, type SubmitQueue } from '../discovery/handoff';
 import type { Http } from '@wma/discovery';
 import { DEFAULT_JUDGE_CAP, executeDailyRun, type DailyRunDeps } from '../discovery/run';
+import { DEFAULT_MAX_PER_COMPANY } from '../discovery/rank';
 import { utcDate } from '../discovery/text';
 import { adaptersFor } from '../discovery/adapters';
 import type { SourceAdapter } from '../discovery/types';
@@ -24,6 +25,17 @@ export function parseJudgeCap(value: string | undefined): number {
     `JUDGE_CAP_PER_RUN=${JSON.stringify(value)} is not an integer >= 1; using ${DEFAULT_JUDGE_CAP}`,
   );
   return DEFAULT_JUDGE_CAP;
+}
+
+/** `MAX_PER_COMPANY_PER_RUN`: an integer >= 1, else the default (one warning). */
+export function parseMaxPerCompany(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return DEFAULT_MAX_PER_COMPANY;
+  const n = /^\d+$/.test(value.trim()) ? Number(value.trim()) : Number.NaN;
+  if (Number.isSafeInteger(n) && n >= 1) return n;
+  console.warn(
+    `MAX_PER_COMPANY_PER_RUN=${JSON.stringify(value)} is not an integer >= 1; using ${DEFAULT_MAX_PER_COMPANY}`,
+  );
+  return DEFAULT_MAX_PER_COMPANY;
 }
 
 export interface DailyRunJobData {
@@ -135,6 +147,7 @@ export async function registerDailyRun(
 ): Promise<void> {
   const now = options.now ?? (() => new Date());
   const judgeCap = parseJudgeCap(process.env.JUDGE_CAP_PER_RUN);
+  const maxPerCompany = parseMaxPerCompany(process.env.MAX_PER_COMPANY_PER_RUN);
   const roster = options.roster ?? dbRoster(db);
   const queue = options.queue ?? bossSubmitQueue(boss);
   let llm = options.llm;
@@ -145,6 +158,7 @@ export async function registerDailyRun(
     now,
     adapters,
     judgeCap,
+    maxPerCompany,
   });
 
   await boss.createQueue(DAILY_RUN_JOB, { policy: 'exclusive' });

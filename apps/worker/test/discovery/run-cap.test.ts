@@ -2,8 +2,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import pg from 'pg';
 import { activity, getRun, listApplications, listRunCandidates, listUserCompanies } from '@wma/db';
 import { FakeLlm, type StructuredRequest } from '@wma/llm';
-import { executeDailyRun, type DailyRunDeps } from '../../src/discovery/run';
-import { parseJudgeCap } from '../../src/jobs/daily-run';
+import { applyJudgeCap, executeDailyRun, type DailyRunDeps } from '../../src/discovery/run';
+import { relevanceScore, type RelevanceProfile } from '../../src/discovery/rank';
+import { parseJudgeCap, parseMaxPerCompany } from '../../src/jobs/daily-run';
 import { setupEnv, type TestEnv, type TestTenant } from '../helpers';
 import {
   approveProfile,
@@ -14,6 +15,7 @@ import {
   fixtureJson,
   judgment,
   NOW,
+  profile as fixtureProfile,
   staticAdapter,
   TODAY,
 } from './support';
@@ -199,5 +201,167 @@ describe('judge cap (rules 5-7)', () => {
     const row = await getRun(t.handle, out.runId);
     expect(row?.counts).toMatchObject({ over_cap: 0, judged: 5 });
     expect((await actions(t)).some((e) => e.action === 'judge_capped')).toBe(false);
+  });
+});
+
+describe('parseMaxPerCompany (rule 16)', () => {
+  it('defaults to 1, falls back on invalid values with one warning each, accepts integers >= 1', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(parseMaxPerCompany(undefined)).toBe(1);
+    expect(warn).not.toHaveBeenCalled();
+    expect(parseMaxPerCompany('abc')).toBe(1);
+    expect(parseMaxPerCompany('0')).toBe(1);
+    expect(parseMaxPerCompany('1.5')).toBe(1);
+    expect(warn).toHaveBeenCalledTimes(3);
+    expect(parseMaxPerCompany('3')).toBe(3);
+    expect(warn).toHaveBeenCalledTimes(3);
+    warn.mockRestore();
+  });
+});
+
+describe('per-company cap (rule 16)', () => {
+  const fits: Record<string, 1 | 2 | 3 | 4 | 5> = { A1: 5, A2: 4, A3: 3, A4: 2, B1: 1 };
+  const fitLlm = () =>
+    new FakeLlm([
+      (q: StructuredRequest) => {
+        const title = q.user.match(/^Title: (.*)$/m)?.[1] ?? '';
+        return judgment({ apply: true, fit: fits[title] ?? 1 });
+      },
+    ]);
+  const roles = () => [
+    ...['A1', 'A2', 'A3', 'A4'].map((title) => candidate({ title, companyName: 'Acme' })),
+    candidate({ title: 'B1', companyName: 'Other Co' }),
+  ];
+  const go = async (target: number, maxPerCompany?: number) => {
+    const t = await env.makeTenant();
+    await approveProfile(t.handle, t.userId, target);
+    const out = await run(
+      t,
+      baseDeps({ llm: fitLlm(), maxPerCompany, adapters: [staticAdapter('greenhouse', roles())] }),
+    );
+    const row = await getRun(t.handle, out.runId);
+    const cands = await listRunCandidates(t.handle, out.runId);
+    return { counts: row!.counts as Record<string, number>, cands };
+  };
+  const identity = (c: Record<string, number>) =>
+    expect(c.approved! - c.deadline_passed!).toBe(c.selected! + c.over_target! + c.company_cap!);
+
+  it('cap 1, four roles at one company and one elsewhere, target 2: one of each, company_cap 3', async () => {
+    const { counts, cands } = await go(2);
+    expect(counts).toMatchObject({ approved: 5, selected: 2, over_target: 0, company_cap: 3 });
+    identity(counts);
+    expect(cands.filter((r) => r.selected).map((r) => r.title)).toEqual(['A1', 'B1']);
+    expect(cands.filter((r) => r.exclusionReason === 'company_cap').map((r) => r.title)).toEqual([
+      'A2',
+      'A3',
+      'A4',
+    ]);
+  });
+
+  it('cap 2, target 3: two at the busy company plus the other, company_cap 2', async () => {
+    const { counts, cands } = await go(3, 2);
+    expect(counts).toMatchObject({ selected: 3, over_target: 0, company_cap: 2 });
+    identity(counts);
+    expect(cands.filter((r) => r.selected).map((r) => r.title)).toEqual(['A1', 'A2', 'B1']);
+  });
+
+  it('the walk stops at the target: later candidates are over_target, not company_cap', async () => {
+    const { counts } = await go(1);
+    expect(counts).toMatchObject({ selected: 1, over_target: 4, company_cap: 0 });
+    identity(counts);
+  });
+});
+
+describe('title pre-filter (rules 17, 18)', () => {
+  const prof: RelevanceProfile = {
+    preferences: { target_titles: ['Staff Software Engineer'] },
+    survey: { target_roles: [] },
+    skills: [{ name: 'Rust' }, { name: 'Kafka' }],
+  };
+
+  it('scores a matching title above an unrelated one', () => {
+    const match = relevanceScore(candidate({ title: 'Staff Software Engineer, Payments' }), prof);
+    const other = relevanceScore(candidate({ title: 'Account Manager' }), prof);
+    expect(match).toBeGreaterThan(other);
+    expect(other).toBe(0);
+  });
+
+  it('+3 when all significant words appear, +1 per word; skills count in the description', () => {
+    const p: RelevanceProfile = {
+      preferences: { target_titles: ['Senior Backend Engineer'] },
+      survey: { target_roles: [] },
+      skills: [],
+    };
+    expect(relevanceScore(candidate({ title: 'Backend Developer' }), p)).toBe(4);
+    expect(relevanceScore(candidate({ title: 'Frontend Developer' }), p)).toBe(0);
+    const withSkill = relevanceScore(
+      candidate({ title: 'Account Manager', description: 'You will write Rust and run Kafka.' }),
+      prof,
+    );
+    expect(withSkill).toBe(2);
+    const late = candidate({ title: 'Account Manager', description: `${'x '.repeat(1100)} Rust` });
+    expect(relevanceScore(late, prof)).toBe(0);
+  });
+
+  it('scores a target repeated across preferences and survey once, ignoring case', () => {
+    const p: RelevanceProfile = {
+      preferences: { target_titles: ['Backend Engineer'] },
+      survey: { target_roles: ['backend engineer'] },
+      skills: [],
+    };
+    // +3 all words, +1 for "backend" - once, not twice.
+    expect(relevanceScore(candidate({ title: 'Backend Engineer' }), p)).toBe(4);
+  });
+
+  it('caps the skills bonus at 5', () => {
+    const p: RelevanceProfile = {
+      preferences: { target_titles: [] },
+      survey: { target_roles: [] },
+      skills: ['a1', 'b2', 'c3', 'd4', 'e5', 'f6', 'g7'].map((name) => ({ name })),
+    };
+    const c = candidate({ title: 'X', description: 'a1 b2 c3 d4 e5 f6 g7' });
+    expect(relevanceScore(c, p)).toBe(5);
+  });
+
+  it('judges the relevant older posting before an unrelated newer one; seeded still first', () => {
+    const rel = candidate({ title: 'Staff Software Engineer', postedAt: '2026-01-01T00:00:00Z' });
+    const unrelated = candidate({ title: 'Account Manager', postedAt: '2026-11-05T00:00:00Z' });
+    const seeded = candidate({ title: 'Seeded Thing' });
+    const r = applyJudgeCap([unrelated, rel, seeded], 2, (c) => c === seeded, prof);
+    expect(r.kept.map((c) => c.title)).toEqual(['Seeded Thing', 'Staff Software Engineer']);
+    expect(r.dropped).toBe(1);
+    // score 0 stays eligible when the cap allows, and is counted
+    const all = applyJudgeCap([unrelated, rel], 5, () => false, prof);
+    expect(all.kept.map((c) => c.title)).toEqual(['Staff Software Engineer', 'Account Manager']);
+    expect(all.prefilterZero).toBe(2 - 1);
+  });
+
+  it('a run records prefilter_zero and judges by relevance', async () => {
+    const t = await tenant();
+    const { llm, judgedTitles } = recordingLlm();
+    const out = await run(
+      t,
+      baseDeps({
+        llm,
+        judgeCap: 2,
+        adapters: [
+          staticAdapter('greenhouse', [
+            candidate({ title: 'Account Manager', postedAt: '2026-11-05T00:00:00Z' }),
+            candidate({ title: 'Senior Backend Engineer', postedAt: '2026-01-01T00:00:00Z' }),
+            candidate({
+              title: 'Platform Lead',
+              postedAt: '2026-02-01T00:00:00Z',
+              description: 'TypeScript and PostgreSQL daily.',
+            }),
+          ]),
+        ],
+      }),
+    );
+    expect(judgedTitles.sort()).toEqual(['Platform Lead', 'Senior Backend Engineer']);
+    expect((await getRun(t.handle, out.runId))?.counts).toMatchObject({
+      over_cap: 1,
+      prefilter_zero: 0,
+    });
+    expect(fixtureProfile.skills.map((s) => s.name)).toContain('TypeScript');
   });
 });

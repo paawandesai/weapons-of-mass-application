@@ -48,24 +48,29 @@ Run status (`runs.status`):
 3. `fetch`: run all sources; write `source_status` per source.
 4. `dedupe`: in-run dedupe happened in `fetch`; drop candidates already applied to.
 5. `judge`: one `apply-decision@v1` call per remaining candidate.
-6. `rank`: order approved candidates, exclude passed deadlines, take the top N, write one `run_candidates` row per judged or unjudged candidate in one batch.
+6. `rank`: order approved candidates, exclude passed deadlines, take the top N with at most `MAX_PER_COMPANY_PER_RUN` per company, write one `run_candidates` row per judged or unjudged candidate in one batch.
 7. `hand_off`: described below.
 8. `finalize`: status, counts, short-day fields, `run_finished`.
 
 ## Counts
 
-`runs.counts` is `{fetched, deduped, already_applied, judged, approved, unjudged, selected}` plus `in_run_duplicates`, `skipped`, `over_cap`, `deadline_passed`, `over_target`, `requeued`, `removed_company` and `hand_off_conflicts`. `over_cap` counts postings left unjudged because the run reached its judge cap (below); they get no `run_candidates` row. `removed_company` counts HN and LinkedIn postings dropped because the user removed that company; they are not part of `fetched`. `hand_off_conflicts` counts selected postings that another run (for a different date) had already turned into an application. They add up:
+`runs.counts` is `{fetched, deduped, already_applied, judged, approved, unjudged, selected}` plus `in_run_duplicates`, `skipped`, `over_cap`, `deadline_passed`, `over_target`, `company_cap`, `prefilter_zero`, `requeued`, `removed_company` and `hand_off_conflicts`. `over_cap` counts postings left unjudged because the run reached its judge cap (below); they get no `run_candidates` row. `removed_company` counts HN and LinkedIn postings dropped because the user removed that company; they are not part of `fetched`. `hand_off_conflicts` counts selected postings that another run (for a different date) had already turned into an application. `company_cap` counts approved postings skipped because their company already had the per-company maximum selected (see Per-company cap); `over_target` counts only the approved postings never reached once the target was filled. `prefilter_zero` counts judged postings whose local relevance score was 0 (see Judge cap; visibility only). They add up:
 
 - `fetched = deduped + in_run_duplicates`
 - `deduped = already_applied + over_cap + unjudged + judged`
 - `fetched = in_run_duplicates + already_applied + over_cap + unjudged + judged`
 - `judged = skipped + approved`
+- `approved - deadline_passed = selected + over_target + company_cap` (before hand-off conflicts reduce `selected`)
 
-Every judged and unjudged candidate has a `run_candidates` row (`judged + unjudged` rows). `exclusion_reason` is one of `unjudged`, `not_approved`, `deadline_passed`, `over_target` or `already_applied` (selected, but another run's hand-off got the posting first; its `selected` flag is cleared). A selected row has none, and `counts.selected` always equals the number of selected rows and of applications created by the run.
+Every judged and unjudged candidate has a `run_candidates` row (`judged + unjudged` rows). `exclusion_reason` is one of `unjudged`, `not_approved`, `deadline_passed`, `over_target`, `company_cap` or `already_applied` (selected, but another run's hand-off got the posting first; its `selected` flag is cleared). A selected row has none, and `counts.selected` always equals the number of selected rows and of applications created by the run.
 
 ## Judge cap
 
-Every run judges at most `JUDGE_CAP_PER_RUN` postings (default 120; a value that is not an integer of 1 or more falls back to 120 and is logged once when the worker starts). The cap applies after already-applied postings are dropped and before judging. Postings are ordered seeded source first, then newest `postedAt` first, undated last, ties in the order the sources returned them; the first `JUDGE_CAP_PER_RUN` are judged and the rest are counted in `over_cap`. When any are dropped the run writes one `judge_capped` activity entry `{run_id, cap, dropped}`.
+Every run judges at most `JUDGE_CAP_PER_RUN` postings (default 120; a value that is not an integer of 1 or more falls back to 120 and is logged once when the worker starts). The cap applies after already-applied postings are dropped and before judging. Each posting gets a local relevance score (no model call): +3 for each target title or target role (profile `preferences.target_titles` and `survey.target_roles`) whose significant words all appear in the posting title; +1 for each such word that appears in the title; +1 for each profile skill name that appears in the title or the first 2,000 characters of the description (at most +5). Significant words have at least 3 letters and are not one of `engineer`, `senior`, `staff`, `lead`, `principal`, `software`, `the`, `and`, `of`; a target made only of those words uses all its words of 3 letters or more instead. Postings are ordered seeded source first, then score descending, then newest `postedAt` first, undated last, ties in the order the sources returned them; the first `JUDGE_CAP_PER_RUN` are judged and the rest are counted in `over_cap`. A posting with score 0 is still judged when the cap allows; those within the cap are counted in `prefilter_zero`. When any are dropped the run writes one `judge_capped` activity entry `{run_id, cap, dropped}`.
+
+## Per-company cap
+
+A run applies to at most `MAX_PER_COMPANY_PER_RUN` roles at one company (default 1; a value that is not an integer of 1 or more falls back to 1 and is logged once when the worker starts). Walking the ranked list, a posting whose company (its `companyId`, else its normalised company name) already has that many selections is skipped with `exclusion_reason` `company_cap` (shown as "Another role at this company was chosen") and the walk continues until the daily target is filled or the list ends.
 
 ## Demo tenant
 

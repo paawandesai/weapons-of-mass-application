@@ -15,6 +15,7 @@ const STATUS_LABEL: Record<RunSummary['status'], string> = {
 const REASON_LABEL: Record<string, string> = {
   not_approved: 'Not approved',
   over_target: 'Over the daily limit',
+  company_cap: 'Another role at this company was chosen',
   already_applied: 'Already applied to',
   unjudged: 'Could not be judged',
   deadline_passed: 'Deadline has passed',

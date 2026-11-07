@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>aria-expanded on the wrapper, menu rendered late</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label id="w-label">Office<span aria-hidden="true">*</span></label>
+        <div
+          id="wrap"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-labelledby="w-label"
+        >
+          <input id="w-input" type="text" autocomplete="off" />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      var wrap = document.getElementById('wrap');
+      var menu = null;
+      function close() {
+        if (menu) menu.remove();
+        menu = null;
+        wrap.setAttribute('aria-expanded', 'false');
+      }
+      wrap.addEventListener('click', function () {
+        if (menu) return;
+        wrap.setAttribute('aria-expanded', 'true');
+        setTimeout(function () {
+          if (wrap.getAttribute('aria-expanded') !== 'true' || menu) return;
+          menu = document.createElement('div');
+          menu.setAttribute('role', 'listbox');
+          ['Lisbon', 'Berlin'].forEach(function (t) {
+            var o = document.createElement('div');
+            o.setAttribute('role', 'option');
+            o.textContent = t;
+            o.addEventListener('click', function () {
+              document.getElementById('w-input').value = t;
+              close();
+            });
+            menu.appendChild(o);
+          });
+          document.body.appendChild(menu);
+        }, 900);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') close();
+      });
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

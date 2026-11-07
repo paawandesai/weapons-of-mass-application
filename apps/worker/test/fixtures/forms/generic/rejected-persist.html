@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A validation error that shows while typing and is still there after submit</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="email">Email</label>
+        <input id="email" type="text" />
+        <p id="email-error" class="field-error" hidden>Enter a valid email address</p>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      document.getElementById('email').addEventListener('input', function () {
+        document.getElementById('email').setAttribute('aria-invalid', 'true');
+        document.getElementById('email-error').hidden = false;
+      });
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

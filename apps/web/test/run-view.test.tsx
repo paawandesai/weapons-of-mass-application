@@ -184,6 +184,21 @@ describe('run view', () => {
     expect(await screen.findByText(/Over the daily limit/)).toBeInTheDocument();
   });
 
+  it('labels a posting skipped for the per-company cap', async () => {
+    server.use(
+      http.get('*/api/runs/current', () =>
+        HttpResponse.json(
+          page({
+            run: run({ status: 'short_day' }),
+            candidates: [cand('Echo', { exclusion_reason: 'company_cap' })],
+          }),
+        ),
+      ),
+    );
+    render(<RunViewPage />);
+    expect(await screen.findByText(/Another role at this company was chosen/)).toBeInTheDocument();
+  });
+
   it('shows an error banner when the run cannot be loaded', async () => {
     server.use(
       http.get('*/api/runs/current', () =>

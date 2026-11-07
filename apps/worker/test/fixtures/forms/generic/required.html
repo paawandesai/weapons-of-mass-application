@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Required detection</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="alpha">Alpha <span aria-hidden="true">*</span></label
+        ><input id="alpha" type="text" />
+      </div>
+      <div class="entry">
+        <label class="_required_9x" for="beta">Beta</label><input id="beta" type="text" />
+      </div>
+      <div class="entry">
+        <label id="gamma-label" for="gamma">Gamma</label>
+        <div>
+          <input
+            id="gamma"
+            type="text"
+            role="combobox"
+            aria-haspopup="true"
+            aria-labelledby="gamma-label"
+          />
+        </div>
+        <input
+          required
+          tabindex="-1"
+          aria-hidden="true"
+          value=""
+          style="opacity: 0; height: 0; position: absolute"
+        />
+      </div>
+      <div class="entry">
+        <label for="delta">Delta (optional)</label><input id="delta" type="text" />
+      </div>
+      <div class="entry">
+        <label for="epsilon">Epsilon</label><input id="epsilon" type="text" aria-required="true" />
+      </div>
+      <div class="entry">
+        <label for="zeta">Zeta</label><input id="zeta" type="text" />
+        <input type="hidden" required value="" />
+      </div>
+      <div class="entry">
+        <label for="eta">Eta</label><input id="eta" type="text" />
+        <input hidden required value="" />
+      </div>
+      <div class="entry">
+        <label for="theta">Theta</label><input id="theta" type="text" />
+        <input required value="" style="display: none" />
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+  </body>
+</html>

@@ -15,7 +15,7 @@ import type {
 /** The page the job drives: a Playwright `Page` satisfies it. */
 export interface PageLike extends AdapterPage {
   goto(url: string): Promise<unknown>;
-  screenshot(): Promise<Buffer>;
+  screenshot(options?: { fullPage?: boolean }): Promise<Buffer>;
   fill(selector: string, value: string, options?: { timeout?: number }): Promise<void>;
   press(selector: string, key: string, options?: { timeout?: number }): Promise<void>;
 }

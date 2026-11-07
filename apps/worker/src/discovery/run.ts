@@ -22,7 +22,13 @@ import { handOff, type SubmitQueue } from './handoff';
 import { sharedHttp, type Http } from '@wma/discovery';
 import { judgeAll, type Judged, type JudgeResult } from './judge';
 import { loadProfileDocument } from './profile-view';
-import { rank, selectTopN } from './rank';
+import {
+  rank,
+  relevanceScore,
+  selectWithCompanyCap,
+  DEFAULT_MAX_PER_COMPANY,
+  type RelevanceProfile,
+} from './rank';
 import type { BoardRef, RemovedCompany, SourceAdapter } from './types';
 import type { Candidate } from '@wma/shared';
 
@@ -51,33 +57,48 @@ export interface DailyRunDeps {
   judgeConcurrency?: number;
   /** Most postings one run judges (`JUDGE_CAP_PER_RUN`). */
   judgeCap?: number;
+  /** Most selections per company in one run (`MAX_PER_COMPANY_PER_RUN`, default 1). */
+  maxPerCompany?: number;
 }
 
 export const DEFAULT_JUDGE_CAP = 120;
 
 /**
  * The postings a run may judge: seeded source first (the seeded adapter reports candidates under the
- * form's vendor, so the caller says which are seeded), then newest `postedAt` first, undated last,
- * ties in the order the sources returned them. The first `cap` are kept.
+ * form's vendor, so the caller says which are seeded), then local relevance score descending, then
+ * newest `postedAt` first (undated last), ties in the order the sources returned them. The first
+ * `cap` are kept. `prefilterZero` counts kept postings whose score is 0.
  */
 export function applyJudgeCap(
   candidates: Candidate[],
   cap: number,
   isSeeded: (c: Candidate) => boolean = () => false,
-): { kept: Candidate[]; dropped: number } {
+  profile?: RelevanceProfile,
+): { kept: Candidate[]; dropped: number; prefilterZero: number } {
   const time = (c: Candidate) => (c.postedAt ? new Date(c.postedAt).getTime() : Number.NaN);
-  const ordered = [...candidates].sort((a, b) => {
-    const sa = isSeeded(a) ? 0 : 1;
-    const sb = isSeeded(b) ? 0 : 1;
-    if (sa !== sb) return sa - sb;
-    const ta = time(a);
-    const tb = time(b);
+  const scored = candidates.map((c, i) => ({
+    c,
+    i,
+    seeded: isSeeded(c),
+    score: profile ? relevanceScore(c, profile) : 0,
+  }));
+  scored.sort((a, b) => {
+    if (a.seeded !== b.seeded) return a.seeded ? -1 : 1;
+    if (a.score !== b.score) return b.score - a.score;
+    const ta = time(a.c);
+    const tb = time(b.c);
     const na = Number.isNaN(ta);
     const nb = Number.isNaN(tb);
-    if (na || nb) return na === nb ? 0 : na ? 1 : -1;
-    return tb - ta;
+    if (na !== nb) return na ? 1 : -1;
+    if (!na && ta !== tb) return tb - ta;
+    return a.i - b.i;
   });
-  return { kept: ordered.slice(0, cap), dropped: Math.max(0, ordered.length - cap) };
+  const kept = scored.slice(0, cap);
+  return {
+    kept: kept.map((k) => k.c),
+    dropped: Math.max(0, scored.length - cap),
+    prefilterZero: kept.filter((k) => k.score === 0).length,
+  };
 }
 
 export interface RunParams {
@@ -106,6 +127,10 @@ export interface RunCounts {
   deadline_passed: number;
   selected: number;
   over_target: number;
+  /** Approved postings skipped because their company already had the per-run maximum selected. */
+  company_cap: number;
+  /** Judged postings whose local relevance score was 0 (visibility only). */
+  prefilter_zero: number;
   /** HN and LinkedIn postings dropped because the user removed the company (not in `fetched`). */
   removed_company: number;
   /** Selected postings another run had already turned into applications. */
@@ -126,6 +151,8 @@ const emptyCounts = (): RunCounts => ({
   deadline_passed: 0,
   selected: 0,
   over_target: 0,
+  company_cap: 0,
+  prefilter_zero: 0,
   removed_company: 0,
   hand_off_conflicts: 0,
   requeued: 0,
@@ -314,8 +341,9 @@ export async function executeDailyRun(
       counts.already_applied = dropped.length;
 
       const cap = deps.judgeCap ?? DEFAULT_JUDGE_CAP;
-      const capped = applyJudgeCap(kept, cap, (c) => found.seededKeys.has(dedupeKey(c)));
+      const capped = applyJudgeCap(kept, cap, (c) => found.seededKeys.has(dedupeKey(c)), profile);
       counts.over_cap = capped.dropped;
+      counts.prefilter_zero = capped.prefilterZero;
       if (capped.dropped > 0) {
         await activity.logActivity(handle, {
           userId,
@@ -341,9 +369,15 @@ export async function executeDailyRun(
       counts.approved = approved.length;
       const { ranked, excluded } = rank(approved, p.date);
       counts.deadline_passed = excluded.length;
-      const selected = selectTopN(ranked, target);
+      const { selected, skipped } = selectWithCompanyCap(
+        ranked,
+        target,
+        deps.maxPerCompany ?? DEFAULT_MAX_PER_COMPANY,
+      );
       counts.selected = selected.length;
-      counts.over_target = ranked.length - selected.length;
+      counts.company_cap = skipped.length;
+      counts.over_target = ranked.length - selected.length - skipped.length;
+      const companyCapKeys = new Set(skipped.map((s) => dedupeKey(s.candidate)));
       const selectedKeys = new Set(selected.map((s) => dedupeKey(s.candidate)));
       const rankByKey = new Map(ranked.map((r) => [dedupeKey(r.candidate), r.rank]));
       const excludedKeys = new Set(excluded.map((e) => dedupeKey(e.item.candidate)));
@@ -364,11 +398,13 @@ export async function executeDailyRun(
         const isSelected = selectedKeys.has(key);
         const exclusionReason = isSelected
           ? null
-          : rk !== null
-            ? 'over_target'
-            : excludedKeys.has(key)
-              ? 'deadline_passed'
-              : 'not_approved';
+          : companyCapKeys.has(key)
+            ? 'company_cap'
+            : rk !== null
+              ? 'over_target'
+              : excludedKeys.has(key)
+                ? 'deadline_passed'
+                : 'not_approved';
         return { ...base, judgment: r.judgment, rank: rk, selected: isSelected, exclusionReason };
       });
       const stored = await insertRunCandidates(handle, run.id, rows);

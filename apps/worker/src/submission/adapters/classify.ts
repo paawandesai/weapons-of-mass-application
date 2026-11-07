@@ -1,6 +1,6 @@
 import type { FieldClassification, FieldDescriptor } from '../types';
 
-/** What the browser-side scanner reports for one question, before classification. */
+/** The parts of a scanned question that classification reads. */
 export interface RawField {
   id: string;
   label: string;
@@ -11,11 +11,6 @@ export interface RawField {
   /** Section id, class, heading text and control names: the vendor-structure signal. */
   hint: string;
   /** Step index on multi-step forms, otherwise null. */
-  step: number | null;
-}
-
-/** A descriptor plus the scan details adapters need to act on it. */
-export interface ScannedField extends FieldDescriptor {
   step: number | null;
 }
 
@@ -30,7 +25,7 @@ const STANDARD_LABEL: RegExp[] = [
   /^(full|legal|preferred)? ?name$/i,
   /\be-?mail\b/i,
   /\b(phone|mobile|telephone)\b/i,
-  /\b(location|city|country|address|zip|postal|state\b|province|time ?zone)/i,
+  /\b(location|located|city|country|address|zip|postal|state\b|province|time ?zone)/i,
   /\b(linkedin|github|twitter|portfolio|website|personal site|url)\b/i,
   /\bcurrent (company|employer|title|role)\b/i,
   /\b(authori[sz]ed to work|work authori[sz]ation|right to work|visa|sponsorship|legally)\b/i,
@@ -52,31 +47,4 @@ export function classifyField(raw: Pick<RawField, 'label' | 'type' | 'hint'>): F
   }
   if (raw.type !== 'file' && STANDARD_LABEL.some((re) => re.test(raw.label))) return 'standard';
   return 'free-text';
-}
-
-export function toScanned(raw: RawField): ScannedField {
-  const d: ScannedField = {
-    id: raw.id,
-    label: raw.label,
-    type: raw.type,
-    required: raw.required,
-    maxLength: raw.maxLength,
-    classification: classifyField(raw),
-    step: raw.step,
-  };
-  if (raw.options) d.options = raw.options;
-  return d;
-}
-
-export function toDescriptor(s: ScannedField): FieldDescriptor {
-  const d: FieldDescriptor = {
-    id: s.id,
-    label: s.label,
-    type: s.type,
-    required: s.required,
-    maxLength: s.maxLength,
-    classification: s.classification,
-  };
-  if (s.options) d.options = s.options;
-  return d;
 }

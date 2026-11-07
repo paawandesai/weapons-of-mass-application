@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Yes/No buttons</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label class="_label_required_1" for="authorized">Are you authorized to work here?</label>
+        <div class="yesno">
+          <button type="button" aria-pressed="false" data-option="yes">Yes</button>
+          <button type="button" aria-pressed="false" data-option="no">No</button>
+          <input type="checkbox" name="authorized" style="opacity: 0; position: absolute" />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      Array.prototype.forEach.call(document.querySelectorAll('[data-option]'), function (b) {
+        b.addEventListener('click', function () {
+          Array.prototype.forEach.call(document.querySelectorAll('[data-option]'), function (o) {
+            o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+          });
+          document.getElementById('app').setAttribute('data-answer', b.getAttribute('data-option'));
+        });
+      });
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

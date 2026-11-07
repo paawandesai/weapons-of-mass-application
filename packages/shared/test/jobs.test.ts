@@ -61,8 +61,8 @@ describe('Candidate and enums', () => {
     expect(c.description).toBeNull();
   });
 
-  it('PendingReason lists the ten reasons', () => {
-    expect(PendingReason.options).toHaveLength(10);
+  it('PendingReason lists the eleven reasons', () => {
+    expect(PendingReason.options).toHaveLength(11);
     expect(PendingReason.safeParse('browser-error').success).toBe(true);
     expect(PendingReason.safeParse('nope').success).toBe(false);
   });

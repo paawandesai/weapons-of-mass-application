@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>hCaptcha challenge in an iframe</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry"><label for="name">Full name</label><input id="name" type="text" /></div>
+      <div id="challenge" hidden>
+        <iframe
+          src="about:blank#hcaptcha-challenge"
+          title="hCaptcha challenge"
+          width="300"
+          height="400"
+        ></iframe>
+        <textarea name="h-captcha-response" style="display: none"></textarea>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+        document.getElementById('challenge').hidden = false;
+      });
+    </script>
+  </body>
+</html>

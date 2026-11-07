@@ -1,0 +1,151 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { activity, getApplication, getFile, listCaptchaRequestsForApplication } from '@wma/db';
+import { FakeLlm } from '@wma/llm';
+import { runSubmission } from '../../src/submission/job';
+import { SubmissionFailure } from '../../src/submission/failure';
+import {
+  FakeAdapter,
+  FrameCaptcha,
+  approveProfile,
+  makeDeps,
+  seedApplication,
+  setupSubmissionEnv,
+  type SubmissionEnv,
+} from './support';
+
+let env: SubmissionEnv;
+beforeAll(async () => {
+  env = await setupSubmissionEnv();
+});
+afterAll(async () => {
+  await env.cleanup();
+});
+
+async function tenant() {
+  const t = await env.makeTenant();
+  await approveProfile(t);
+  return t;
+}
+const data = (t: { id: string; userId: string }, applicationId: string) => ({
+  tenantId: t.id,
+  userId: t.userId,
+  applicationId,
+});
+
+describe('wave 5: what the generic page layer reports to the job', () => {
+  it('form-rejected: pending with the error texts and a screenshot, no second submit', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    adapter.beforeSubmit = () => {
+      throw new SubmissionFailure('form-rejected', {
+        errors: ['Email: Enter a valid email address'],
+      });
+    };
+    const deps = makeDeps(env.db, { adapter });
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out).toEqual({ outcome: 'pending', reason: 'form-rejected' });
+    expect(adapter.submits).toBe(0);
+    expect(deps.browser.pages[0]!.screenshots).toBe(1);
+    const row = await getApplication(t.handle, s.application.id);
+    expect(row).toMatchObject({
+      status: 'pending',
+      pendingReason: 'form-rejected',
+      attemptCount: 1,
+    });
+    const entry = (await activity.listByApplication(t.handle, s.application.id)).find(
+      (e) => e.action === 'form-rejected',
+    );
+    expect(entry?.detail).toMatchObject({
+      errors: ['Email: Enter a valid email address'],
+      attempt: 1,
+      screenshot: `tenants/${t.id}/applications/${s.application.id}/failure-1.png`,
+    });
+    expect(
+      await getFile(t.handle, `tenants/${t.id}/applications/${s.application.id}/failure-1.png`),
+    ).not.toBeNull();
+  });
+
+  it('records a form notice (an application limit) and still submits', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    (adapter as FakeAdapter & { notices: () => Promise<unknown[]> }).notices = async () => [
+      { kind: 'application-limit', max: 5, days: 180 },
+    ];
+    const deps = makeDeps(env.db, { adapter });
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out.outcome).toBe('applied');
+    const log = (await activity.listByApplication(t.handle, s.application.id)).reverse();
+    expect(log.map((e) => e.action)).toEqual([
+      'submission-started',
+      'tailored',
+      'form-notice',
+      'filled',
+      'submitting',
+      'submitted',
+    ]);
+    expect(log[2]!.detail).toEqual({ kind: 'application-limit', max: 5, days: 180 });
+  });
+
+  it('an iframe challenge goes straight to the human stage: no solver attempts, a full-page screenshot, cleared externally', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    const frame = new FrameCaptcha();
+    adapter.captchas = [frame];
+    const llm = new FakeLlm([{ answer: 'WRONG' }]);
+    const deps = makeDeps(env.db, { adapter, llm });
+    deps.clock.onSleep = async () => {
+      // The user opens the page and solves the challenge there; the emailed reply is only the nudge.
+      frame.solved = true;
+      await env.owner.query(
+        `update captcha_requests set human_answer = 'done'
+          where user_id = $1 and stage = 'human' and human_answer is null and resolved_at is null`,
+        [t.userId],
+      );
+    };
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out.outcome).toBe('applied');
+    expect(llm.calls).toHaveLength(0);
+    // The handle does not type into the frame: the answer reached it and did nothing.
+    expect(frame.entered).toEqual(['done']);
+    const [req] = await listCaptchaRequestsForApplication(t.handle, s.application.id);
+    expect(req).toMatchObject({
+      resolvedBy: 'human',
+      attempts: { agent1: 0, agent2: 0, human: 1 },
+    });
+    expect(deps.sender.sent).toHaveLength(1);
+    expect(deps.sender.sent[0]!.attachments![0]).toMatchObject({ contentType: 'image/png' });
+    const trail = (await activity.listByApplication(t.handle, s.application.id))
+      .reverse()
+      .map((e) => e.action);
+    expect(trail).toContain('captcha-stage');
+    expect(trail).toContain('captcha-human-requested');
+    expect(trail.filter((a) => a === 'captcha-stage')).toHaveLength(1);
+  });
+
+  it('an iframe challenge is not cleared by a typed answer alone: the human attempts run out', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    const frame = new FrameCaptcha();
+    adapter.captchas = [frame];
+    const llm = new FakeLlm([{ answer: 'WRONG' }]);
+    const deps = makeDeps(env.db, { adapter, llm });
+    deps.clock.onSleep = async () => {
+      await env.owner.query(
+        `update captcha_requests set human_answer = 'ABC123'
+          where user_id = $1 and stage = 'human' and resolved_at is null`,
+        [t.userId],
+      );
+    };
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out).toEqual({ outcome: 'pending', reason: 'captcha-timeout' });
+    expect(llm.calls).toHaveLength(0);
+    expect(frame.entered.length).toBeGreaterThan(0);
+    expect(frame.entered.every((a) => a === 'ABC123')).toBe(true);
+    const [req] = await listCaptchaRequestsForApplication(t.handle, s.application.id);
+    expect(req?.resolvedBy).toBeNull();
+  });
+});

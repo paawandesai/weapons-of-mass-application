@@ -5,9 +5,15 @@ import type { PendingReason } from '@wma/shared';
  * second failure, a closed application. `detail` goes to the activity log, so it must never hold
  * a password, token or other secret.
  */
+/**
+ * The pending reasons a submission can end in. `form-rejected` (the vendor page showed validation
+ * errors after submit) is a `PendingReason` like the others.
+ */
+export type SubmissionReason = PendingReason;
+
 export class SubmissionFailure extends Error {
   constructor(
-    readonly reason: PendingReason,
+    readonly reason: SubmissionReason,
     readonly detail: Record<string, unknown> = {},
   ) {
     super(reason);

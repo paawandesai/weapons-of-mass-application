@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Boilerplate that reads like a confirmation; the form only hides, then errors</title>
+  </head>
+  <body>
+    <p id="note">Please note: after your application has been received you will hear from us.</p>
+    <form id="app">
+      <div class="entry"><label for="name">Full name</label><input id="name" type="text" /></div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      var form = document.getElementById('app');
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        form.hidden = true;
+        setTimeout(function () {
+          form.hidden = false;
+          document.getElementById('name').setAttribute('aria-invalid', 'true');
+          var err = document.createElement('p');
+          err.className = 'form-error';
+          err.textContent = 'Something went wrong, please try again';
+          form.appendChild(err);
+        }, 600);
+      });
+    </script>
+  </body>
+</html>

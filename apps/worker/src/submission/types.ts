@@ -22,6 +22,11 @@ export interface FieldDescriptor {
   maxLength: number | null;
   classification: FieldClassification;
   options?: string[];
+  /**
+   * Set when the page layer could not describe the control fully: `large-list` (a combobox with
+   * more than 60 options, `options` omitted) or `unknown-control` (read as `text`).
+   */
+  hint?: 'large-list' | 'unknown-control';
 }
 
 /** A resolved value for one field, by field id. Skipped fields are simply absent. */
@@ -40,11 +45,24 @@ export interface Credential {
 export type SignInOutcome = 'ok' | 'rejected';
 
 export interface CaptchaHandle {
+  /**
+   * `image` (default): a text-and-image widget the solver chain can read. `frame`: an hCaptcha or
+   * reCAPTCHA challenge in an iframe, which has no image to solve; it goes straight to the human
+   * stage and `screenshot()` is the full page.
+   */
+  challenge?: 'image' | 'frame';
   /** The challenge region as a PNG. */
   screenshot(): Promise<Buffer>;
   enter(answer: string): Promise<void>;
   /** True when the challenge is no longer present or the page moved on. */
   cleared(): Promise<boolean>;
+}
+
+/** Something the form says about itself that is recorded but does not stop the submission. */
+export interface FormNotice {
+  kind: 'application-limit';
+  max: number;
+  days: number;
 }
 
 /** One per vendor; selected by URL pattern. */
@@ -61,6 +79,8 @@ export interface FormAdapter {
   submit(page: AdapterPage): Promise<void>;
   confirmed(page: AdapterPage): Promise<boolean>;
   findCaptcha(page: AdapterPage): Promise<CaptchaHandle | null>;
+  /** Visible notices on the form, e.g. an application limit (`form-notice` activity entry). */
+  notices?(page: AdapterPage): Promise<FormNotice[]>;
 }
 
 export type TailorFailureDetail = 'invalid_facts' | 'too_long';

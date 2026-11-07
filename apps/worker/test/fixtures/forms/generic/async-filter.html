@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A combobox whose filtered results arrive late</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="skill">Main skill</label>
+        <div class="box">
+          <input
+            id="skill"
+            type="text"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      // The first list is a default one; typing re-queries a "server" that answers after 700 ms,
+      // and the old rows stay mounted until then.
+      var input = document.getElementById('skill');
+      var menu = null;
+      var all = ['Zebra crossing design', 'Zoology', 'Alpha', 'Beta'];
+      function show(items) {
+        if (menu) menu.remove();
+        menu = document.createElement('div');
+        menu.setAttribute('role', 'listbox');
+        items.forEach(function (t) {
+          var o = document.createElement('div');
+          o.setAttribute('role', 'option');
+          o.textContent = t;
+          o.addEventListener('click', function () {
+            input.value = t;
+            menu.remove();
+            menu = null;
+            input.setAttribute('aria-expanded', 'false');
+          });
+          menu.appendChild(o);
+        });
+        document.body.appendChild(menu);
+        input.setAttribute('aria-expanded', 'true');
+      }
+      input.addEventListener('click', function () {
+        show(['Alpha', 'Beta']);
+      });
+      input.addEventListener('input', function () {
+        var q = input.value.toLowerCase();
+        setTimeout(function () {
+          if (!menu) return;
+          show(
+            all.filter(function (t) {
+              return t.toLowerCase().indexOf(q) >= 0;
+            }),
+          );
+        }, 700);
+      });
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && menu) {
+          menu.remove();
+          menu = null;
+        }
+      });
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

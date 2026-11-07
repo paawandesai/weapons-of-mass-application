@@ -1,37 +1,63 @@
 # Submission form adapters
 
 Code: `apps/worker/src/submission/adapters/`. Tests: `apps/worker/test/submission/adapters.test.ts`
-against synthesized fixtures in `apps/worker/test/fixtures/forms/`.
+(the demo fixtures through the generic path), `generic.test.ts` (real captures and one synthetic
+page per control kind) and `generic-job.test.ts`.
 
-Contract: the `FormAdapter` interface in `apps/worker/src/submission/types.ts`. One adapter per
-vendor; `selectAdapter(url)` picks it by hosted-vendor host and returns
-`{ ok: false, reason: 'unsupported-ats' }` for everything else without opening a browser.
+Contract: the `FormAdapter` interface in `apps/worker/src/submission/types.ts`. There is one
+adapter object per vendor, but all of them are the same class (`VendorAdapter` in `common.ts`)
+driven by **hints**; reading, filling and submitting the form is the generic page layer
+(`generic.ts`, with the browser-side scripts in `scan-script.ts`). `selectAdapter(url)` picks the
+vendor by hosted-vendor host (or, in demo mode, the fixture forms path) and returns
+`{ ok: false, reason: 'unsupported-ats' }` for everything else without opening a browser. The
+design is in [design/wave5-generic-submitter.md](design/wave5-generic-submitter.md).
 
-| Vendor     | Hosts matched                                              | Form page                       |
-| ---------- | ---------------------------------------------------------- | ------------------------------- |
-| Greenhouse | `boards.greenhouse.io`, `job-boards[.eu].greenhouse.io`    | the posting page itself         |
-| Lever      | `jobs.lever.co`, `jobs.eu.lever.co`                        | `<posting>/apply` (added by `load`) |
-| Ashby      | `jobs.ashbyhq.com`                                         | `<posting>/application` (added by `load`) |
+| Vendor     | Hosts matched                                           | Form page                                 |
+| ---------- | ------------------------------------------------------- | ----------------------------------------- |
+| Greenhouse | `boards.greenhouse.io`, `job-boards[.eu].greenhouse.io` | the posting page itself                   |
+| Lever      | `jobs.lever.co`, `jobs.eu.lever.co`                     | `<posting>/apply` (added by `load`)       |
+| Ashby      | `jobs.ashbyhq.com`                                      | `<posting>/application` (added by `load`) |
 
 Only the exact hosts match; look-alike hosts and non-http(s) URLs are unsupported.
 
+## Vendor hints
+
+`VendorHints` in `common.ts` is all a vendor file may say:
+
+| Hint           | Meaning                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| `ats`, `hosts` | The `AtsId` and the host pattern.                                                          |
+| `applyUrl`     | Maps a posting URL to the page that holds the form (Lever, Ashby).                         |
+| `confirmation` | The vendor's confirmation marker: a `selector` and optionally a `url` pattern.             |
+| `account`      | Candidate account pages (Greenhouse, and Ashby's demo pages); `null` when there are none.  |
+| `resumeInput`  | Optional selector overriding the resume file input. No vendor sets it today.               |
+
+There are no scan selectors in vendor files. A redesign of a vendor's form needs no change here.
+
 ## How `fields()` works
 
-A browser-side scan (`scan-script.ts`) walks the question blocks of the form and reports id,
-label (required marker stripped), type, required, max length, options and a section hint (the
-enclosing section's id, class, heading text, plus the control's name and id). Node-side
-`classify.ts` turns that into a classification.
+`scanPage` runs `SCAN_SCRIPT` in the page. It finds the form root, the controls, groups them into
+questions and reads label, required flag, options, current value and a context string (nearest
+section heading, class names, control name and id). The script stamps each control with
+`data-wma-c` so Playwright can act on exactly what was read. Comboboxes are then opened once to
+read their options. `classify.ts` turns label, type and context into a classification.
 
-A field is `required` when its label carries the vendor's required marker or any of its controls
-is `required` / `aria-required`. The descriptor `id` is the control's `id`, falling back to its
-`name`; radio and multi-checkbox groups use the shared `name`. `fields()` reads every question on
-the page, including those on hidden steps.
+The rules (form root, controls, question boxes, labels, options, required, kinds, verification,
+submit button, resume input, confirmation, CAPTCHA detection) are summarised in
+[submission.md](submission.md#the-generic-submitter) and numbered in the design brief.
+
+Descriptor `type` for the answers step: text-like inputs and unrecognised controls are `text`;
+comboboxes, listboxes and native selects are `select` (a combobox with no readable options is
+`text`); Yes/No buttons and radios are `radio` (Yes/No buttons report options `Yes`, `No`); a
+checkbox group is `checkbox` with options and a lone checkbox is `checkbox` without; dates are
+`date`; uploads are `file`. `hint` is `large-list` for a combobox of more than 60 options (the
+options are left out) and `unknown-control` for a control kind the layer does not know.
 
 ## Classification rules (all vendors)
 
 Evaluated in this order:
 
-1. `self-identification` when the section hint matches EEO, EEOC, self-identif*, voluntary,
+1. `self-identification` when the context matches EEO, EEOC, self-identif\*, voluntary,
    demographic or diversity, or the label names gender, race, ethnicity, Hispanic/Latino, veteran,
    disability, sexual orientation, transgender or LGBTQ. These are never filled, even if a value
    is supplied (design rule 7).
@@ -42,52 +68,31 @@ Evaluated in this order:
    how-did-you-hear, pronouns, and consent/privacy checkboxes. Non-resume file inputs are never
    `standard`.
 4. Everything else is `free-text`: the answers step resolves it from the profile or marks it
-   unanswerable. The LLM label fallback of design D2 belongs to that step, not to the adapters.
+   unanswerable.
 
 A required field that is a file input other than the resume can never be filled; it surfaces as
 `unmapped-field` (below).
 
-## Per-vendor hints
+## Fill, submit and outcomes
 
-### Greenhouse
+- `attachResume` sets the file on the resume input (hidden inputs and drop zones with an input are
+  fine). A form with no resume input proceeds; a drop zone with no input is `unmapped-field`
+  naming `resume`.
+- `fill` fills the questions that have values (never self-identification or uploads), rescans and
+  verifies. A required question that did not take its value throws `SubmissionFailure`
+  `unmapped-field` with `fields: [{ id, label }]`; the job stores the failure screenshot.
+- `submit` finds the submit button in the form root (walking to the last step first on a stepped
+  form). A button that stays disabled or `aria-disabled` after the fill is `unmapped-field` with
+  `field: 'Submit'`. After the click it waits up to 10 s for the first of: the vendor
+  confirmation or a thank-you text with the form gone (returns), validation errors that were not
+  there before the click (`form-rejected`, with the sanitized error texts), a CAPTCHA (returns).
+  Otherwise it returns and the job waits for the confirmation email (`unconfirmed` on timeout).
+- `confirmed` checks the vendor hint, then the thank-you text.
+- `notices` returns visible notices; today that is the application limit (`may not apply more
+than N times in any D day`), which the job records as `form-notice`.
 
-- Form `#application_form`; each question is a `.field` (`fieldset.field` with a `legend` for
-  radio groups) with `label.field-label`; the required marker is `.asterisk`.
-- Sections: `#main_fields` (name, email, phone, resume, cover letter), `#custom_fields`
-  (employer questions), `#eeoc_fields` (voluntary self-identification; selects named
-  `job_application_gender`, `_hispanic_ethnicity`, `_race`, `_veteran_status`, `_disability_status`).
-- Resume input `#resume`; submit `#submit_app`; confirmation `#application_confirmation`.
-- Accounts: `#account_form` (`#account_email`, `#account_password`, optional
-  `#account_password_confirmation`, `#account_terms`); create `#create_account`, sign in
-  `#sign_in`, switch links `#show_signup` / `#show_signin`; error `.error`; after sign-up
-  `.verification-sent`.
-
-### Lever
-
-- Form `#application-form`; each question is `li.application-question` with `.application-label`;
-  the required marker is `.required`. Ids are mostly absent so the descriptor id is the input
-  `name`: `name`, `email`, `phone`, `org`, `urls[LinkedIn]`, `cards[<id>][field<n>]` (employer
-  questions), `comments`, and `eeo[gender|race|veteran|disability]` (the `.application-eeo`
-  section). The resume input is `#resume-upload-input` (`name="resume"`).
-- Submit `#btn-submit`; confirmation `.application-confirmation` or a `/thanks` URL.
-- No candidate accounts: `requiresAccount` is always false and `signUp` / `signIn` throw.
-
-### Ashby
-
-- Form `#ashby-application-form`, a sequence of `section.ashby-step[data-step]`; only the current
-  step is visible. Questions are `.ashby-application-form-field-entry` with
-  `.ashby-application-form-question-title`; required marker
-  `.ashby-application-form-question-required`. System fields have ids
-  `_systemfield_name`, `_systemfield_email`, `_systemfield_resume`.
-- The self-identification step is the section whose heading says Voluntary Self-Identification.
-- `fill` walks the steps with Next/Back (Next is blocked while a required text field on the step
-  is empty), `submit` goes to the last step first. `attachResume` does not navigate: a file input
-  accepts files while its step is hidden. The job attaches the resume before `fill`, because Next
-  validates the step's required upload.
-- Submit `.ashby-application-form-submit-button`; confirmation
-  `.ashby-application-form-success-container`.
-- Accounts: `.ashby-auth-form` (`data-mode` sign-up or sign-in), `.ashby-auth-submit`,
-  `.ashby-auth-switch`, error `.ashby-auth-error`, after sign-up `.ashby-auth-verify`.
+Steps: a form whose sections carry `data-step` is walked with the visible Next/Back buttons; the
+inactive sections' controls are still read by `fields()`.
 
 ## Sign-up and sign-in
 
@@ -104,8 +109,12 @@ page shows an error. If neither appears within 10 s it throws, so a slow or chan
 `findCaptcha` returns a handle for a visible text-and-image challenge widget (`#captcha-widget`,
 `.captcha-widget` or `[data-captcha]`): `screenshot()` is the widget region as PNG, `enter(answer)`
 fills its text input and presses Verify, `cleared()` is true once the widget is gone or hidden.
-Challenge types without a text answer (image grids, checkbox widgets in iframes) are not
-recognized and return null.
+
+Otherwise it looks for an iframe challenge: an `iframe[src*=hcaptcha]` or `iframe[src*=recaptcha]`
+that is visible with a size (the invisible reCAPTCHA badge does not count) or a visible
+`[data-sitekey]` box. That handle has `challenge: 'frame'`: `screenshot()` is the full page,
+`enter` does nothing (the frame is cross-origin) and `cleared()` is true once the frame is gone.
+The job sends frame challenges straight to the human stage.
 
 ## Unmapped fields and failure screenshots
 
@@ -114,13 +123,23 @@ recognized and return null.
 `{ reason: 'unmapped-field', fields: [{id, label}], screenshotKey }` after storing a full-page PNG.
 `screenshotOnFailure(page, ctx, name)` stores under
 `applicationFileKey(tenant, applicationId, 'failure-<name>.png')` and returns the key, or null if
-the page cannot be captured.
+the page cannot be captured. The job's own failure path stores a full-page screenshot for every
+park.
 
 ## Fixtures
 
-Hand-written, vendor-shaped HTML; nothing was downloaded from a vendor. Each vendor folder has
-`form.html`, a confirmation page and, for Greenhouse and Ashby, `account.html` (sign-up),
-`signin.html` and `check-email.html`. Variants are selected with a query string on `form.html`:
-`?captcha` adds a hidden text-and-image challenge revealed by the first submit (answer `7K3Q`);
-`?unmapped` adds a required upload no profile can fill. The test account is
-`candidate@example.com` / `correct-horse-battery`. Shared behaviour is in `_shared/fixture.js`.
+- `forms/{greenhouse,lever,ashby}`: hand-written, vendor-shaped demo forms served by the demo
+  forms server; nothing was downloaded from a vendor. Each has `form.html`, a confirmation page
+  and, for Greenhouse and Ashby, `account.html`, `signin.html` and `check-email.html`. Query
+  variants on `form.html`: `?captcha` adds a hidden text-and-image challenge revealed by the first
+  submit (answer `7K3Q`); `?unmapped` adds a required upload no profile can fill. The test account
+  is `candidate@example.com` / `correct-horse-battery`. Shared behaviour is in `_shared/fixture.js`.
+- `forms/real`: captures of today's Greenhouse job-boards (Anthropic), Ashby (OpenAI) and Lever
+  (Palantir) pages: rendered HTML with scripts, styles, iframes and SVG removed, plus Playwright
+  aria snapshots. `lever.html` and `lever.aria.yml` were shrunk: the 3,300-school dropdown keeps its
+  first 25 schools and "Other - School Not Listed", and the hidden card-definition JSON values
+  (about 900 KB) are replaced by `{}`. They are static, so a react-select menu cannot open and
+  Greenhouse comboboxes are scanned as `text` there.
+- `forms/generic`: one small page per control kind (portal combobox, Yes/No buttons, autocomplete,
+  date picker, international phone widget, drop zone), required-detection cases, a disabled
+  submit, a validation error, confirmation by text and by URL, an iframe challenge and a badge-only page.

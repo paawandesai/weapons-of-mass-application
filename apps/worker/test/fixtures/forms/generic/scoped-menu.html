@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Two autocompletes: a late menu of the first must not be offered to the second</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="first">First pick</label>
+        <input
+          id="first"
+          type="text"
+          role="combobox"
+          aria-controls="menu-first"
+          aria-expanded="false"
+          aria-autocomplete="list"
+          autocomplete="off"
+        />
+      </div>
+      <div class="entry">
+        <label for="second">Second pick</label>
+        <input
+          id="second"
+          type="text"
+          role="combobox"
+          aria-controls="menu-second"
+          aria-expanded="false"
+          aria-autocomplete="list"
+          autocomplete="off"
+        />
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <div
+      id="menu-first"
+      role="listbox"
+      hidden
+      style="position: absolute; top: 20px; left: 400px"
+    ></div>
+    <div
+      id="menu-second"
+      role="listbox"
+      hidden
+      style="position: absolute; top: 120px; left: 400px"
+    ></div>
+    <script>
+      function wire(input, menu, items, lateMenu) {
+        function fill() {
+          menu.innerHTML = '';
+          items.forEach(function (t) {
+            var o = document.createElement('div');
+            o.setAttribute('role', 'option');
+            o.textContent = t;
+            o.addEventListener('click', function () {
+              input.value = t;
+              menu.hidden = true;
+              input.setAttribute('aria-expanded', 'false');
+              document.getElementById('app').setAttribute('data-' + input.id, t);
+            });
+            menu.appendChild(o);
+          });
+          menu.hidden = false;
+          input.setAttribute('aria-expanded', 'true');
+        }
+        input.addEventListener('click', fill);
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') menu.hidden = true;
+        });
+        return fill;
+      }
+      var late = wire(document.getElementById('first'), document.getElementById('menu-first'), [
+        'Pick Beta (first)',
+      ]);
+      wire(document.getElementById('second'), document.getElementById('menu-second'), [
+        'Pick Beta (second)',
+      ]);
+      // The first autocomplete's results arrive while the second one is being opened.
+      document.getElementById('second').addEventListener('click', function () {
+        setTimeout(late, 150);
+      });
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

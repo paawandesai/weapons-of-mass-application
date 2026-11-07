@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Autocomplete that filters on typing</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="_systemfield_location"
+          >Where are you located?<span aria-hidden="true">*</span></label
+        >
+        <div class="box">
+          <input
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            placeholder="Start typing..."
+            data-name="place"
+          />
+        </div>
+      </div>
+      <div class="entry">
+        <label for="_systemfield_other">Other place</label>
+        <div class="box">
+          <input
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            placeholder="Start typing..."
+            data-name="other"
+          />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      var cities = [
+        'Porto, Portugal',
+        'Lisbon, Ohio, United States',
+        'Lisbon, Portugal',
+        'Madrid, Spain',
+      ];
+      Array.prototype.forEach.call(document.querySelectorAll('[role=combobox]'), function (input) {
+        var list = null;
+        input.addEventListener('input', function () {
+          if (list) list.remove();
+          list = null;
+          input.setAttribute('aria-expanded', 'false');
+          var q = input.value.toLowerCase();
+          if (q.length < 2 || input.getAttribute('data-name') === 'other') return;
+          setTimeout(function () {
+            list = document.createElement('ul');
+            list.setAttribute('role', 'listbox');
+            cities
+              .filter(function (c) {
+                return c.toLowerCase().indexOf(q) >= 0;
+              })
+              .forEach(function (c) {
+                var li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.textContent = c;
+                li.addEventListener('click', function () {
+                  input.value = c;
+                  list.remove();
+                  list = null;
+                  input.setAttribute('aria-expanded', 'false');
+                });
+                list.appendChild(li);
+              });
+            input.parentNode.appendChild(list);
+            input.setAttribute('aria-expanded', 'true');
+          }, 150);
+        });
+      });
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

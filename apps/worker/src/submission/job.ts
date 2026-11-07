@@ -148,7 +148,7 @@ async function failAttempt(
         ctx.application.id,
         `failure-${attempt}.png`,
       );
-      await ctx.files.put(key, await page.screenshot());
+      await ctx.files.put(key, await page.screenshot({ fullPage: true }));
       screenshot = key;
     } catch {
       // the page may already be gone; the reason is still recorded
@@ -361,6 +361,11 @@ async function attempt(
     }
 
     const captchaOpts = { webOrigin: deps.webOrigin, companyName: ctx.companyName };
+    // Design rule 15: what the form says about itself (an application limit) is recorded, and
+    // does not stop the submission.
+    for (const notice of (await adapter.notices?.(formPage)) ?? []) {
+      await recordStep(ctx, { action: 'form-notice', detail: { ...notice } });
+    }
     const fields = await adapter.fields(formPage);
     const plan = planFill(fields, await deps.resolveAnswers(ctx, fields));
     const pdfKey = ctx.application.resumePdfRef;

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A standalone aria-pressed toggle</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <span id="sub-label">Keep me informed<span aria-hidden="true">*</span></span>
+        <button type="button" id="sub" aria-pressed="false" aria-labelledby="sub-label">
+          Subscribe
+        </button>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      var b = document.getElementById('sub');
+      b.addEventListener('click', function () {
+        b.setAttribute(
+          'aria-pressed',
+          b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true',
+        );
+      });
+    </script>
+  </body>
+</html>

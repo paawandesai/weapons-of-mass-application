@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Combobox with a portal menu</title>
+    <style>
+      .portal-menu {
+        position: absolute;
+        top: 400px;
+        left: 20px;
+        background: #fff;
+        border: 1px solid #999;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="app">
+      <div class="field">
+        <label id="colour-label" for="colour"
+          >Favourite colour<span aria-hidden="true">*</span></label
+        >
+        <div class="shell">
+          <div class="single-value" id="colour-value"></div>
+          <input
+            id="colour"
+            type="text"
+            role="combobox"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-autocomplete="list"
+            aria-labelledby="colour-label"
+            aria-required="true"
+            autocomplete="off"
+          />
+          <input
+            required
+            tabindex="-1"
+            aria-hidden="true"
+            value=""
+            style="opacity: 0; height: 0; position: absolute"
+          />
+        </div>
+      </div>
+      <div class="field">
+        <label id="country-label" for="country">Country</label>
+        <div class="shell">
+          <div class="single-value" id="country-value"></div>
+          <input
+            id="country"
+            type="text"
+            role="combobox"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-labelledby="country-label"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      (function () {
+        var colours = ['Red', 'Green', 'Blue', 'Blue-green'];
+        var countries = ['Portugal', 'United Kingdom', 'United States'];
+        for (var i = 0; i < 70; i++) countries.push('Land ' + i);
+        function combo(input, valueEl, list) {
+          var menu = null;
+          function close() {
+            if (menu) menu.remove();
+            menu = null;
+            input.setAttribute('aria-expanded', 'false');
+          }
+          function open(filter) {
+            close();
+            menu = document.createElement('div');
+            menu.setAttribute('role', 'listbox');
+            menu.className = 'portal-menu';
+            var shown = list.filter(function (t) {
+              return t.toLowerCase().indexOf((filter || '').toLowerCase()) >= 0;
+            });
+            shown.forEach(function (t, n) {
+              var o = document.createElement('div');
+              o.setAttribute('role', 'option');
+              o.id = 'react-select-' + input.id + '-option-' + n;
+              o.textContent = t;
+              o.addEventListener('click', function () {
+                valueEl.textContent = t;
+                input.value = '';
+                document.getElementById('app').setAttribute('data-' + input.id, t);
+                close();
+              });
+              menu.appendChild(o);
+            });
+            document.body.appendChild(menu);
+            input.setAttribute('aria-expanded', 'true');
+          }
+          input.addEventListener('click', function () {
+            open('');
+          });
+          input.addEventListener('input', function () {
+            open(input.value);
+          });
+          input.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') close();
+          });
+        }
+        combo(document.getElementById('colour'), document.getElementById('colour-value'), colours);
+        combo(
+          document.getElementById('country'),
+          document.getElementById('country-value'),
+          countries,
+        );
+        document.getElementById('app').addEventListener('submit', function (e) {
+          e.preventDefault();
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -103,6 +103,8 @@ function deps(
     queue: fakeQueue(),
     http: fastHttp(),
     now: () => NOW,
+    // the fixture postings share one company; the per-company cap has its own tests (run-cap.test.ts)
+    maxPerCompany: 1000,
     ...over,
   } as DailyRunDeps & { queue: ReturnType<typeof fakeQueue> };
 }

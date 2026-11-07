@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Date with a picker</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="start">Start date<span aria-hidden="true">*</span></label>
+        <input
+          id="start"
+          type="text"
+          class="date-input"
+          placeholder="DD/MM/YYYY"
+          autocomplete="off"
+        />
+        <div class="picker" id="picker" hidden>Pick a day</div>
+      </div>
+      <div class="entry">
+        <label for="native">Native date</label>
+        <input id="native" type="date" />
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      var input = document.getElementById('start');
+      var picker = document.getElementById('picker');
+      input.addEventListener('focus', function () {
+        picker.hidden = false;
+      });
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') picker.hidden = true;
+      });
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

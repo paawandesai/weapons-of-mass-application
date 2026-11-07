@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Controls with no id and no name</title>
+  </head>
+  <body>
+    <form id="app">
+      <div id="rows">
+        <div class="row"><span>Nickname</span><input type="text" /></div>
+        <div class="row"><span>Hometown</span><input type="text" /></div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      // Inserts an anonymous control ahead of the others, as an upload or an answer can.
+      window.insertFirst = function () {
+        var row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = '<span>Pet name</span><input type="text" />';
+        var rows = document.getElementById('rows');
+        rows.insertBefore(row, rows.firstChild);
+      };
+    </script>
+  </body>
+</html>

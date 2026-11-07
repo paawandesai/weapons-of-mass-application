@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Two comboboxes sharing a parent: each owns its selected value</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="row">
+        <label id="a-label" for="a">First choice</label>
+        <label id="b-label" for="b">Second choice<span aria-hidden="true">*</span></label>
+        <div class="shell">
+          <div class="single-value">Alpha</div>
+          <input
+            id="a"
+            type="text"
+            role="combobox"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-labelledby="a-label"
+            autocomplete="off"
+          />
+        </div>
+        <div class="shell">
+          <div class="single-value" id="b-value"></div>
+          <input
+            id="b"
+            type="text"
+            role="combobox"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-labelledby="b-label"
+            autocomplete="off"
+          />
+          <input
+            required
+            tabindex="-1"
+            aria-hidden="true"
+            value=""
+            style="opacity: 0; height: 0; position: absolute"
+          />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      (function () {
+        var input = document.getElementById('b');
+        var menu = null;
+        function close() {
+          if (menu) menu.remove();
+          menu = null;
+          input.setAttribute('aria-expanded', 'false');
+        }
+        input.addEventListener('click', function () {
+          close();
+          menu = document.createElement('div');
+          menu.setAttribute('role', 'listbox');
+          ['Beta', 'Gamma'].forEach(function (t) {
+            var o = document.createElement('div');
+            o.setAttribute('role', 'option');
+            o.textContent = t;
+            o.addEventListener('click', function () {
+              document.getElementById('b-value').textContent = t;
+              close();
+            });
+            menu.appendChild(o);
+          });
+          document.body.appendChild(menu);
+          input.setAttribute('aria-expanded', 'true');
+        });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') close();
+        });
+        document.getElementById('app').addEventListener('submit', function (e) {
+          e.preventDefault();
+        });
+      })();
+    </script>
+  </body>
+</html>

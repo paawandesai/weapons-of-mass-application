@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>A thank-you message beside a form that still shows role-based controls</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <span id="pick-label">Pick one</span>
+        <div role="radiogroup" aria-labelledby="pick-label">
+          <div role="radio" aria-checked="false" tabindex="0">One</div>
+          <div role="radio" aria-checked="false" tabindex="0">Two</div>
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <p id="msg" hidden>Thank you for applying!</p>
+    <script>
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+        document.getElementById('msg').hidden = false;
+      });
+    </script>
+  </body>
+</html>
