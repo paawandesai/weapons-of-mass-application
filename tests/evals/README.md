@@ -45,3 +45,14 @@ before committing. Everything is fictional; the candidate is the fixture profile
 
 The apply decision, profile build, email-to-application matching, company list, pay-data extraction and prep
 plan, and an end-to-end run of the daily loop. CAPTCHA solving is deliberately out of scope.
+
+## The golden set (end-to-end gate)
+
+`scripts/gauntlet.sh --golden` is the end-to-end regression gate, separate from these DeepEval suites:
+eight fictional employers ("Gauntlet …"), each one posting with a distinct form challenge and a
+scripted recruiter scenario (slots, pay question, reschedule, three rounds, booking link, vague
+time, injection, ghost). One command seeds them, runs the daily loop, plays the user's one step
+(confirming offered times), waits for the recruiter scripts to settle, and scores every employer
+against the contract in `packages/db/src/seed/scorecard.ts`. Exit 1 on any failure. It needs
+`ANTHROPIC_API_KEY` and takes about five minutes. The DeepEval suites test the individual model
+steps; the golden set tests that the whole product holds together.
