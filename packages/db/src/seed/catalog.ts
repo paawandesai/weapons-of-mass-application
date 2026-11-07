@@ -273,6 +273,7 @@ export const DEMO_PROFILE: ProfileDocument = {
     visa_sponsorship_required: false,
     start_date: 'Within 30 days',
     earliest_start_date: '2026-12-01',
+    previous_interviews: [],
     notice_period: '2 weeks',
     reasons_for_change: 'Looking for broader platform ownership',
   },

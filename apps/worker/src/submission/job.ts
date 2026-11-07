@@ -8,6 +8,7 @@ import {
   getJob,
   getProfileVersion,
   getUserById,
+  listAppliedCompanyNames,
   listRunCandidates,
   lockForAttempt,
   putFile,
@@ -260,6 +261,7 @@ async function attempt(
     application: claim,
     job,
     companyName: '',
+    priorApplications: [],
     profile,
     judgment: await runCandidateJudgment(handle, claim, job),
     clock: deps.clock,
@@ -278,6 +280,7 @@ async function attempt(
   };
 
   ctx.companyName = await companyNameFor(ctx);
+  ctx.priorApplications = await listAppliedCompanyNames(handle, userId);
 
   // Evidence of earlier attempts: the first start, and the first time a submit was about to be
   // clicked. The second is what makes a vendor-side submission possible.

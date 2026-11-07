@@ -168,6 +168,8 @@ export interface ApplicationDetail {
     status: 'filled' | 'blank' | 'skipped' | 'attached';
     value: unknown;
     skipped?: string;
+    /** Set when the agent inferred or guessed the answer (rule 30). */
+    source?: 'inferred' | 'guessed';
   }[];
   unmet_requirements: string[];
   threads: ThreadDetail[];

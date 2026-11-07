@@ -367,6 +367,28 @@ describe('profile review', () => {
     expect(state.profile?.document.standard_answers.earliest_start_date).toBeNull();
   });
 
+  it('edits previous interviews as a comma-separated list: null untouched, [] cleared', async () => {
+    const user = userEvent.setup();
+    seedProfile();
+    renderAt('/profile/review');
+    const input = await screen.findByLabelText(/Companies interviewed at before/);
+    await user.type(screen.getByLabelText('Notice period'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+    await screen.findByText('Saved as a new version.');
+    expect(state.profile?.document.standard_answers.previous_interviews).toBeNull();
+    await user.type(input, 'Anthropic, OpenAI');
+    await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+    await screen.findByText('Saved as a new version.');
+    expect(state.profile?.document.standard_answers.previous_interviews).toEqual([
+      'Anthropic',
+      'OpenAI',
+    ]);
+    await user.clear(screen.getByLabelText(/Companies interviewed at before/));
+    await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+    await screen.findByText('Saved as a new version.');
+    expect(state.profile?.document.standard_answers.previous_interviews).toEqual([]);
+  });
+
   it('blocks saving invalid fields with a message', async () => {
     const user = userEvent.setup();
     seedProfile();

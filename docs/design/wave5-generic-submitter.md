@@ -291,3 +291,64 @@ Andre's decisions (2026-11-07, evening), replacing 23 and 24 above:
     description is part of the match now that rule 22 captures it.
 25. Take-home exercises (a required URL/file for an exercise, assignment, case study or work
     sample) stay parked as `unanswerable-question`; out of scope for now.
+
+## Found by the third real submission round (2026-11-07, evening)
+
+AI policy and start date passed. Parks: four Anthropic forms on "Have you ever interviewed at
+Anthropic before?", two OpenAI forms on "Are you authorized to work in the country where the job
+is located?" (the profile's `work_authorization` is null: Andre fills it on the review page), one
+Warp form on "Do you have permanent authorization to work for Warp in the U.S. or Canada?"
+(phrasing not matched by the work-authorization rule).
+
+26. The work-authorization rule also matches "authori[sz]ation to work", "permanent(ly)
+    authori[sz]ed", "permanent authori[sz]ation", "eligib(le|ility) to work" and "legally
+    (able|allowed|entitled) to work". A null `work_authorization` keeps parking as
+    `missing-profile-field` (the answer is the user's to give, never guessed).
+27. Prior-contact questions resolve from facts the system holds:
+    - "Have you (ever) worked (at|for) <company>" → Yes/No from `work_history` employers
+      (normalised name match against the posting's company).
+    - "Have you (ever|previously) interviewed (at|with) <company>" → Yes/No from a new standard
+      answer `previous_interviews: string[] | null` (company names; `[]` means none; null = not
+      yet answered → `missing-profile-field` naming it). Editable on the review page as a
+      comma-separated list.
+    - "Have you (ever|previously) applied (to|at|for) <company>" → Yes when the application
+      records hold an earlier applied row for that company or `previous_interviews` names it;
+      otherwise No when `previous_interviews` is set; null parks.
+    The company in the question is the posting's company unless the label names another.
+
+## Andre's policy change (2026-11-07, evening): educated guesses from the profile
+
+"You are allowed to make educated guesses for these questions based on profile. We'll never
+finish if you stop at every mildly ambiguous question." The never-invent rule still governs
+facts that would be credentials (employers, titles, dates, degrees, certifications, licences,
+clearances), compensation and self-identification. For everything else the agent answers with
+the most likely value the profile supports, records that it guessed, and tells the user.
+
+28. Null standard answers get an inferred default at resolve time instead of parking, recorded
+    with source `inferred`:
+    - `work_authorization`: from `identity.location` (a US state or city, or a US phone country
+      code → "Authorized to work in the United States"; likewise UK, Canada, EU countries from
+      the address); unknown country → the question's own country when it names one, else park.
+    - `visa_sponsorship_required`: false when authorization was inferred for the question's
+      country, else park.
+    - `previous_interviews`: `[]` (none).
+    - `start_date`: "Within 30 days"; `notice_period`: "2 weeks"; `earliest_start_date` derives
+      from those (rule 23b).
+    - `relocation` (willing_to_relocate null): No when `preferences.remote` is `remote`, else
+      Yes when the posting's location is in `preferences.locations`, else No.
+29. Guess mode for free-text questions. The answer prompt may answer a question about the
+    candidate that the profile does not state outright when the profile makes one answer clearly
+    more likely (years of experience with a listed skill, familiarity with a tool in the same
+    family, team size from a highlight, "open to hybrid" from preferences). It sets
+    `guessed: true` and `grounded: false` for such an answer; the retry-on-ungrounded rule does
+    not fire for a guess. Guesses are never made for: credentials, licences, certifications,
+    clearances, criminal history, compensation, demographics, legal attestations beyond work
+    authorization, or anything the posting treats as a hard requirement with a number the
+    profile contradicts. A required question with no defensible guess still parks.
+30. Visibility. Every inferred or guessed answer is stored in `form_answers` as
+    `{value, source: 'inferred' | 'guessed'}`, shown on the application page with the label
+    "Answered by inference, correct it in your profile if wrong", and listed in the daily digest
+    under "Answers we guessed today". A profile edit that fills the field stops the inference.
+
+Decision log: 2026-11-07, educated guesses allowed (Andre); credentials, compensation and
+self-identification stay hard parks.

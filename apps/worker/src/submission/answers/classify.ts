@@ -17,6 +17,9 @@ export const STANDARD_KEYS = [
   'visa_sponsorship',
   'no_sponsorship_needed',
   'authorized_without_sponsorship',
+  'worked_before',
+  'interviewed_before',
+  'applied_before',
   'start_date',
   'notice_period',
   'reasons_for_change',
@@ -95,8 +98,13 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   ['visa_sponsorship', /sponsor|\bvisa\b/],
   [
     'work_authorization',
-    /(authori[sz]ed|eligible|right|permitted|legally able) to work|work authori[sz]ation|work permit|employment eligibility/,
+    /(authori[sz]ed|eligible|right|permitted|legally able) to work|work authori[sz]ation|work permit|employment eligibility|authori[sz]ation to work|permanent(?:ly)? authori[sz](?:ed|ation)|eligib(?:le|ility) to work|legally (?:able|allowed|entitled) to work/,
   ],
+  // Rule 27: prior contact with the company. After sponsorship / work authorization so those keep
+  // their labels; before the generic patterns.
+  ['worked_before', /\bhave you (?:ever |previously )?worked (?:at|for)\b/],
+  ['interviewed_before', /\bhave you (?:ever |previously )?interviewed (?:at|with|for)\b/],
+  ['applied_before', /\bhave you (?:ever |previously )?applied (?:to|at|for|with)\b/],
   ['relocation', RELOCATION_WILLINGNESS],
   ['notice_period', /notice period/],
   [

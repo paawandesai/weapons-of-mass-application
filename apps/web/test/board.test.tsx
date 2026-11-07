@@ -245,6 +245,38 @@ describe('card detail', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('labels inferred and guessed answers and leaves plain ones alone (rule 30)', async () => {
+    useBoard(boardOf({ applied: [card({ id: 'a1' })] }));
+    server.use(
+      http.get('*/api/applications/a1', () =>
+        HttpResponse.json(
+          detail({
+            form_answers: [
+              { question: 'Full name', status: 'filled', value: 'Mara Quill' },
+              {
+                question: 'Work authorization',
+                status: 'filled',
+                value: 'Authorized to work in the United States',
+                source: 'inferred',
+              },
+              { question: 'Years of Kafka', status: 'filled', value: 'About 5', source: 'guessed' },
+            ],
+          }),
+        ),
+      ),
+    );
+    renderBoard();
+    await userEvent.click(await screen.findByRole('button', { name: 'Acme Robotics' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Card detail' });
+    expect(
+      await within(dialog).findByText(/Authorized to work in the United States/),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/About 5/)).toBeInTheDocument();
+    expect(
+      within(dialog).getAllByText('Answered by inference, correct it in your profile if wrong'),
+    ).toHaveLength(2);
+  });
+
   it('renders as a page at /applications/:id and shows not found for another tenant', async () => {
     server.use(
       http.get('*/api/applications/zzz', () =>

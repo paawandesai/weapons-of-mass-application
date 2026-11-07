@@ -48,7 +48,11 @@ export function planFill(fields: FieldDescriptor[], resolutions: AnswerResolutio
           throw new SubmissionFailure('unmapped-field', { field: f.label });
         }
         values[f.id] = r.value;
-        answers[f.label] = r.value;
+        // Inferred and guessed answers are recorded with their source so they can be shown as such.
+        answers[f.label] =
+          r.source === 'inferred' || r.source === 'guessed'
+            ? { value: r.value, source: r.source }
+            : r.value;
         break;
       case 'skipped':
         answers[f.label] = { skipped: r.skipped };

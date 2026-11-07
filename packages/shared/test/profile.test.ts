@@ -65,6 +65,18 @@ describe('profileDocumentSchema', () => {
     expect(profileDocumentSchema.parse(doc).standard_answers.earliest_start_date).toBeNull();
   });
 
+  it('defaults previous_interviews to null and accepts a list or an empty list', () => {
+    const doc = clone();
+    delete doc.standard_answers.previous_interviews;
+    expect(profileDocumentSchema.parse(doc).standard_answers.previous_interviews).toBeNull();
+    for (const ok of [[], ['Anthropic', 'OpenAI']]) {
+      doc.standard_answers.previous_interviews = ok;
+      expect(profileDocumentSchema.parse(doc).standard_answers.previous_interviews).toEqual(ok);
+    }
+    doc.standard_answers.previous_interviews = [1];
+    expect(profileDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+
   it('defaults the daily target to 12 and bounds it to 1-30', () => {
     const doc = clone();
     delete doc.survey.daily_target;

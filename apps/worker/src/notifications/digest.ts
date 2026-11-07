@@ -1,5 +1,6 @@
 import {
   activity,
+  getApplication,
   getDigestCheckpoint,
   getUserById,
   hasActivityWithDetail,
@@ -263,6 +264,31 @@ export async function collectDigestSections(
     }
   }
 
+  // Rule 30: answers the agent inferred or guessed, for applications submitted in the window.
+  const guessed: Line[] = [];
+  const submittedIds = [
+    ...new Set(
+      entries
+        .filter((e) => e.action === 'submitted' && e.applicationId)
+        .map((e) => e.applicationId!),
+    ),
+  ];
+  for (const appId of submittedIds) {
+    const row = await getApplication(handle, appId);
+    const raw = row?.formAnswers;
+    if (!raw || typeof raw !== 'object') continue;
+    for (const [question, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+      const a = v as { value?: unknown; source?: unknown };
+      if (a.source !== 'inferred' && a.source !== 'guessed') continue;
+      const shown = typeof a.value === 'string' ? a.value : JSON.stringify(a.value);
+      guessed.push({
+        text: `${nameOf(appId)}: ${scrub(question)}: ${scrub(shown)}`,
+        url: link(appId),
+      });
+    }
+  }
+
   const pending: Line[] = awaiting.map((a) => ({
     text: `${nameOf(a.applicationId)}: times offered ${a.slots
       .map((sl) => formatLocal(sl.startsAt, user.timezone))
@@ -284,6 +310,7 @@ export async function collectDigestSections(
 
   const all: DigestSection[] = [
     { title: 'Applications submitted', lines: applied },
+    { title: 'Answers we guessed today', lines: guessed },
     { title: 'Replies from employers', lines: replies },
     { title: 'Follow-ups sent', lines: followUps },
     { title: 'Interviews booked', lines: booked },

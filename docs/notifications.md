@@ -31,6 +31,7 @@ Content: activity in (checkpoint, cutoff], where the cutoff is the clock reading
 | Section | Source |
 |---|---|
 | Applications submitted | activity `submitted` |
+| Answers we guessed today | for each application with a `submitted` entry in the window, every `applications.form_answers` entry stored as `{value, source}` with source `inferred` or `guessed` (rule 30 of the wave 5 design), listed as company - role: question: value; omitted when there are none |
 | Replies from employers | activity `thread_linked`, `status_changed` |
 | Follow-ups sent, Interviews booked | activity `follow_up_sent`, `interview_booked` |
 | Threads that need you | activity `digest_flag` (`detail.kind`: `compensation`, `booking_link` with `detail.link`, `activity_on_closed`, `no_free_slot`), `mailbox_reauth_needed`, and every `email_threads` row of an open application with `compensation_flag` or a `booking_link` (listed in every digest until the application closes; deduplicated against the activity entry by thread id) |
@@ -38,6 +39,8 @@ Content: activity in (checkpoint, cutoff], where the cutoff is the clock reading
 | Security checks waiting for you | `captcha_requests` at stage `human`, unresolved, not expired |
 | Blocked messages | `outgoing_messages` with `blocked = true` in the window |
 | Interviews in the next 7 days | confirmed interviews starting within seven days |
+
+The "Answers we guessed today" section tells the user which answers the agent inferred from the profile or guessed rather than took from it, so they can correct the profile if one was wrong; the question and value are scrubbed like every other employer-derived text.
 
 A day with nothing in any section still sends a short digest saying so.
 

@@ -11,6 +11,8 @@ export const answerSchema = z.object({
   answer: z.string(),
   grounded: z.boolean(),
   unanswerable: z.boolean(),
+  /** Rule 29: an educated guess the profile makes likely but does not state. */
+  guessed: z.boolean().default(false),
   /** Quoted claims the model could not source; used to word the single retry. */
   ungrounded_claims: z.array(z.string()),
 });
@@ -133,7 +135,8 @@ function checkAnswer(field: FieldDescriptor, out: AnswerOutput): Checked {
  * `grounded = false` (or an answer that breaks the length or options contract) gets one retry that
  * quotes the problem; after that the field is unanswerable. Unanswerable resolves to a blank when
  * the field is optional and to `unanswerable` (parks the application) when it is required. File
- * fields are never generated. Model transport errors propagate.
+ * fields are never generated. Rule 29: `guessed = true` skips the ungrounded retry and resolves
+ * with source `guessed`; the options and length checks still apply. Model transport errors propagate.
  */
 export async function resolveFreeText(
   ctx: Pick<SubmissionContext, 'profile' | 'job' | 'llm'>,
@@ -148,6 +151,7 @@ export async function resolveFreeText(
 
   let rejected: string | null = null;
   let tooLong: string | null = null;
+  let tooLongGuessed = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     const out: AnswerOutput = await callStructured(
       ctx.llm,
@@ -157,7 +161,7 @@ export async function resolveFreeText(
     );
     if (out.unanswerable) return unanswerable();
     tooLong = null;
-    if (!out.grounded) {
+    if (!out.grounded && !out.guessed) {
       const claims = out.ungrounded_claims.length
         ? out.ungrounded_claims.map((c) => `"${c}"`).join('; ')
         : 'some claims';
@@ -165,14 +169,31 @@ export async function resolveFreeText(
       continue;
     }
     const checked = checkAnswer(field, out);
-    if (checked.ok) return { ...base, status: 'filled', value: checked.value, source: 'generated' };
+    if (checked.ok) {
+      return {
+        ...base,
+        status: 'filled',
+        value: checked.value,
+        source: out.guessed ? 'guessed' : 'generated',
+      };
+    }
     rejected = `Rejected: ${checked.why}.`;
-    if (checked.tooLong) tooLong = out.answer.trim();
+    if (checked.tooLong) {
+      tooLong = out.answer.trim();
+      tooLongGuessed = out.guessed;
+    }
   }
   // Second attempt failed. A grounded answer that was only too long is cut at a sentence end.
   if (tooLong !== null) {
     const cut = trimToSentence(tooLong, maxChars(field));
-    if (cut) return { ...base, status: 'filled', value: cut, source: 'generated' };
+    if (cut) {
+      return {
+        ...base,
+        status: 'filled',
+        value: cut,
+        source: tooLongGuessed ? 'guessed' : 'generated',
+      };
+    }
   }
   return unanswerable();
 }

@@ -26,4 +26,18 @@ describe('submission prompts', () => {
       /leave the option out\. When no option is supported, the question is unanswerable/,
     );
   });
+
+  it('the answer prompt carries guess mode and the never-guess list (rule 29)', () => {
+    const p = loadPrompt('answer-form-question', 'v1');
+    expect(p).toMatch(/Guess mode/);
+    expect(p).toMatch(/set `guessed` to true and `grounded` to false/);
+    expect(p).toMatch(
+      /Never guess about: credentials, licenses, certifications, security clearances/,
+    );
+    expect(p).toMatch(/compensation/);
+    expect(p).toMatch(/criminal history/);
+    expect(p).toMatch(/legal attestations beyond work authorization/);
+    expect(p).toMatch(/hard requirement with a number that the profile contradicts/);
+    expect(p).toMatch(/no guess is defensible stays unanswerable/);
+  });
 });

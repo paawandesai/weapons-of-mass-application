@@ -31,6 +31,7 @@ export const PROFILE: ProfileDocument = {
     earliest_start_date: '2026-12-01',
     notice_period: '30 days',
     reasons_for_change: 'Looking for a larger platform scope.',
+    previous_interviews: null,
   },
   flags: [],
 };

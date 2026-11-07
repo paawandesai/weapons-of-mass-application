@@ -104,7 +104,7 @@ These are reversible. Each one changes a bounded part of the system.
 - GitHub by username: public repositories, languages, recent activity.
 - Google Drive: the user picks folders; documents are scanned for portfolios, writing samples, certificates, past cover letters.
 - The survey is a single page; answers are stored on the profile.
-- The master profile is one jsonb document with sections: identity, contact, work history, projects, skills, education, preferences, survey answers, standard form answers (work authorization, visa, start date, earliest start date as an ISO date, notice period, reasons for change).
+- The master profile is one jsonb document with sections: identity, contact, work history, projects, skills, education, preferences, survey answers, standard form answers (work authorization, visa, start date, earliest start date as an ISO date, notice period, reasons for change, companies interviewed at before as a list).
 - The profile review screen renders the document as an editable form. Approval is a stored flag and timestamp; autopilot is gated on it.
 
 ### 7.2 Discovery

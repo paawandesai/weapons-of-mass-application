@@ -11,7 +11,13 @@ export {
   type ClassifiedField,
   type StandardKey,
 } from './classify';
-export { resolveStandardFields, profileValue, deriveStartDate } from './standard';
+export {
+  resolveStandardFields,
+  profileValue,
+  deriveStartDate,
+  companyAsked,
+  normalizeCompany,
+} from './standard';
 export { resolveFreeText, maxChars, DEFAULT_MAX_ANSWER_CHARS } from './freetext';
 
 /** Name of the stored resume file shown as the resolved value of a resume field. */
@@ -25,7 +31,8 @@ export const RESUME_FILENAME = 'resume.pdf';
  * first `missing-profile-field` or `unanswerable` and writes `toFormAnswers(...)` before submit.
  */
 export async function resolveAnswers(
-  ctx: Pick<SubmissionContext, 'profile' | 'job' | 'llm'>,
+  ctx: Pick<SubmissionContext, 'profile' | 'job' | 'llm'> &
+    Partial<Pick<SubmissionContext, 'companyName' | 'priorApplications'>>,
   fields: FieldDescriptor[],
 ): Promise<AnswerResolution[]> {
   const classified: ClassifiedField[] = await classifyFields(fields, ctx.llm);
@@ -66,21 +73,28 @@ export function toFieldValues(
   return values;
 }
 
+type FormAnswer =
+  | string
+  | boolean
+  | string[]
+  | { skipped: 'self-identification' }
+  | { value: string | boolean | string[]; source: 'inferred' | 'guessed' }
+  | null;
+
 /**
  * The record stored in `applications.form_answers`, keyed by exact question text: the entered
  * value, `{skipped: "self-identification"}`, or null for a field left blank. Unresolved fields
  * (`unanswerable`, `missing-profile-field`) are omitted: the application parks before submit.
  */
-export function toFormAnswers(
-  resolutions: AnswerResolution[],
-): Record<string, string | boolean | string[] | { skipped: 'self-identification' } | null> {
-  const out: Record<
-    string,
-    string | boolean | string[] | { skipped: 'self-identification' } | null
-  > = {};
+export function toFormAnswers(resolutions: AnswerResolution[]): Record<string, FormAnswer> {
+  const out: Record<string, FormAnswer> = {};
   for (const r of resolutions) {
-    if (r.status === 'filled') out[r.question] = r.value;
-    else if (r.status === 'skipped') out[r.question] = { skipped: r.skipped };
+    if (r.status === 'filled') {
+      out[r.question] =
+        r.source === 'inferred' || r.source === 'guessed'
+          ? { value: r.value, source: r.source }
+          : r.value;
+    } else if (r.status === 'skipped') out[r.question] = { skipped: r.skipped };
     else if (r.status === 'blank') out[r.question] = null;
   }
   return out;

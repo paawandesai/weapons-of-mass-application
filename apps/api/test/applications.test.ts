@@ -115,6 +115,10 @@ describe('GET /applications/:id', () => {
         'Optional note': null,
         Gender: { skipped: 'self-identification' },
         Resume: { attached: 'resume.pdf' },
+        'Work authorization': {
+          value: 'Authorized to work in the United States',
+          source: 'inferred',
+        },
       },
     });
     for (const action of ['submission-started', 'tailored', 'filled', 'submitted']) {
@@ -166,6 +170,12 @@ describe('GET /applications/:id', () => {
         question: 'Why do you want to work here?',
         status: 'filled',
         value: 'Because the work is interesting.',
+      },
+      {
+        question: 'Work authorization',
+        status: 'filled',
+        value: 'Authorized to work in the United States',
+        source: 'inferred',
       },
     ]);
     expect(body.activity.map((e: { action: string }) => e.action)).toEqual([

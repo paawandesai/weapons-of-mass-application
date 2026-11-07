@@ -16,6 +16,9 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   visa_sponsorship: 'standard_answers.visa_sponsorship_required',
   no_sponsorship_needed: 'standard_answers.visa_sponsorship_required',
   authorized_without_sponsorship: 'standard_answers.work_authorization',
+  worked_before: 'work_history',
+  interviewed_before: 'standard_answers.previous_interviews',
+  applied_before: 'standard_answers.previous_interviews',
   start_date: 'standard_answers.start_date',
   notice_period: 'standard_answers.notice_period',
   reasons_for_change: 'standard_answers.reasons_for_change',
@@ -24,6 +27,69 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   relocation: 'survey.willing_to_relocate',
   consent: 'standard_answers.consent',
 };
+
+/** What the resolver knows beyond the profile: the posting's company and earlier applied rows. */
+export interface PriorContact {
+  /** The posting's company display name. */
+  companyName?: string;
+  /** Names of companies the user has an applied application for. */
+  priorApplications?: string[];
+  /** The posting's location text, for the relocation inference. */
+  jobLocation?: string | null;
+}
+
+const COMPANY_SUFFIX =
+  /\b(?:inc|llc|ltd|limited|corp|corporation|co|company|gmbh|plc|pbc|ag|sa)\b/g;
+
+/** A company name reduced to what identifies it: lowercase letters and digits, suffixes dropped. */
+export function normalizeCompany(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(COMPANY_SUFFIX, ' ')
+    .replace(/^the\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const GENERIC_COMPANY =
+  /^(?:this|our|the|us|we|this company|the company|this organi[sz]ation|our company)$/;
+
+/**
+ * Rule 27: the company a prior-contact question asks about. The name after "at/to/for/with" when
+ * the label names one; otherwise (no name, or "this company") the posting's company.
+ */
+export function companyAsked(question: string, posting: string | undefined): string | null {
+  const m =
+    /\b(?:worked|interviewed|applied)\s+(?:at|for|with|to)\s+(.+?)(?:\s+(?:before|previously|in the past|already|ever)\b.*|[?.]*)$/i.exec(
+      question.trim(),
+    );
+  const named = m?.[1]?.replace(/^(?:the|a|an)\s+/i, '').trim() ?? '';
+  const generic = named === '' || GENERIC_COMPANY.test(named.toLowerCase());
+  const name = generic ? posting : named;
+  return name && normalizeCompany(name) !== '' ? name : null;
+}
+
+const sameCompany = (a: string, b: string) => normalizeCompany(a) === normalizeCompany(b);
+
+function priorContact(
+  p: ProfileDocument,
+  key: 'worked_before' | 'interviewed_before' | 'applied_before',
+  question: string,
+  prior: PriorContact,
+): boolean | null {
+  const company = companyAsked(question, prior.companyName);
+  if (company === null) return null;
+  const interviews = p.standard_answers.previous_interviews;
+  const interviewed = interviews?.some((c) => sameCompany(c, company)) ?? false;
+  if (key === 'worked_before') return p.work_history.some((w) => sameCompany(w.employer, company));
+  if (key === 'interviewed_before') return interviews == null ? null : interviewed;
+  if (interviewed || (prior.priorApplications ?? []).some((c) => sameCompany(c, company))) {
+    return true;
+  }
+  return interviews == null ? null : false;
+}
 
 function currentRole(p: ProfileDocument) {
   return p.work_history.find((w) => w.end_date === null) ?? p.work_history[0] ?? null;
@@ -34,6 +100,7 @@ export function profileValue(
   p: ProfileDocument,
   key: StandardKey,
   question = '',
+  prior: PriorContact = {},
 ): string | boolean | null {
   const nonEmpty = (s: string | null | undefined) => (s && s.trim() !== '' ? s.trim() : null);
   const name = nonEmpty(p.identity.full_name);
@@ -73,6 +140,10 @@ export function profileValue(
       if (required) return false;
       return isAuthorizedFor(p.standard_answers.work_authorization, question);
     }
+    case 'worked_before':
+    case 'interviewed_before':
+    case 'applied_before':
+      return priorContact(p, key, question, prior);
     case 'start_date':
       return nonEmpty(p.standard_answers.start_date);
     case 'notice_period':
@@ -183,7 +254,7 @@ function matchOption(text: string, f: FieldDescriptor): string | null {
   return hit ?? null;
 }
 
-type Resolved = { value: string | boolean } | { unexpressible: true } | null;
+type Resolved = { value: string | boolean; inferred?: true } | { unexpressible: true } | null;
 
 const NUMBER_WORDS: Record<string, number> = {
   a: 1,
@@ -249,40 +320,188 @@ export function deriveStartDate(p: ProfileDocument, today: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Rule 28: inference helpers. Used only when the profile holds no value.
+const PLACE_NAME: Record<string, string> = {
+  us: 'the United States',
+  uk: 'the United Kingdom',
+  ca: 'Canada',
+  de: 'Germany',
+  fr: 'France',
+  es: 'Spain',
+  nl: 'the Netherlands',
+  ie: 'Ireland',
+  it: 'Italy',
+  pt: 'Portugal',
+  pl: 'Poland',
+  se: 'Sweden',
+  be: 'Belgium',
+  at: 'Austria',
+  dk: 'Denmark',
+  fi: 'Finland',
+  au: 'Australia',
+  in: 'India',
+  br: 'Brazil',
+};
+const US_STATE_CODES =
+  'AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC'.split(
+    ' ',
+  );
+const US_STATE_NAMES =
+  /\b(?:alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming)\b/i;
+const US_CITIES =
+  /\b(?:san francisco|los angeles|san diego|san jose|seattle|portland|austin|boston|chicago|denver|atlanta|miami|brooklyn|manhattan|philadelphia|houston|dallas|oakland|palo alto|mountain view|pittsburgh|washington,? d\.?c)\b/i;
+const CA_CITIES =
+  /\b(?:toronto|vancouver|montreal|ottawa|calgary|ontario|british columbia|quebec)\b/i;
+const UK_CITIES =
+  /\b(?:london|manchester|edinburgh|glasgow|bristol|birmingham|cambridge|oxford)\b/i;
+
+/** The country (a PLACES id) the profile's location or phone implies, or null. */
+function profileCountry(p: ProfileDocument): string | null {
+  const loc = p.identity.location?.trim() ?? '';
+  if (loc) {
+    const named = placesIn(loc);
+    for (const id of Object.keys(PLACE_NAME)) if (named.has(id)) return id;
+    if (CA_CITIES.test(loc)) return 'ca';
+    if (UK_CITIES.test(loc)) return 'uk';
+    const code = /,\s*([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?\s*(?:,\s*(?:USA?|U\.S\.A?\.?))?$/.exec(
+      loc,
+    );
+    if (code && US_STATE_CODES.includes(code[1]!)) return 'us';
+    if (US_STATE_NAMES.test(loc) || US_CITIES.test(loc)) return 'us';
+  }
+  const phone = p.contact.phone?.replace(/[\s().-]/g, '') ?? '';
+  if (/^\+1\d{10}$/.test(phone)) return 'us';
+  if (/^\+44/.test(phone)) return 'uk';
+  return null;
+}
+
+/**
+ * An inferred work-authorization statement for a question: the country the profile implies, else
+ * the countries the question itself names, else null (the question is then the user's to answer).
+ * When the profile implies a country the question must be covered by it.
+ */
+function inferredAuthorization(p: ProfileDocument, question: string): string | null {
+  const home = profileCountry(p);
+  if (home) {
+    const statement = `Authorized to work in ${PLACE_NAME[home]}`;
+    return isAuthorizedFor(statement, question) === true ? statement : null;
+  }
+  const asked = [...placesIn(question)].filter((id) => PLACE_NAME[id]);
+  if (asked.length === 0) return null;
+  return `Authorized to work in ${asked.map((id) => PLACE_NAME[id]).join(' and ')}`;
+}
+
+function locationMatches(posting: string, wanted: string[]): boolean {
+  const norm = (x: string) =>
+    x
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  const p = norm(posting);
+  return (
+    p !== '' &&
+    wanted.some((w) => {
+      const n = norm(w);
+      return n !== '' && (p.includes(n) || n.includes(p));
+    })
+  );
+}
+
+/** The inferred value for a standard key the profile leaves null, or null when none is defensible. */
+function inferValue(
+  p: ProfileDocument,
+  key: StandardKey,
+  question: string,
+  prior: PriorContact,
+): string | boolean | null {
+  const sa = p.standard_answers;
+  const authInferable =
+    sa.work_authorization === null && inferredAuthorization(p, question) !== null;
+  switch (key) {
+    case 'visa_sponsorship':
+      return sa.visa_sponsorship_required === null && authInferable ? false : null;
+    case 'no_sponsorship_needed':
+      return sa.visa_sponsorship_required === null && authInferable ? true : null;
+    case 'authorized_without_sponsorship': {
+      const required = sa.visa_sponsorship_required;
+      if (required === true) return null;
+      if (!authInferable) return null;
+      return true;
+    }
+    case 'interviewed_before':
+    case 'applied_before':
+      return priorContact(
+        { ...p, standard_answers: { ...sa, previous_interviews: [] } },
+        key,
+        question,
+        prior,
+      );
+    case 'start_date':
+      return 'Within 30 days';
+    case 'notice_period':
+      return '2 weeks';
+    case 'relocation':
+      if (p.survey.willing_to_relocate !== null) return null;
+      if (p.preferences.remote === 'remote') return false;
+      return prior.jobLocation
+        ? locationMatches(prior.jobLocation, p.preferences.locations)
+        : false;
+    default:
+      return null;
+  }
+}
+
 function valueForField(
   profile: ProfileDocument,
   key: StandardKey,
   f: FieldDescriptor,
   today: Date,
+  prior: PriorContact,
+  allowInference: boolean,
 ): Resolved {
   if (key === 'work_authorization') {
-    const text = profileValue(profile, key, f.label);
+    const explicit = profileValue(profile, key, f.label, prior);
+    const inferred = typeof explicit !== 'string' && allowInference;
+    const text =
+      typeof explicit === 'string'
+        ? explicit
+        : inferred && profile.standard_answers.work_authorization === null
+          ? inferredAuthorization(profile, f.label)
+          : null;
     if (typeof text !== 'string') return null;
+    const flag = text === explicit ? {} : { inferred: true as const };
     if (isYesNoField(f)) {
       const authorized = isAuthorizedFor(text, f.label);
       if (authorized === null) return null;
       const mapped = yesNo(authorized, f);
-      return mapped === null ? { unexpressible: true } : { value: mapped };
+      return mapped === null ? { unexpressible: true } : { value: mapped, ...flag };
     }
     if (f.options?.length) {
       const hit = matchOption(text, f);
-      return hit ? { value: hit } : { unexpressible: true };
+      return hit ? { value: hit, ...flag } : { unexpressible: true };
     }
-    return { value: text };
+    return { value: text, ...flag };
   }
   // Rule 23b: a date picker always gets a date; a text box keeps the start-date text.
   if (key === 'start_date' && f.type === 'date') return { value: deriveStartDate(profile, today) };
-  const value = profileValue(profile, key, f.label);
+  let value = profileValue(profile, key, f.label, prior);
+  let flag: { inferred?: true } = {};
+  // authorized_without_sponsorship: an explicit sponsorship answer with no stated authorization
+  // falls through to the inference too.
+  if (value === null && allowInference) {
+    value = inferValue(profile, key, f.label, prior);
+    if (value !== null) flag = { inferred: true };
+  }
   if (value === null) return null;
   if (typeof value === 'boolean') {
     const mapped = yesNo(value, f);
-    return mapped === null ? { unexpressible: true } : { value: mapped };
+    return mapped === null ? { unexpressible: true } : { value: mapped, ...flag };
   }
   if (f.options?.length) {
     const hit = matchOption(value, f);
-    return hit ? { value: hit } : { value };
+    return hit ? { value: hit, ...flag } : { value, ...flag };
   }
-  return { value };
+  return { value, ...flag };
 }
 
 /**
@@ -291,7 +510,8 @@ function valueForField(
  * optional one resolves to a blank.
  */
 export function resolveStandardFields(
-  ctx: Pick<SubmissionContext, 'profile'> & Partial<Pick<SubmissionContext, 'clock'>>,
+  ctx: Pick<SubmissionContext, 'profile'> &
+    Partial<Pick<SubmissionContext, 'clock' | 'companyName' | 'priorApplications' | 'job'>>,
   fields: Array<FieldDescriptor & { standardKey?: StandardKey }>,
 ): AnswerResolution[] {
   const out: AnswerResolution[] = [];
@@ -307,7 +527,18 @@ export function resolveStandardFields(
       );
       continue;
     }
-    const resolved = valueForField(ctx.profile, key, f, ctx.clock?.now() ?? new Date());
+    const resolved = valueForField(
+      ctx.profile,
+      key,
+      f,
+      ctx.clock?.now() ?? new Date(),
+      {
+        companyName: ctx.companyName,
+        priorApplications: ctx.priorApplications,
+        jobLocation: ctx.job?.location ?? null,
+      },
+      f.required,
+    );
     if (resolved === null) {
       out.push(
         f.required
@@ -324,7 +555,12 @@ export function resolveStandardFields(
       );
       continue;
     }
-    out.push({ ...base, status: 'filled', value: resolved.value, source: 'profile' });
+    out.push({
+      ...base,
+      status: 'filled',
+      value: resolved.value,
+      source: resolved.inferred ? 'inferred' : 'profile',
+    });
   }
   return out;
 }

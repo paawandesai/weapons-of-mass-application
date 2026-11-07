@@ -9,6 +9,7 @@ import {
   listOutgoingMessagesForUser,
   setNotificationSettings,
   updateCaptchaRequest,
+  updateApplication,
   upsertCompany,
 } from '@wma/db';
 import { flagDigest } from '../../src/inbox/flags';
@@ -433,5 +434,65 @@ describe('rule 14: failed sends', () => {
     const [job] = forUser(deps, t);
     expect(job!.opts.retryLimit! * job!.opts.retryDelay!).toBeLessThanOrEqual(3600);
     expect(job!.opts.retryLimit).toBe(3);
+  });
+});
+
+describe('rule 30: answers we guessed today', () => {
+  const submit = (t: TestTenant, applicationId: string) =>
+    activity.logActivity(t.handle, {
+      userId: t.userId,
+      applicationId,
+      actor: 'agent',
+      action: 'submitted',
+    });
+
+  it('lists inferred and guessed answers of applications submitted in the window', async () => {
+    const t = await tenant();
+    const a = await seedApplication(t);
+    const plainApp = await seedApplication(t);
+    await updateApplication(t.handle, a.application.id, {
+      formAnswers: {
+        'Full name': 'Mara Quill',
+        'Work authorization': {
+          value: 'Authorized to work in the United States',
+          source: 'inferred',
+        },
+        'Years of Kafka experience?': { value: 'About 5', source: 'guessed' },
+        Gender: { skipped: 'self-identification' },
+      },
+    });
+    await updateApplication(t.handle, plainApp.application.id, {
+      formAnswers: { 'Full name': 'Mara Quill' },
+    });
+    await submit(t, a.application.id);
+    await submit(t, plainApp.application.id);
+    const deps = makeDeps(new Date(), { store: 'db' });
+    deps.clock.set(new Date(Date.now() + 1000));
+    await runDigest(t.handle, { userId: t.userId }, deps);
+    const text = plain(deps.sender.sent[0]!.text);
+    expect(text).toContain('Answers we guessed today');
+    expect(text).toContain(
+      `${a.companyName} - ${a.job.title}: Work authorization: Authorized to work in the United States`,
+    );
+    expect(text).toContain(
+      `${a.companyName} - ${a.job.title}: Years of Kafka experience?: About 5`,
+    );
+    expect(text).not.toContain('Mara Quill');
+    expect(text).not.toContain(`${plainApp.companyName} - ${plainApp.job.title}: Full name`);
+  });
+
+  it('omits the section when nothing was inferred or guessed', async () => {
+    const t = await tenant();
+    const a = await seedApplication(t);
+    await updateApplication(t.handle, a.application.id, {
+      formAnswers: { 'Full name': 'Mara Quill' },
+    });
+    await submit(t, a.application.id);
+    const deps = makeDeps(new Date(), { store: 'db' });
+    deps.clock.set(new Date(Date.now() + 1000));
+    await runDigest(t.handle, { userId: t.userId }, deps);
+    const text = deps.sender.sent[0]!.text;
+    expect(text).toContain('Applications submitted');
+    expect(text).not.toContain('Answers we guessed today');
   });
 });

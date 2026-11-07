@@ -113,7 +113,8 @@ export type AnswerResolution =
       question: string;
       status: 'filled';
       value: string | boolean | string[];
-      source: 'profile' | 'generated';
+      /** `inferred`: a default derived from the profile (rule 28); `guessed`: a model guess (rule 29). */
+      source: 'profile' | 'generated' | 'inferred' | 'guessed';
     }
   | { fieldId: string; question: string; status: 'skipped'; skipped: 'self-identification' }
   | {
@@ -175,6 +176,8 @@ export interface SubmissionContext {
   job: JobRow;
   /** The company's display name; mail about the application must tie back to it. */
   companyName: string;
+  /** Names of companies the user has an applied application for (rule 27). */
+  priorApplications: string[];
   profile: ProfileDocument;
   /** The decision facts from `run_candidates.judgment`; null when the run row is gone. */
   judgment: Judgment | null;

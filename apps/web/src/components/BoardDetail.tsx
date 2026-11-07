@@ -159,7 +159,15 @@ export function BoardDetail({ id }: { id: string }) {
             {detail.form_answers.map((a) => (
               <div key={a.question}>
                 <dt>{a.question}</dt>
-                <dd>{answerText(a)}</dd>
+                <dd>
+                  {answerText(a)}
+                  {a.source && (
+                    <small className="muted">
+                      {' '}
+                      Answered by inference, correct it in your profile if wrong
+                    </small>
+                  )}
+                </dd>
               </div>
             ))}
           </dl>

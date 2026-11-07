@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { ApiError, api, errorMessage, formatTime } from '../api';
 import { getAt, sameValue, setAt } from '../profilePaths';
 
-type Kind = 'text' | 'area' | 'month' | 'lines' | 'tri' | 'date';
+type Kind = 'text' | 'area' | 'month' | 'lines' | 'tri' | 'date' | 'list';
 interface Spec {
   key: string;
   label: string;
@@ -62,6 +62,11 @@ const STANDARD: Spec[] = [
   { key: 'earliest_start_date', label: 'Earliest start date', kind: 'date' },
   { key: 'notice_period', label: 'Notice period' },
   { key: 'reasons_for_change', label: 'Reasons for change', kind: 'area' },
+  {
+    key: 'previous_interviews',
+    label: 'Companies interviewed at before (comma-separated)',
+    kind: 'list',
+  },
 ];
 
 const REMOTE = ['remote', 'hybrid', 'onsite', 'any'] as const;
@@ -77,6 +82,9 @@ function cleanDocument(doc: ProfileDocument): ProfileDocument {
   d.preferences.locations = cleanLines(d.preferences.locations);
   for (const w of d.work_history) w.highlights = cleanLines(w.highlights);
   for (const p of d.projects) p.technologies = cleanLines(p.technologies);
+  if (d.standard_answers.previous_interviews) {
+    d.standard_answers.previous_interviews = cleanLines(d.standard_answers.previous_interviews);
+  }
   return d;
 }
 
@@ -85,6 +93,29 @@ interface FieldProps {
   base: string;
   spec: Spec;
   onChange: (path: string, value: unknown) => void;
+}
+
+/** Comma-separated list; the text is kept locally so a trailing comma survives typing. */
+function ListInput({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string[] | null;
+  onChange: (v: string[]) => void;
+}) {
+  const [text, setText] = useState((value ?? []).join(', '));
+  return (
+    <input
+      id={id}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(e.target.value === '' ? [] : e.target.value.split(','));
+      }}
+    />
+  );
 }
 
 function Field({ doc, base, spec, onChange }: FieldProps) {
@@ -111,6 +142,10 @@ function Field({ doc, base, spec, onChange }: FieldProps) {
         value={((value as string[] | undefined) ?? []).join('\n')}
         onChange={(e) => onChange(path, e.target.value === '' ? [] : e.target.value.split('\n'))}
       />
+    );
+  } else if (kind === 'list') {
+    control = (
+      <ListInput id={id} value={value as string[] | null} onChange={(v) => onChange(path, v)} />
     );
   } else if (kind === 'date') {
     control = (

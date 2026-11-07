@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { nextStatus, type Classification } from '@wma/shared';
 import type { Db, TenantHandle } from '../client';
-import { applications, jobs } from '../schema';
+import { applications, companies, jobs } from '../schema';
 import type { AtsKind } from './companies';
 
 export type ApplicationRow = typeof applications.$inferSelect;
@@ -171,6 +171,31 @@ export function listApplicationJobKeys(
       )
       .where(and(eq(applications.tenantId, handle.tenantId), eq(applications.userId, userId))),
   );
+}
+
+/** Display names of the companies the user has an applied application for (distinct). */
+export async function listAppliedCompanyNames(
+  handle: TenantHandle,
+  userId: string,
+): Promise<string[]> {
+  const rows = await handle.run((tx) =>
+    tx
+      .selectDistinct({ name: companies.name })
+      .from(applications)
+      .innerJoin(
+        jobs,
+        and(eq(jobs.tenantId, applications.tenantId), eq(jobs.id, applications.jobId)),
+      )
+      .innerJoin(companies, eq(companies.id, jobs.companyId))
+      .where(
+        and(
+          eq(applications.tenantId, handle.tenantId),
+          eq(applications.userId, userId),
+          eq(applications.status, 'applied'),
+        ),
+      ),
+  );
+  return rows.map((r) => r.name);
 }
 
 export interface FollowUpOwed {

@@ -13,6 +13,7 @@ import {
   toFieldValues,
   toFormAnswers,
 } from '../../src/submission/answers';
+import { planFill } from '../../src/submission/fill';
 import type { FieldClassification, FieldDescriptor } from '../../src/submission/types';
 import { callsTo, makeCtx, PROFILE, scripted } from '../fixtures/submission';
 
@@ -215,6 +216,8 @@ describe('resolveStandardFields (task 3.2)', () => {
   it('reports missing-profile-field naming the field when work authorization is absent', () => {
     const profile = {
       ...PROFILE,
+      identity: { ...PROFILE.identity, location: null },
+      contact: { ...PROFILE.contact, phone: null },
       standard_answers: { ...PROFILE.standard_answers, work_authorization: null },
     };
     const out = resolveStandardFields({ profile }, fields());
@@ -778,19 +781,19 @@ describe('relocation and consent (live-loop rules 9-12)', () => {
       const f = std('Are you open to relocation?', { type, options: YN });
       expect(resolve(withSurvey(false), f)).toMatchObject({ status: 'filled', value: 'No' });
       expect(resolve(withSurvey(true), f)).toMatchObject({ status: 'filled', value: 'Yes' });
-      expect(resolve(withSurvey(null), f)).toEqual({
-        fieldId: f.id,
-        question: f.label,
-        status: 'missing-profile-field',
-        profileField: 'survey.willing_to_relocate',
+      // Rule 28: an unanswered relocation question is inferred, never parked.
+      expect(resolve(withSurvey(null), f)).toMatchObject({
+        status: 'filled',
+        value: 'No',
+        source: 'inferred',
       });
     }
   });
 
-  it('maps relocation onto Yes/No/Depends options by meaning, and parks null (rule 9)', () => {
+  it('maps relocation onto Yes/No/Depends options by meaning, and infers null (rules 9, 28)', () => {
     const f = std('Would you relocate?', { type: 'radio', options: ['Yes', 'No', 'Depends'] });
     expect(resolve(withSurvey(true), f)).toMatchObject({ value: 'Yes' });
-    expect(resolve(withSurvey(null), f)).toMatchObject({ status: 'missing-profile-field' });
+    expect(resolve(withSurvey(null), f)).toMatchObject({ value: 'No', source: 'inferred' });
   });
 
   it('answers consent affirmatively on a lone checkbox, a Yes/No select and a text box (rule 10)', () => {
@@ -901,5 +904,400 @@ describe('relocation and consent (live-loop rules 9-12)', () => {
     expect(text).toMatch(/qualifier \(in production, professionally/);
     expect(text).toMatch(/Postgres is PostgreSQL/);
     expect(text).toMatch(/`select` or `radio`, `answer` must be exactly one/);
+  });
+});
+
+describe('work-authorization wording and prior contact (wave 5 rules 26, 27)', () => {
+  const YN = ['Yes', 'No'];
+  const std = (label: string, over: Partial<FieldDescriptor> = {}) =>
+    field({
+      label,
+      classification: 'standard',
+      required: true,
+      type: 'radio',
+      options: YN,
+      ...over,
+    });
+  const run = (
+    standard: Partial<typeof PROFILE.standard_answers>,
+    label: string,
+    ctx: { companyName?: string; priorApplications?: string[] } = {},
+    profileOver: Partial<typeof PROFILE> = {},
+  ) => {
+    const profile = {
+      ...PROFILE,
+      ...profileOver,
+      standard_answers: { ...PROFILE.standard_answers, ...standard },
+    };
+    return resolveStandardFields({ profile, ...ctx }, [std(label)])[0];
+  };
+
+  it('classifies the widened work-authorization phrasings', () => {
+    for (const l of [
+      'Do you have permanent authorization to work for Warp in the U.S. or Canada?',
+      'Are you authorized to work in the country where the job is located?',
+      'Are you permanently authorized to work in the UK?',
+      'Are you eligible to work in the United States?',
+      'Are you legally allowed to work in Germany?',
+      'Do you have eligibility to work here?',
+    ]) {
+      expect(standardKeyFor(l), l).toBe('work_authorization');
+    }
+    expect(standardKeyFor('Are you authorized to work in the US without sponsorship?')).toBe(
+      'authorized_without_sponsorship',
+    );
+  });
+
+  it('a question naming no place with a positive statement resolves Yes; a null statement with no derivable country parks', () => {
+    const q = 'Are you authorized to work in the country where the job is located?';
+    expect(run({ work_authorization: 'Authorized to work in the United States' }, q)).toMatchObject(
+      { status: 'filled', value: 'Yes' },
+    );
+    expect(
+      run(
+        { work_authorization: null },
+        q,
+        {},
+        {
+          identity: { ...PROFILE.identity, location: null },
+          contact: { ...PROFILE.contact, phone: null },
+        },
+      ),
+    ).toMatchObject({
+      status: 'missing-profile-field',
+      profileField: 'standard_answers.work_authorization',
+    });
+  });
+
+  it('classifies the prior-contact questions', () => {
+    expect(standardKeyFor('Have you ever interviewed at Anthropic before?')).toBe(
+      'interviewed_before',
+    );
+    expect(standardKeyFor('Have you worked at Acme before?')).toBe('worked_before');
+    expect(standardKeyFor('Have you previously applied to Acme?')).toBe('applied_before');
+    expect(standardKeyFor('Have you worked with Kubernetes?')).toBeNull();
+  });
+
+  it('interviewed: null is inferred as none, [] is No, a named company is Yes', () => {
+    const q = 'Have you ever interviewed at Anthropic before?';
+    expect(run({ previous_interviews: null }, q)).toMatchObject({
+      status: 'filled',
+      value: 'No',
+      source: 'inferred',
+    });
+    expect(run({ previous_interviews: [] }, q)).toMatchObject({ status: 'filled', value: 'No' });
+    expect(run({ previous_interviews: ['Anthropic'] }, q)).toMatchObject({
+      status: 'filled',
+      value: 'Yes',
+    });
+    expect(run({ previous_interviews: ['anthropic, pbc'] }, q)).toMatchObject({ value: 'Yes' });
+    expect(run({ previous_interviews: ['OpenAI'] }, q)).toMatchObject({ value: 'No' });
+  });
+
+  it('uses the posting company when the label names none', () => {
+    const q = 'Have you previously interviewed with us?';
+    expect(run({ previous_interviews: ['Acme'] }, q, { companyName: 'Acme Inc' })).toMatchObject({
+      value: 'Yes',
+    });
+  });
+
+  it('worked: from work_history employers', () => {
+    const employer = PROFILE.work_history[0]!.employer;
+    const q = (c: string) => `Have you worked at ${c} before?`;
+    expect(run({}, q(employer))).toMatchObject({ status: 'filled', value: 'Yes' });
+    expect(run({}, q('Acme'))).toMatchObject({ status: 'filled', value: 'Yes' });
+    expect(run({}, q('Initech'))).toMatchObject({ status: 'filled', value: 'No' });
+    expect(
+      run({}, 'Have you ever worked for this company?', { companyName: employer }),
+    ).toMatchObject({ value: 'Yes' });
+  });
+
+  it('applied: from priorApplications or previous_interviews; null is inferred No', () => {
+    const q = 'Have you applied to Acme before?';
+    expect(run({ previous_interviews: null }, q, { priorApplications: ['Acme'] })).toMatchObject({
+      status: 'filled',
+      value: 'Yes',
+    });
+    expect(run({ previous_interviews: ['Acme'] }, q)).toMatchObject({ value: 'Yes' });
+    expect(run({ previous_interviews: [] }, q, { priorApplications: ['Other'] })).toMatchObject({
+      value: 'No',
+    });
+    expect(run({ previous_interviews: null }, q, { priorApplications: ['Other'] })).toMatchObject({
+      value: 'No',
+      source: 'inferred',
+    });
+  });
+});
+
+describe('resolveFreeText guess mode (rule 29)', () => {
+  const run = (llm: FakeLlm, f: FieldDescriptor) => resolveFreeText(makeCtx(llm), f);
+  const guess = (answer: string) => ({
+    answer,
+    grounded: false,
+    guessed: true,
+    unanswerable: false,
+    ungrounded_claims: ['about five years'],
+  });
+
+  it('accepts a guessed answer without the ungrounded retry and marks its source', async () => {
+    const llm = scripted({ 'answer-form-question/v1': [guess('About 5 years')] });
+    const r = await run(llm, field({ label: 'Years of Kafka experience?', required: true }));
+    expect(r).toMatchObject({ status: 'filled', value: 'About 5 years', source: 'guessed' });
+    expect(callsTo(llm, 'answer-form-question/v1')).toHaveLength(1);
+  });
+
+  it('still enforces the options contract: one retry, then the guess resolves', async () => {
+    const llm = scripted({
+      'answer-form-question/v1': [guess('about 5'), guess('3-5 years')],
+    });
+    const r = await run(
+      llm,
+      field({
+        label: 'Years of Kafka experience?',
+        type: 'select',
+        options: ['0-2 years', '3-5 years', '6+ years'],
+        required: true,
+      }),
+    );
+    expect(callsTo(llm, 'answer-form-question/v1')).toHaveLength(2);
+    expect(callsTo(llm, 'answer-form-question/v1')[1]?.user).toContain('<rejected>');
+    expect(r).toMatchObject({ status: 'filled', value: '3-5 years', source: 'guessed' });
+  });
+
+  it('a guess that keeps breaking the options contract parks a required question', async () => {
+    const llm = scripted({ 'answer-form-question/v1': [guess('about 5'), guess('around 5')] });
+    const r = await run(
+      llm,
+      field({
+        label: 'Years?',
+        type: 'select',
+        options: ['0-2 years', '3-5 years'],
+        required: true,
+      }),
+    );
+    expect(r.status).toBe('unanswerable');
+  });
+
+  it('an ungrounded answer that is not a guess still gets the retry', async () => {
+    const llm = scripted({
+      'answer-form-question/v1': [{ ...guess('x'), guessed: false }, grounded('Fine')],
+    });
+    const r = await run(llm, field({ label: 'Q' }));
+    expect(callsTo(llm, 'answer-form-question/v1')).toHaveLength(2);
+    expect(r).toMatchObject({ source: 'generated', value: 'Fine' });
+  });
+
+  it('an unanswerable reply still parks a required question and blanks an optional one', async () => {
+    const llm = scripted({ 'answer-form-question/v1': [UNANSWERABLE] });
+    expect(await run(llm, field({ label: 'Clearance level?', required: true }))).toMatchObject({
+      status: 'unanswerable',
+    });
+    const llm2 = scripted({ 'answer-form-question/v1': [UNANSWERABLE] });
+    expect(await run(llm2, field({ label: 'Clearance level?' }))).toMatchObject({
+      status: 'blank',
+    });
+  });
+});
+
+describe('inferred defaults for null standard answers (wave 5 rule 28)', () => {
+  const YN = ['Yes', 'No'];
+  const BLANK = {
+    work_authorization: null,
+    visa_sponsorship_required: null,
+    start_date: null,
+    earliest_start_date: null,
+    notice_period: null,
+    reasons_for_change: null,
+    previous_interviews: null,
+  };
+  const make = (
+    over: {
+      location?: string | null;
+      phone?: string | null;
+      remote?: 'remote' | 'hybrid' | 'onsite' | 'any';
+      locations?: string[];
+      relocate?: boolean | null;
+      standard?: Partial<typeof PROFILE.standard_answers>;
+    } = {},
+  ) => ({
+    ...PROFILE,
+    identity: {
+      ...PROFILE.identity,
+      location: over.location === undefined ? null : over.location,
+    },
+    contact: { ...PROFILE.contact, phone: over.phone === undefined ? null : over.phone },
+    preferences: {
+      ...PROFILE.preferences,
+      remote: over.remote ?? 'any',
+      locations: over.locations ?? [],
+    },
+    survey: { ...PROFILE.survey, willing_to_relocate: over.relocate ?? null },
+    standard_answers: { ...BLANK, ...over.standard },
+  });
+  const ask = (
+    profile: ReturnType<typeof make>,
+    label: string,
+    ctx: { job?: { location: string | null } } = {},
+    over: Partial<FieldDescriptor> = {},
+  ) =>
+    resolveStandardFields({ profile, ...(ctx as object) } as never, [
+      field({
+        label,
+        classification: 'standard',
+        required: true,
+        type: 'radio',
+        options: YN,
+        ...over,
+      }),
+    ])[0];
+  const AUTH = 'Are you legally authorized to work in the country where this job is located?';
+
+  it('infers work authorization from a US state, a US city or a +1 phone', () => {
+    for (const p of [
+      make({ location: 'Austin, TX' }),
+      make({ location: 'San Francisco' }),
+      make({ phone: '+1 (415) 555-0100' }),
+    ]) {
+      expect(ask(p, AUTH)).toMatchObject({ status: 'filled', value: 'Yes', source: 'inferred' });
+    }
+  });
+
+  it('infers from a UK, Canadian or EU location', () => {
+    for (const location of ['London, UK', 'Toronto, Canada', 'Berlin, Germany']) {
+      expect(ask(make({ location }), AUTH), location).toMatchObject({
+        value: 'Yes',
+        source: 'inferred',
+      });
+    }
+  });
+
+  it('parks when no country can be derived and the question names none', () => {
+    expect(ask(make({ location: null }), AUTH)).toMatchObject({
+      status: 'missing-profile-field',
+      profileField: 'standard_answers.work_authorization',
+    });
+    expect(ask(make({ location: 'Somewhere' }), AUTH)).toMatchObject({
+      status: 'missing-profile-field',
+    });
+  });
+
+  it("uses the question's own country when the profile implies none", () => {
+    expect(
+      ask(make(), 'Do you have permanent authorization to work in the U.S. or Canada?'),
+    ).toMatchObject({ value: 'Yes', source: 'inferred' });
+  });
+
+  it('parks when the profile country does not cover the question', () => {
+    expect(
+      ask(make({ location: 'Austin, TX' }), 'Are you authorized to work in Germany?'),
+    ).toMatchObject({
+      status: 'missing-profile-field',
+    });
+  });
+
+  it('an explicit profile value always wins over the inference', () => {
+    const p = make({
+      location: 'Austin, TX',
+      standard: {
+        work_authorization: 'Authorized to work in the EU',
+        visa_sponsorship_required: true,
+      },
+    });
+    expect(ask(p, 'Are you authorized to work in the US?')).toMatchObject({
+      status: 'missing-profile-field',
+    });
+    expect(ask(p, 'Will you require sponsorship?')).toMatchObject({
+      status: 'filled',
+      value: 'Yes',
+      source: 'profile',
+    });
+    const q = make({
+      location: 'Austin, TX',
+      standard: {
+        start_date: 'In March',
+        notice_period: '1 month',
+        previous_interviews: ['Acme'],
+      },
+    });
+    expect(
+      ask(q, 'What is your notice period?', {}, { type: 'text', options: undefined }),
+    ).toMatchObject({ value: '1 month', source: 'profile' });
+    expect(ask(q, 'Have you interviewed at Acme before?', {})).toMatchObject({
+      value: 'Yes',
+      source: 'profile',
+    });
+  });
+
+  it('infers no sponsorship needed when authorization is inferred', () => {
+    const p = make({ location: 'Austin, TX' });
+    expect(ask(p, 'Will you now or in the future require visa sponsorship?')).toMatchObject({
+      value: 'No',
+      source: 'inferred',
+    });
+    expect(ask(p, 'Are you authorized to work in the US without sponsorship?')).toMatchObject({
+      value: 'Yes',
+      source: 'inferred',
+    });
+    expect(ask(make(), 'Will you now or in the future require visa sponsorship?')).toMatchObject({
+      status: 'missing-profile-field',
+    });
+  });
+
+  it('infers previous interviews as none, start date and notice period', () => {
+    const p = make();
+    expect(ask(p, 'Have you ever interviewed at Anthropic before?')).toMatchObject({
+      value: 'No',
+      source: 'inferred',
+    });
+    expect(ask(p, 'When can you start?', {}, { type: 'text', options: undefined })).toMatchObject({
+      value: 'Within 30 days',
+      source: 'inferred',
+    });
+    expect(
+      ask(p, 'What is your notice period?', {}, { type: 'text', options: undefined }),
+    ).toMatchObject({
+      value: '2 weeks',
+      source: 'inferred',
+    });
+  });
+
+  it('infers relocation: remote preference is No, a preferred posting location is Yes, else No', () => {
+    const q = 'Are you open to relocation?';
+    expect(
+      ask(make({ remote: 'remote', locations: ['Berlin'] }), q, { job: { location: 'Berlin' } }),
+    ).toMatchObject({
+      value: 'No',
+      source: 'inferred',
+    });
+    expect(
+      ask(make({ locations: ['Berlin', 'Remote'] }), q, { job: { location: 'Berlin, Germany' } }),
+    ).toMatchObject({ value: 'Yes', source: 'inferred' });
+    expect(ask(make({ locations: ['Berlin'] }), q, { job: { location: 'Paris' } })).toMatchObject({
+      value: 'No',
+    });
+    expect(ask(make(), q)).toMatchObject({ value: 'No', source: 'inferred' });
+    expect(ask(make({ relocate: true, remote: 'remote' }), q)).toMatchObject({
+      value: 'Yes',
+      source: 'profile',
+    });
+  });
+
+  it('does not infer for an optional field', () => {
+    expect(
+      ask(make(), 'Have you ever interviewed at Anthropic before?', {}, { required: false }),
+    ).toMatchObject({ status: 'blank' });
+  });
+
+  it('planFill and toFormAnswers record inferred answers with their source', () => {
+    const f = field({ label: 'Notice period', classification: 'standard', type: 'text' });
+    const res = [
+      { fieldId: f.id, question: f.label, status: 'filled', value: '2 weeks', source: 'inferred' },
+    ] as const;
+    expect(planFill([f], [...res]).answers).toEqual({
+      'Notice period': { value: '2 weeks', source: 'inferred' },
+    });
+    expect(toFormAnswers([...res])).toEqual({
+      'Notice period': { value: '2 weeks', source: 'inferred' },
+    });
   });
 });

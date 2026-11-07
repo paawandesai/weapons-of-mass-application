@@ -108,6 +108,9 @@ export const standardAnswersSchema = z.object({
   earliest_start_date: isoDateSchema.nullable().default(null),
   notice_period: z.string().nullable(),
   reasons_for_change: z.string().nullable(),
+  // Companies the candidate has interviewed at; [] means none, null means not yet answered.
+  // Default so profile documents stored before the field existed still parse.
+  previous_interviews: z.array(z.string()).nullable().default(null),
 });
 
 export const flagKindSchema = z.enum([

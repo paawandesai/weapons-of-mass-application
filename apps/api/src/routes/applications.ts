@@ -135,6 +135,11 @@ function answerList(raw: unknown) {
       const v = value as { skipped?: string; attached?: string };
       if (v.skipped) return { question, status: 'skipped', value: null, skipped: v.skipped };
       if (v.attached) return { question, status: 'attached', value: v.attached };
+      // Rule 30: an inferred or guessed answer is stored as {value, source}.
+      const w = value as { value?: unknown; source?: unknown };
+      if ('value' in w && (w.source === 'inferred' || w.source === 'guessed')) {
+        return { question, status: 'filled', value: w.value, source: w.source };
+      }
     }
     return { question, status: 'filled', value };
   });

@@ -140,6 +140,7 @@ async function carriedSections(
         visa_sponsorship_required: null,
         start_date: null,
         earliest_start_date: null,
+        previous_interviews: null,
         notice_period: null,
         reasons_for_change: null,
       },
