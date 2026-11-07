@@ -26,6 +26,7 @@ import {
 } from '../../src/demo/gauntlet';
 import { createDemoSender } from '../../src/demo/ports';
 import {
+  recruiterIdentity,
   runSimulatedRecruiter,
   SLOTS_HEADER,
   KIND_HEADER,
@@ -240,13 +241,19 @@ describe('Gauntlet Jobs recruiter', () => {
     }
   });
 
-  it('sends only the confirmation when the recruiter ghosts', async () => {
+  it('sends only the confirmation when the recruiter ghosts, from the recruiter in person', async () => {
     const app = await gauntletApp();
     const r = await run('ghost');
     expect(r.delivered.filter((d) => d.applicationId === app.id).map((d) => d.kind)).toEqual([
       'confirmation',
     ]);
     expect(await thread(app.id)).toEqual([]);
+    // A no-reply sender would leave the follow-up with nobody to write to (`no_contact`).
+    const confirmation = await listDemoThread(env.handle, `sim-confirm-thread-${app.id}`);
+    expect(confirmation[0]!.fromAddress).toBe(
+      recruiterIdentity('Gauntlet Jobs', 'gauntlet-jobs').address,
+    );
+    expect(confirmation[0]!.fromAddress).not.toMatch(/^no-reply@/);
   });
 
   it('moves a booked interview, then acknowledges a time from the new proposal', async () => {

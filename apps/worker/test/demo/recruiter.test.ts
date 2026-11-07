@@ -6,11 +6,13 @@ import {
   upsertCompany,
   upsertJob,
   type DemoMailboxMessageRow,
+  GAUNTLET_SCENARIO_BY_SLUG,
 } from '@wma/db';
 import { createDemoSender } from '../../src/demo/ports';
 import {
   acceptedSlot,
   proposeSlots,
+  proposeSlotsFor,
   recruiterIdentity,
   runSimulatedRecruiter,
   SIMULATED_HEADER,
@@ -46,6 +48,28 @@ describe('identity and slots', () => {
     expect(a).toEqual(recruiterIdentity('Harbor Robotics', 'harbor-robotics'));
     expect(a.address).toMatch(/^[a-z]+\.[a-z]+@harbor-robotics\.example$/);
     expect(a.address).toBe(`${a.first}.${a.last}@harbor-robotics.example`.toLowerCase());
+  });
+
+  it('spreads the golden employers so no two propose an overlapping time', () => {
+    const now = new Date('2026-11-06T20:00:00Z');
+    const zone = 'America/Los_Angeles';
+    const all = Object.keys(GAUNTLET_SCENARIO_BY_SLUG).map((slug) => ({
+      slug,
+      slots: proposeSlotsFor(now, zone, slug),
+    }));
+    expect(all).toHaveLength(8);
+    for (const a of all) {
+      expect(a.slots).toHaveLength(3);
+      for (const b of all) {
+        if (a === b) continue;
+        for (const x of a.slots)
+          for (const y of b.slots)
+            expect(x.start < y.end && y.start < x.end, `${a.slug} overlaps ${b.slug}`).toBe(false);
+      }
+    }
+    // Other companies keep the plain slots.
+    expect(proposeSlotsFor(now, zone, 'harbor-robotics')).toEqual(proposeSlots(now, zone));
+    expect(proposeSlotsFor(now, zone, null)).toEqual(proposeSlots(now, zone));
   });
 
   it('proposes three upcoming weekdays', () => {

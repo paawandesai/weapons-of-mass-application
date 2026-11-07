@@ -27,6 +27,8 @@ export const STANDARD_KEYS = [
   'current_title',
   'relocation',
   'consent',
+  'heard_about',
+  'travel',
 ] as const;
 export type StandardKey = (typeof STANDARD_KEYS)[number];
 
@@ -247,6 +249,16 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   ['interviewed_before', /\bhave you (?:ever |previously )?interviewed (?:at|with|for)\b/],
   ['applied_before', /\bhave you (?:ever |previously )?applied (?:to|at|for|with)\b/],
   ['relocation', RELOCATION_WILLINGNESS],
+  // Rule 45: where the candidate heard of the role. Before the free-text catch-all sees it.
+  [
+    'heard_about',
+    /how did you (?:hear|find out|learn) (?:about|of)|where did you (?:hear|find|see|learn)|how did you find (?:this|us|the)|^(?:referral |application |lead |candidate )?source(?: of (?:application|referral|hire))?$/,
+  ],
+  // Rule 46: willingness to travel (an amount up to 25% or none stated; see travelPercent).
+  [
+    'travel',
+    /^(?!.*\b(?:expenses?|reimburs\w*|history|visa|passport|restrictions?)\b)(?=.*\btravel\w*)(?=.*\b(?:willing\w*|able|open|comfortable|prepared|ready|up to|\d{1,3}\s*(?:%|percent)|required|requirement|expect\w*)\b)/,
+  ],
   ['notice_period', /notice period/],
   [
     'start_date',
@@ -291,9 +303,20 @@ export function standardKeyFor(label: string, type?: string, description = ''): 
     // Consent is an acknowledgement control; a text box is never one. Without a type (label-only
     // callers) the label alone decides.
     if (key === 'consent' && type !== undefined && !CONSENT_TYPES.has(type)) continue;
+    // Rule 46: more than 25% travel is not inferred; the question goes to the model like any other.
+    if (key === 'travel' && (travelPercent(l) ?? 0) > MAX_INFERRED_TRAVEL_PERCENT) continue;
     if (re.test(l)) return key;
   }
   return null;
+}
+
+/** Rule 46: the largest share of travel the profile is assumed to accept without saying so. */
+export const MAX_INFERRED_TRAVEL_PERCENT = 25;
+
+/** The percentage a travel question names ("up to 25%", "50 percent"), or null when none. */
+export function travelPercent(label: string): number | null {
+  const m = /(\d{1,3})\s*(?:%|percent)/i.exec(label);
+  return m ? Number(m[1]) : null;
 }
 
 interface RuleVerdict {

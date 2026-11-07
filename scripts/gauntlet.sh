@@ -76,7 +76,12 @@ if [[ "$GATE" == 1 ]]; then
   api="http://127.0.0.1:$API_PORT"
   export WEB_ORIGIN="${WEB_ORIGIN:-http://localhost:$WEB_PORT}"
   jar=$(mktemp)
-  q() { psql "$DATABASE_URL" -tAc "$1"; }
+  # psql from the host when installed, else the one inside the Postgres container.
+  if command -v psql > /dev/null 2>&1; then
+    q() { psql "$DATABASE_URL" -tAc "$1"; }
+  else
+    q() { docker exec wma-postgres psql -U wma -d "$DB" -tAc "$1"; }
+  fi
   trap 'rm -f "$jar"; stop' EXIT
 
   echo "gate: signing in as the demo user and starting the run"

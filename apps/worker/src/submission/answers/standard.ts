@@ -6,7 +6,9 @@ import {
   hasAcknowledgementOptions,
   isAcknowledgementOption,
   isCountryListField,
+  MAX_INFERRED_TRAVEL_PERCENT,
   standardKeyFor,
+  travelPercent,
   type StandardKey,
 } from './classify';
 
@@ -34,6 +36,8 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   current_title: 'work_history.0.title',
   relocation: 'survey.willing_to_relocate',
   consent: 'standard_answers.consent',
+  heard_about: 'application source (not a profile field)',
+  travel: 'travel willingness (not a profile field)',
 };
 
 /** What the resolver knows beyond the profile: the posting's company and earlier applied rows. */
@@ -167,7 +171,32 @@ export function profileValue(
     case 'consent':
       // Acknowledgements are answered in the affirmative; see docs/design/live-loop-fixes.md rule 10.
       return true;
+    case 'heard_about':
+    case 'travel':
+      // Not profile facts; rules 45 and 46 infer them (inferValue / heardAbout).
+      return null;
   }
+}
+
+// Rule 45: the answer to "how did you hear about this role", most honest first. The agent found
+// the posting on the company's own board, so a job-board or careers-site option wins; "Other" is
+// the fallback when the list offers nothing closer.
+const HEARD_ABOUT_OPTIONS: RegExp[] = [
+  /\bjob board\b|\bjob (?:site|listing|posting|search)\b/i,
+  /\bcareers? (?:site|page|website)\b|\bcompany (?:website|site)\b|\bour website\b|\bwebsite\b/i,
+  /\bonline\b|\binternet\b|\bweb search\b|\bsearch engine\b|\bgoogle\b/i,
+  /\blinkedin\b/i,
+  /\bother\b/i,
+];
+const HEARD_ABOUT_TEXT = 'Job board';
+
+function heardAbout(f: FieldDescriptor): Resolved {
+  if (!f.options?.length) return { value: HEARD_ABOUT_TEXT, inferred: true };
+  for (const re of HEARD_ABOUT_OPTIONS) {
+    const hit = f.options.find((o) => re.test(o));
+    if (hit) return { value: hit, inferred: true };
+  }
+  return { unexpressible: true };
 }
 
 // Places a work-authorization answer or a question can name. A group "covers" the places it lists.
@@ -487,6 +516,10 @@ function inferValue(
       return 'Within 30 days';
     case 'notice_period':
       return '2 weeks';
+    case 'travel':
+      // Rule 46: travel up to MAX_INFERRED_TRAVEL_PERCENT (or no amount named) is accepted;
+      // standardKeyFor leaves larger shares to the model.
+      return (travelPercent(question) ?? 0) <= MAX_INFERRED_TRAVEL_PERCENT ? true : null;
     case 'relocation':
       if (p.survey.willing_to_relocate !== null) return null;
       if (p.preferences.remote === 'remote') return false;
@@ -555,6 +588,8 @@ function valueForField(
       if (acks.length > 0) return { value: acks };
     }
   }
+  // Rule 45: where the candidate heard about the role is never a profile fact.
+  if (key === 'heard_about') return allowInference ? heardAbout(f) : null;
   // Rule 23b: a date picker always gets a date; a text box keeps the start-date text.
   if (key === 'start_date' && f.type === 'date') return { value: deriveStartDate(profile, today) };
   let value = profileValue(profile, key, f.label, prior);

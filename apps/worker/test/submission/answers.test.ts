@@ -51,7 +51,7 @@ const LABELS: Array<[vendor: string, rows: Row[]]> = [
         YES_NO,
       ],
       ['Why do you want to work at Initrode?', 'textarea', 'free-text'],
-      ['How did you hear about this job?', 'text', 'free-text'],
+      ['How did you hear about this job?', 'text', 'standard'],
       ['Gender', 'select', 'self-identification', EEO],
       ['Are you Hispanic/Latino?', 'select', 'self-identification', YES_NO],
       ['Race', 'select', 'self-identification', ['Asian', 'White', 'Decline to self identify']],
@@ -1286,6 +1286,46 @@ describe('inferred defaults for null standard answers (wave 5 rule 28)', () => {
     expect(
       ask(make(), 'Have you ever interviewed at Anthropic before?', {}, { required: false }),
     ).toMatchObject({ status: 'blank' });
+  });
+
+  it('rule 45: "how did you hear about this role" takes the job-board-like option, else Other', () => {
+    const q = 'How did you hear about this role?';
+    const sel = (options: string[]) => ({ type: 'select' as const, options });
+    expect(ask(make(), q, {}, sel(['LinkedIn', 'Referral', 'Job board', 'Other']))).toMatchObject({
+      value: 'Job board',
+      source: 'inferred',
+    });
+    expect(ask(make(), q, {}, sel(['Referral', 'Company website', 'Other']))).toMatchObject({
+      value: 'Company website',
+    });
+    expect(ask(make(), q, {}, sel(['Referral', 'Employee', 'Other']))).toMatchObject({
+      value: 'Other',
+    });
+    expect(ask(make(), q, {}, sel(['Referral', 'Employee']))).toMatchObject({
+      status: 'unanswerable',
+    });
+    expect(ask(make(), q, {}, { type: 'text', options: undefined })).toMatchObject({
+      value: 'Job board',
+      source: 'inferred',
+    });
+    expect(
+      ask(make(), 'Where did you see this posting?', {}, { type: 'text', options: undefined }),
+    ).toMatchObject({ value: 'Job board' });
+  });
+
+  it('rule 46: travel up to 25% (or no amount) is Yes; more goes to the model', () => {
+    expect(ask(make(), 'Are you willing to travel up to 25% of the time?')).toMatchObject({
+      value: 'Yes',
+      source: 'inferred',
+    });
+    expect(ask(make(), 'Are you able to travel occasionally for team offsites?')).toMatchObject({
+      value: 'Yes',
+      source: 'inferred',
+    });
+    expect(standardKeyFor('Are you willing to travel up to 50% of the time?')).toBeNull();
+    expect(standardKeyFor('Are you comfortable with 30 percent travel?')).toBeNull();
+    expect(standardKeyFor('Will you need travel expenses reimbursed?')).toBeNull();
+    expect(standardKeyFor('Travel history outside the US')).toBeNull();
   });
 
   it('planFill and toFormAnswers record inferred answers with their source', () => {

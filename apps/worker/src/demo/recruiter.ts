@@ -1,6 +1,7 @@
 import {
   activity,
   demoFormsOrigin,
+  GAUNTLET_SCENARIO_BY_SLUG,
   getDemoMessage,
   getUserById,
   insertDemoMessage,
@@ -181,10 +182,20 @@ function zonedInstant(y: number, mo: number, d: number, hour: number, zone: stri
 const SLOT_HOURS = [10, 14, 11];
 const SLOT_MINUTES = 45;
 
-/** Three slots on the next three weekdays at least two days out (10:00, 14:00, 11:00 local). */
-export function proposeSlots(now: Date, zone: string): ProposedTime[] {
+/**
+ * Three slots on the next three weekdays at least two days out (10:00, 14:00, 11:00 local), each
+ * shifted by `hourOffset` hours (0-3), after skipping the first `skipWeekdays` eligible weekdays,
+ * so employers proposing in the same week do not collide.
+ */
+export function proposeSlots(
+  now: Date,
+  zone: string,
+  hourOffset = 0,
+  skipWeekdays = 0,
+): ProposedTime[] {
   const out: ProposedTime[] = [];
   const dayMs = 24 * 60 * 60 * 1000;
+  let skip = skipWeekdays;
   for (let i = 2; out.length < 3 && i < 20; i++) {
     const probe = new Date(now.getTime() + i * dayMs);
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -196,16 +207,33 @@ export function proposeSlots(now: Date, zone: string): ProposedTime[] {
     }).formatToParts(probe);
     const get = (t: string) => parts.find((p) => p.type === t)!.value;
     if (get('weekday') === 'Sat' || get('weekday') === 'Sun') continue;
+    if (skip > 0) {
+      skip--;
+      continue;
+    }
     const start = zonedInstant(
       Number(get('year')),
       Number(get('month')),
       Number(get('day')),
-      SLOT_HOURS[out.length]!,
+      SLOT_HOURS[out.length]! + hourOffset,
       zone,
     );
     out.push({ start, end: new Date(start.getTime() + SLOT_MINUTES * 60_000) });
   }
   return out;
+}
+
+/**
+ * Slots for one employer. Every recruiter used to propose the same three times, so in a golden run
+ * the fourth employer's slots all overlapped interviews already booked with the first three and
+ * the agent (rightly) raised `no_free_slot`. Golden employers are spread by their position in the
+ * catalog: an hour offset (0-3) and, for the second four, the three weekdays after the first
+ * four's. Other companies keep the plain slots.
+ */
+export function proposeSlotsFor(now: Date, zone: string, boardSlug: string | null): ProposedTime[] {
+  const idx = boardSlug ? Object.keys(GAUNTLET_SCENARIO_BY_SLUG).indexOf(boardSlug) : -1;
+  if (idx < 0) return proposeSlots(now, zone);
+  return proposeSlots(now, zone, idx % 4, Math.floor(idx / 4) * 3);
 }
 
 const bullets = (slots: ProposedTime[], zone: string) =>
@@ -397,18 +425,24 @@ export async function runSimulatedRecruiter(
       companyName: company.name,
       jobTitle: job.title,
       firstName,
-      slots: proposeSlots(now, zone),
+      slots: proposeSlotsFor(now, zone, company.boardSlug),
       zone,
     };
     const threadId = `sim-thread-${app.id}`;
     // Gauntlet Jobs confirms at once, like an applicant-tracking system, in a thread of its own.
+    // The ghost scenario's confirmation comes from the recruiter in person: a no-reply sender
+    // leaves nobody to follow up with (follow-up rule `no_contact`), and the point of the
+    // scenario is the follow-up.
     const confirmId = `sim-confirm-${app.id}`;
     const scenario = scenarioOf(company);
     if (scenario && !(await getDemoMessage(handle, confirmId))) {
-      const careers = {
-        address: `no-reply@${recruiter.address.split('@')[1]}`,
-        name: `${company.name} Careers`,
-      };
+      const careers =
+        scenario === 'ghost'
+          ? { address: recruiter.address, name: recruiter.name }
+          : {
+              address: `no-reply@${recruiter.address.split('@')[1]}`,
+              name: `${company.name} Careers`,
+            };
       await deliver(
         {
           kind: 'confirmation',
@@ -547,7 +581,11 @@ export async function runSimulatedRecruiter(
       const gmailMessageId = `sim-step-${app.id}-${acks.length}`;
       if (await getDemoMessage(handle, gmailMessageId)) continue;
       const recruiter = recruiterIdentity(company.name, company.boardSlug);
-      const slots = proposeSlots(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), zone);
+      const slots = proposeSlotsFor(
+        new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        zone,
+        company.boardSlug,
+      );
       const input: MessageInput = {
         recruiter,
         companyName: company.name,

@@ -8,4 +8,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile
+# Real Google Chrome (design rule 37): reCAPTCHA Enterprise scores Playwright's bundled Chromium as
+# a bot and Ashby silently drops the submit. browser.ts launches channel "chrome" and falls back to
+# the bundled Chromium only if this is missing.
+RUN pnpm --filter @wma/worker exec playwright install chrome
 CMD ["pnpm", "--filter", "@wma/worker", "start"]
