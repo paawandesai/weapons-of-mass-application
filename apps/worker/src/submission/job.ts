@@ -264,7 +264,7 @@ async function attempt(
     judgment: await runCandidateJudgment(handle, claim, job),
     clock: deps.clock,
     gmail: deps.gmail(handle, userId),
-    mail: deps.sendMail(handle),
+    mail: deps.sendMail(handle, userId),
     llm: deps.llm,
     files: {
       put: (key, bytes) => putFile(handle, key, bytes),

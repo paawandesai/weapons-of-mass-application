@@ -1,6 +1,8 @@
 import type { PgBoss } from 'pg-boss';
 import { createGmailSender } from '@wma/google';
 import { createLlmClient } from '@wma/llm';
+import { createBlockedLogger, createOutgoingStore } from '@wma/db';
+import { defaultGuards } from '@wma/shared';
 import { selectAdapter } from './adapters';
 import { launchSharedBrowser, sharedBrowser } from './browser';
 import { systemClock, type SubmissionDeps } from './deps';
@@ -23,7 +25,12 @@ export function createSubmissionDeps(boss: PgBoss): SubmissionDeps {
     gmail: createGmailPort,
     clock: systemClock,
     llm: createLlmClient(),
-    sendMail: (handle) => ({ sender: createGmailSender(handle), guards: [] }),
+    sendMail: (handle, userId) => ({
+      sender: createGmailSender(handle),
+      guards: defaultGuards,
+      store: createOutgoingStore(handle, userId),
+      onBlocked: createBlockedLogger(handle, userId),
+    }),
     followUp: createFollowUpQueue(boss),
     webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   };

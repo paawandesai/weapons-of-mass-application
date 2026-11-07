@@ -1,0 +1,14 @@
+{
+  "id": "msg-confirmation",
+  "threadId": "thr-confirmation",
+  "date": "2026-03-11T09:14:00Z",
+  "from": "Dana Whitcomb <recruiting@{{domain}}>",
+  "subject": "We received your application for {{title}}",
+  "body": "Hi Mara,\n\nThank you for applying for the {{title}} role at {{company}}. We have received your application and our team will review it.\n\nDana Whitcomb\nTalent team, {{company}}",
+  "classification": {
+    "classification": "confirmation",
+    "compensation_flag": false,
+    "booking_link": null,
+    "proposed_slots": []
+  }
+}

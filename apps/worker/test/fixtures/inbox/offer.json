@@ -1,0 +1,14 @@
+{
+  "id": "msg-offer",
+  "threadId": "thr-offer",
+  "date": "2026-03-18T15:00:00Z",
+  "from": "Dana Whitcomb <recruiting@{{domain}}>",
+  "subject": "Offer of employment: {{title}}",
+  "body": "Hi Mara,\n\nWe are delighted to offer you the {{title}} position at {{company}}. The base salary is $185,000 per year with an equity grant described in the attached letter.\n\nPlease reply by Friday.\n\nDana Whitcomb",
+  "classification": {
+    "classification": "offer",
+    "compensation_flag": true,
+    "booking_link": null,
+    "proposed_slots": []
+  }
+}

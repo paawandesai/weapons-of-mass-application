@@ -1,0 +1,14 @@
+{
+  "id": "msg-booking",
+  "threadId": "thr-booking",
+  "date": "2026-03-13T12:00:00Z",
+  "from": "Dana Whitcomb <recruiting@{{domain}}>",
+  "subject": "Pick a time to talk about {{title}}",
+  "body": "Hi Mara,\n\nPlease choose a time that suits you on my calendar: https://cal.{{domain}}/dana/intro-call\n\nDana Whitcomb",
+  "classification": {
+    "classification": "interview",
+    "compensation_flag": false,
+    "booking_link": "https://cal.{{domain}}/dana/intro-call",
+    "proposed_slots": []
+  }
+}

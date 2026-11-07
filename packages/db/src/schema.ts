@@ -11,6 +11,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -55,6 +56,8 @@ export const users = pgTable(
     approvedProfileVersion: integer('approved_profile_version'),
     approvedProfileAt: timestamp('approved_profile_at', { withTimezone: true }),
     digestHour: integer('digest_hour').notNull().default(8),
+    /** IANA zone the digest hour and slot display are interpreted in. */
+    timezone: text('timezone').notNull().default('America/Los_Angeles'),
     dailyTarget: integer('daily_target').notNull().default(12),
     createdAt: createdAt(),
   },
@@ -430,6 +433,8 @@ export const applications = pgTable(
     appliedAt: timestamp('applied_at', { withTimezone: true }),
     /** Set once the follow-up job is confirmed queued. Null on an applied row is the outbox record: the job is still owed and reconciliation enqueues it. */
     followUpEnqueuedAt: timestamp('follow_up_enqueued_at', { withTimezone: true }),
+    /** Set when the follow-up email was sent; the follow-up job sends at most once. */
+    followedUpAt: timestamp('followed_up_at', { withTimezone: true }),
     confirmationSource: confirmationSource('confirmation_source'),
     lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
@@ -514,4 +519,229 @@ export const captchaRequests = pgTable(
       foreignColumns: [applications.tenantId, applications.id],
     }).onDelete('cascade'),
   ],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Wave 3: inbox sync, interview scheduling, outgoing mail.
+// ---------------------------------------------------------------------------------------------
+
+export const threadKind = pgEnum('thread_kind', [
+  'confirmation',
+  'rejection',
+  'interview',
+  'offer',
+  'other',
+  'unlinked',
+]);
+export const processedOutcome = pgEnum('processed_outcome', ['linked', 'unlinked', 'failed']);
+export const prepPlanStatus = pgEnum('prep_plan_status', ['pending', 'ready', 'failed']);
+/** pending: the send is in flight or its outcome is unknown; sent: Gmail accepted it; blocked: a guard stopped it. */
+export const outgoingState = pgEnum('outgoing_state', ['pending', 'sent', 'blocked']);
+
+export const outgoingKind = pgEnum('outgoing_kind', [
+  'follow_up',
+  'slot_confirmation',
+  'recruiter_reply',
+  'reminder',
+  'digest',
+  'captcha_request',
+  'other',
+]);
+
+export const emailThreads = pgTable(
+  'email_threads',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    /** Null while the thread is unlinked. */
+    applicationId: uuid('application_id'),
+    gmailThreadId: text('gmail_thread_id').notNull(),
+    kind: threadKind('kind').notNull(),
+    compensationFlag: boolean('compensation_flag').notNull().default(false),
+    bookingLink: text('booking_link'),
+    promptVersion: text('prompt_version'),
+    lastMessageAt: timestamp('last_message_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('email_threads_tenant_gmail_thread_key').on(t.tenantId, t.gmailThreadId),
+    unique('email_threads_tenant_id_id_key').on(t.tenantId, t.id),
+    index('email_threads_tenant_application_idx').on(t.tenantId, t.applicationId),
+    userRef(t),
+    foreignKey({
+      columns: [t.tenantId, t.applicationId],
+      foreignColumns: [applications.tenantId, applications.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+export const processedMessages = pgTable(
+  'processed_messages',
+  {
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    gmailMessageId: text('gmail_message_id').notNull(),
+    /** Null for a message that failed before a thread row existed. */
+    threadId: uuid('thread_id'),
+    outcome: processedOutcome('outcome').notNull(),
+    processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.gmailMessageId] }),
+    index('processed_messages_tenant_user_idx').on(t.tenantId, t.userId),
+    userRef(t),
+    foreignKey({
+      columns: [t.tenantId, t.threadId],
+      foreignColumns: [emailThreads.tenantId, emailThreads.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+export const interviews = pgTable(
+  'interviews',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    applicationId: uuid('application_id').notNull(),
+    threadId: uuid('thread_id').notNull(),
+    /** The slot the user confirmed (no foreign key: slots reference their interview). */
+    confirmedSlotId: uuid('confirmed_slot_id'),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    calendarEventId: text('calendar_event_id'),
+    replySentAt: timestamp('reply_sent_at', { withTimezone: true }),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    prepPlan: text('prep_plan'),
+    prepPlanStatus: prepPlanStatus('prep_plan_status'),
+    feedback: jsonb('feedback'),
+    confirmationEmailSentAt: timestamp('confirmation_email_sent_at', { withTimezone: true }),
+    /** Bumped each time a slot is confirmed and each time a reschedule clears the confirmation; booking writes are conditioned on it. */
+    confirmedGeneration: integer('confirmed_generation').notNull().default(0),
+    /** Client-generated Calendar event id, persisted before the insert so a retry finds the same event. */
+    calendarEventClientId: text('calendar_event_client_id'),
+    /** The confirmed generation whose reply and Calendar write both completed; null until then. */
+    bookedGeneration: integer('booked_generation'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('interviews_tenant_id_id_key').on(t.tenantId, t.id),
+    // One interview per application thread.
+    unique('interviews_tenant_thread_key').on(t.tenantId, t.threadId),
+    index('interviews_tenant_application_idx').on(t.tenantId, t.applicationId),
+    index('interviews_tenant_user_starts_idx').on(t.tenantId, t.userId, t.startsAt),
+    userRef(t),
+    foreignKey({
+      columns: [t.tenantId, t.applicationId],
+      foreignColumns: [applications.tenantId, applications.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [t.tenantId, t.threadId],
+      foreignColumns: [emailThreads.tenantId, emailThreads.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+export const interviewSlots = pgTable(
+  'interview_slots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    interviewId: uuid('interview_id').notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    tzHint: text('tz_hint'),
+    /** sha256 of the single-use token; the token itself is never stored. */
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    invalidatedAt: timestamp('invalidated_at', { withTimezone: true }),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('interview_slots_token_hash_key').on(t.tokenHash),
+    index('interview_slots_tenant_interview_idx').on(t.tenantId, t.interviewId),
+    foreignKey({
+      columns: [t.tenantId, t.interviewId],
+      foreignColumns: [interviews.tenantId, interviews.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+export const outgoingMessages = pgTable(
+  'outgoing_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    applicationId: uuid('application_id'),
+    kind: outgoingKind('kind').notNull(),
+    toAddress: text('to_address').notNull(),
+    subject: text('subject').notNull(),
+    bodyText: text('body_text').notNull(),
+    bodyHtml: text('body_html'),
+    gmailMessageId: text('gmail_message_id'),
+    blocked: boolean('blocked').notNull().default(false),
+    blockedReason: text('blocked_reason'),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    state: outgoingState('state').notNull().default('sent'),
+    /** Logical identity of the send (kind + logical id); written before Gmail is called. */
+    deliveryKey: text('delivery_key'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('outgoing_messages_tenant_delivery_key_key')
+      .on(t.tenantId, t.deliveryKey)
+      .where(sql`${t.deliveryKey} is not null`),
+    index('outgoing_messages_tenant_user_created_idx').on(t.tenantId, t.userId, t.createdAt),
+    index('outgoing_messages_tenant_application_idx').on(t.tenantId, t.applicationId),
+    userRef(t),
+    foreignKey({
+      columns: [t.tenantId, t.applicationId],
+      foreignColumns: [applications.tenantId, applications.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+export const mailSyncState = pgTable(
+  'mail_sync_state',
+  {
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    historyId: text('history_id'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    reauthNeeded: boolean('reauth_needed').notNull().default(false),
+    /** Messages listed but not processed (calendar unreadable); retried by id on every sync. */
+    deferredMessageIds: text('deferred_message_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.userId] }), userRef(t)],
+);
+
+/** Per-user digest cursor: activity up to `collectedThrough` was included in a digest. */
+export const digestState = pgTable(
+  'digest_state',
+  {
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    collectedThrough: timestamp('collected_through', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.userId] }), userRef(t)],
 );

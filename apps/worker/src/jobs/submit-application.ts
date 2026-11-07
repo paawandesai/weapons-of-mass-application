@@ -1,7 +1,7 @@
 import type { PgBoss } from 'pg-boss';
 import type { Db } from '@wma/db';
+import { FOLLOW_UP_JOB } from './follow-up';
 import {
-  FOLLOW_UP_JOB,
   SUBMIT_APPLICATION_JOB,
   SUBMIT_CONCURRENCY,
   SUBMIT_QUEUE_OPTIONS,

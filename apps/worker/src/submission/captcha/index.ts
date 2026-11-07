@@ -15,7 +15,7 @@ import {
   type CaptchaStage,
 } from '@wma/db';
 import { loadPrompt } from '@wma/llm';
-import { sendEmail } from '@wma/shared';
+import { sendEmailRecovering } from '@wma/shared';
 import {
   HUMAN_WINDOW_S,
   MAX_AGENT_ATTEMPTS,
@@ -167,15 +167,23 @@ async function expire(
   throw new SubmissionFailure('captcha-timeout', { request_id: req.id, ...detail });
 }
 
+/** Thrown when the challenge email was blocked by a guard or its delivery is unresolved. */
+class ChallengeEmailFailed extends Error {}
+
 async function sendChallenge(
   ctx: SubmissionContext,
   opts: CaptchaOptions,
   email: string,
   token: string,
   png: Buffer,
+  requestId: string,
+  attempt: number,
 ): Promise<void> {
-  await sendEmail(ctx.mail, {
+  const result = await sendEmailRecovering(ctx.mail, {
     userId: ctx.userId,
+    kind: 'captcha_request',
+    applicationId: ctx.application.id,
+    deliveryKey: `captcha_request:${requestId}:${attempt}`,
     to: email,
     ...captchaEmail({
       companyName: opts.companyName,
@@ -184,6 +192,8 @@ async function sendChallenge(
       image: png,
     }),
   });
+  // A blocked or unresolved send never reached the user: it counts as a failed email.
+  if (result.status !== 'sent') throw new ChallengeEmailFailed(result.status);
 }
 
 async function humanStage(
@@ -208,8 +218,9 @@ async function humanStage(
   if (slot === 'busy') return expire(ctx, req, 'captcha-parked', { parked: true });
 
   const user = await getUserById(ctx.handle, ctx.userId);
+  let emailAttempt = 0;
   try {
-    await sendChallenge(ctx, opts, user.email, token, png0);
+    await sendChallenge(ctx, opts, user.email, token, png0, req.id, 0);
   } catch {
     return expire(ctx, req, 'captcha-timeout', { detail: 'email_failed' });
   }
@@ -263,7 +274,7 @@ async function humanStage(
         imageRef: await saveImage(ctx, png),
       });
       try {
-        await sendChallenge(ctx, opts, user.email, token, png);
+        await sendChallenge(ctx, opts, user.email, token, png, req.id, ++emailAttempt);
       } catch {
         return expire(ctx, req, 'captcha-timeout', { detail: 'email_failed' });
       }

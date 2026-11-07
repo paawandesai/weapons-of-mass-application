@@ -14,8 +14,8 @@ export const MAX_FAILED_ATTEMPTS = 2;
 export const SUBMIT_CONCURRENCY = 2;
 
 export const SUBMIT_APPLICATION_JOB = 'submit-application';
-/** Enqueued by a successful submission; consumed by the inbox wave. */
-export const FOLLOW_UP_JOB = 'follow-up';
+/** The constant lives with its job; re-exported so submission code keeps one import. */
+export { FOLLOW_UP_JOB } from '../jobs/follow-up';
 
 /**
  * Send options for submit-application jobs. A job only fails to pg-boss when no application

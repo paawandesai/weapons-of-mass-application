@@ -1,3 +1,5 @@
+import { scrubEmployerText } from '@wma/shared';
+
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -9,7 +11,13 @@ export interface CaptchaEmailInput {
 }
 
 /** The message that asks the user to read a challenge; the image is inline (`cid:captcha`). */
-export function captchaEmail(input: CaptchaEmailInput) {
+export function captchaEmail(raw: CaptchaEmailInput) {
+  // Employer-supplied names run through the scrubber before the money guard sees the message.
+  const input = {
+    ...raw,
+    companyName: scrubEmployerText(raw.companyName),
+    jobTitle: scrubEmployerText(raw.jobTitle),
+  };
   const minutes = 15;
   const subject = `Your help needed: ${input.companyName} application (${input.jobTitle})`;
   const text = [

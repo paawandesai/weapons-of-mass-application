@@ -58,6 +58,10 @@ export function buildMime(email: OutgoingEmail): string {
   return [
     `To: ${headerValue(to)}`,
     `Subject: ${headerValue(email.subject)}`,
+    ...(email.inReplyTo ? [`In-Reply-To: ${headerValue(email.inReplyTo)}`] : []),
+    ...(email.references || email.inReplyTo
+      ? [`References: ${headerValue(email.references ?? email.inReplyTo ?? '')}`]
+      : []),
     'MIME-Version: 1.0',
     body,
   ].join('\r\n');
@@ -70,7 +74,10 @@ export function createGmailSender(handle: TenantHandle): GmailSender {
       const gmail = await getGmailClient(handle, email.userId);
       const res = await gmail.users.messages.send({
         userId: 'me',
-        requestBody: { raw: Buffer.from(buildMime(email)).toString('base64url') },
+        requestBody: {
+          raw: Buffer.from(buildMime(email)).toString('base64url'),
+          ...(email.threadId ? { threadId: email.threadId } : {}),
+        },
       });
       return { messageId: res.data.id ?? '' };
     },

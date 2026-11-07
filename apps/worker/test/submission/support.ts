@@ -16,7 +16,7 @@ import {
   type JobRow,
 } from '@wma/db';
 import { FakeLlm } from '@wma/llm';
-import { InMemorySender, type AtsId } from '@wma/shared';
+import { InMemoryOutgoingStore, InMemorySender, type AtsId } from '@wma/shared';
 import profile from '../../../../packages/shared/test/fixtures/profile.full.json';
 import { domainAllowed, senderDomain } from '../../src/submission/domains';
 import type {
@@ -464,7 +464,7 @@ export function makeDeps(db: Db, opts: DepsOptions = {}): TestDeps {
     },
     gmail: () => gmailBox,
     llm: opts.llm ?? new FakeLlm([{ answer: 'x' }]),
-    sendMail: () => ({ sender, guards: [] }),
+    sendMail: () => ({ sender, guards: [], store: new InMemoryOutgoingStore() }),
     followUp: {
       async enqueueFollowUp(data, startAfter) {
         // Idempotent per application, like the real queue.

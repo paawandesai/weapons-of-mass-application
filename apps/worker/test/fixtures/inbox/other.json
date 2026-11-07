@@ -1,0 +1,14 @@
+{
+  "id": "msg-other",
+  "threadId": "thr-other",
+  "date": "2026-03-12T08:00:00Z",
+  "from": "Dana Whitcomb <recruiting@{{domain}}>",
+  "subject": "A quick question about your {{title}} application",
+  "body": "Hi Mara,\n\nCould you send us a link to your portfolio for the {{title}} role? Thanks!\n\nDana Whitcomb",
+  "classification": {
+    "classification": "other",
+    "compensation_flag": false,
+    "booking_link": null,
+    "proposed_slots": []
+  }
+}

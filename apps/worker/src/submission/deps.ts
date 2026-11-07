@@ -50,7 +50,7 @@ export interface SubmissionDeps {
   gmail(handle: TenantHandle, userId: string): GmailPort;
   clock: Clock;
   llm: StructuredLlm;
-  sendMail(handle: TenantHandle): MailDeps;
+  sendMail(handle: TenantHandle, userId: string): MailDeps;
   followUp: FollowUpQueue;
   /** Origin of the public site, for the link in the CAPTCHA email. */
   webOrigin: string;

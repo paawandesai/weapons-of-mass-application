@@ -6,9 +6,11 @@ import { requireSession, type AppEnv } from './middleware/session';
 import { applicationsRoutes } from './routes/applications';
 import { captchaRoutes } from './routes/captcha';
 import { companiesRoutes } from './routes/companies';
+import { confirmRoutes } from './routes/confirm';
 import { meRoutes } from './routes/me';
 import { profileRoutes } from './routes/profile';
 import { runsRoutes } from './routes/runs';
+import { settingsRoutes } from './routes/settings';
 import { sourcesRoutes } from './routes/sources';
 import { surveyRoutes } from './routes/survey';
 
@@ -39,8 +41,10 @@ export function createApp(opts: AppOptions = {}) {
   app.route('/api/companies', companiesRoutes);
   app.route('/api/runs', runsRoutes);
   app.route('/api/applications', applicationsRoutes);
+  app.route('/api/settings', settingsRoutes);
   // Public: the visitor holds only a single-use token, so this is outside requireSession.
   app.route('/captcha', captchaRoutes);
+  app.route('/confirm', confirmRoutes);
 
   app.notFound((c) =>
     c.req.path.startsWith('/api/')

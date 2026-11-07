@@ -1,0 +1,21 @@
+{
+  "id": "msg-compensation",
+  "threadId": "thr-compensation",
+  "date": "2026-03-13T11:00:00Z",
+  "from": "Dana Whitcomb <recruiting@{{domain}}>",
+  "subject": "Next steps for {{title}}",
+  "body": "Hi Mara,\n\nBefore we schedule, what are your salary expectations for the {{title}} role? We can talk on Monday March 30, 2026 at 11:00 AM Pacific.\n\nDana Whitcomb",
+  "classification": {
+    "classification": "interview",
+    "compensation_flag": true,
+    "booking_link": null,
+    "proposed_slots": [
+      {
+        "start": "2026-03-30T11:00:00-07:00",
+        "end": null,
+        "tz_hint": "America/Los_Angeles",
+        "ambiguous": false
+      }
+    ]
+  }
+}

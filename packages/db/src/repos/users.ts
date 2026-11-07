@@ -9,12 +9,13 @@ export interface NewUser {
   googleSub: string;
   displayName?: string | null;
   digestHour?: number;
+  timezone?: string;
   dailyTarget?: number;
 }
 
 export async function createUser(handle: TenantHandle, input: NewUser): Promise<User> {
   // tenant_id is always stamped from the handle; a caller-supplied value is discarded.
-  const { email, googleSub, displayName, digestHour, dailyTarget } = input;
+  const { email, googleSub, displayName, digestHour, timezone, dailyTarget } = input;
   const rows = await handle.run((tx) =>
     tx
       .insert(users)
@@ -23,6 +24,7 @@ export async function createUser(handle: TenantHandle, input: NewUser): Promise<
         googleSub,
         displayName,
         digestHour,
+        timezone,
         dailyTarget,
         tenantId: handle.tenantId,
       })
@@ -89,6 +91,28 @@ export async function setDailyTarget(
     tx
       .update(users)
       .set({ dailyTarget })
+      .where(and(eq(users.tenantId, handle.tenantId), eq(users.id, userId)))
+      .returning(),
+  );
+  if (!rows[0]) throw new NotFoundError('user');
+  return rows[0];
+}
+
+/** Digest hour (0-23) and IANA time zone; the caller validates both. Only given fields change. */
+export async function setNotificationSettings(
+  handle: TenantHandle,
+  userId: string,
+  settings: { digestHour?: number; timezone?: string },
+): Promise<User> {
+  const set = {
+    ...(settings.digestHour !== undefined ? { digestHour: settings.digestHour } : {}),
+    ...(settings.timezone !== undefined ? { timezone: settings.timezone } : {}),
+  };
+  if (Object.keys(set).length === 0) return getUserById(handle, userId);
+  const rows = await handle.run((tx) =>
+    tx
+      .update(users)
+      .set(set)
       .where(and(eq(users.tenantId, handle.tenantId), eq(users.id, userId)))
       .returning(),
   );

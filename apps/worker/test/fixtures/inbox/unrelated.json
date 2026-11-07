@@ -1,0 +1,14 @@
+{
+  "id": "msg-unrelated",
+  "threadId": "thr-unrelated",
+  "date": "2026-03-12T07:00:00Z",
+  "from": "Weekly Digest <news@gardenclub.example>",
+  "subject": "This week at the garden club",
+  "body": "Seed swap on Saturday. Bring cuttings.",
+  "classification": {
+    "classification": "other",
+    "compensation_flag": false,
+    "booking_link": null,
+    "proposed_slots": []
+  }
+}

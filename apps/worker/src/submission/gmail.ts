@@ -1,25 +1,26 @@
 import { getGmailClient } from '@wma/google';
 import type { TenantHandle } from '@wma/db';
+import type { SentLookup } from '@wma/shared';
 import { fromAllowedDomains } from './domains';
 import type { GmailPort, InboundMessage } from './types';
 
-interface MessagePart {
+export interface MessagePart {
   mimeType?: string | null;
   body?: { data?: string | null } | null;
   parts?: MessagePart[] | null;
 }
 
-const decode = (data: string | null | undefined) =>
+export const decode = (data: string | null | undefined) =>
   data ? Buffer.from(data, 'base64url').toString('utf8') : '';
 
-function collect(part: MessagePart | undefined, out: { text: string; html: string }) {
+export function collect(part: MessagePart | undefined, out: { text: string; html: string }) {
   if (!part) return;
   if (part.mimeType === 'text/plain') out.text += decode(part.body?.data);
   else if (part.mimeType === 'text/html') out.html += decode(part.body?.data);
   for (const p of part.parts ?? []) collect(p, out);
 }
 
-function linksIn(text: string, html: string): string[] {
+export function linksIn(text: string, html: string): string[] {
   const found = new Set<string>();
   for (const m of html.matchAll(/href="(https?:\/\/[^"]+)"/gi))
     found.add(m[1]!.replace(/&amp;/g, '&'));
@@ -27,7 +28,7 @@ function linksIn(text: string, html: string): string[] {
   return [...found];
 }
 
-const stripTags = (html: string) =>
+export const stripTags = (html: string) =>
   html
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
@@ -69,6 +70,23 @@ export function createGmailPort(handle: TenantHandle, userId: string): GmailPort
       return fromAllowedDomains(out, fromDomains).filter(
         (m) => m.receivedAt.getTime() >= after.getTime(),
       );
+    },
+  };
+}
+
+/**
+ * Finds a message the user's mailbox already sent (to this address, with this subject, since the
+ * receipt was opened): how a pending delivery receipt is resolved after a crash or a lost response.
+ */
+export function createSentLookup(handle: TenantHandle, userId: string): SentLookup {
+  return {
+    async find({ to, subject, after }) {
+      const gmail = await getGmailClient(handle, userId);
+      const clean = (v: string) => v.replace(/["\\]/g, ' ');
+      const q = `in:sent to:${clean(to.split(',')[0]!.trim())} subject:"${clean(subject)}" after:${Math.floor(after.getTime() / 1000)}`;
+      const list = await gmail.users.messages.list({ userId: 'me', q, maxResults: 1 });
+      const id = list.data.messages?.[0]?.id;
+      return id ? { messageId: id } : null;
     },
   };
 }

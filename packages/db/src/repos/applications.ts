@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
+import { nextStatus, type Classification } from '@wma/shared';
 import type { Db, TenantHandle } from '../client';
 import { applications, jobs } from '../schema';
 import type { AtsKind } from './companies';
@@ -17,6 +18,7 @@ export type ApplicationPatch = Partial<
     | 'unmetRequirements'
     | 'appliedAt'
     | 'followUpEnqueuedAt'
+    | 'followedUpAt'
     | 'confirmationSource'
     | 'lastActivityAt'
   >
@@ -210,4 +212,63 @@ export async function markFollowUpEnqueued(
       .set({ followUpEnqueuedAt: at })
       .where(and(eq(applications.tenantId, handle.tenantId), eq(applications.id, id))),
   );
+}
+
+export type AppliedTransition =
+  | { changed: false; reason: 'not_found' | 'no_change'; from: ApplicationStatus | null }
+  | { changed: true; from: ApplicationStatus; to: ApplicationStatus; closedReason: string | null };
+
+/**
+ * Moves an application along `nextStatus` atomically against its CURRENT status: the row is
+ * locked, the next status is computed from what is stored now (not from a caller's earlier
+ * snapshot), and the update is conditioned on that same status. A rejection that committed
+ * first is therefore never overwritten by a later interview or offer. Returns what changed.
+ * For a confirmation on a pending card it also records `confirmation_source = email`.
+ */
+export function applyTransition(
+  handle: TenantHandle,
+  applicationId: string,
+  classification: Classification,
+  extras: { appliedAt?: Date } = {},
+): Promise<AppliedTransition> {
+  return handle.run(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(applications)
+      .where(and(eq(applications.tenantId, handle.tenantId), eq(applications.id, applicationId)))
+      .for('update');
+    const current = rows[0];
+    if (!current) return { changed: false, reason: 'not_found', from: null } as const;
+    const change = nextStatus(current.status, classification);
+    if (!change) return { changed: false, reason: 'no_change', from: current.status } as const;
+    const updated = await tx
+      .update(applications)
+      .set({
+        status: change.status,
+        ...(change.closedReason ? { closedReason: change.closedReason } : {}),
+        ...(classification === 'confirmation' && current.status === 'pending'
+          ? {
+              confirmationSource: 'email' as const,
+              appliedAt: current.appliedAt ?? extras.appliedAt ?? new Date(),
+            }
+          : {}),
+        lastActivityAt: new Date(),
+      })
+      .where(
+        and(
+          eq(applications.tenantId, handle.tenantId),
+          eq(applications.id, applicationId),
+          eq(applications.status, current.status),
+        ),
+      )
+      .returning({ id: applications.id });
+    if (updated.length === 0)
+      return { changed: false, reason: 'no_change', from: current.status } as const;
+    return {
+      changed: true,
+      from: current.status,
+      to: change.status,
+      closedReason: change.closedReason ?? null,
+    } as const;
+  });
 }

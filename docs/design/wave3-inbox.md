@@ -1,0 +1,40 @@
+# Design brief: inbox sync, scheduling, follow-ups, notifications
+
+Purpose: read the user's Gmail for replies to applications, move cards accordingly, get interviews onto the calendar only after the user confirms a slot, send follow-ups and reminders, and never write anything about money. Read by the board, the digest and the user.
+
+Inputs: Gmail via the user's token (history.list from a stored historyId; fallback messages.list with `after:`); applications and their jobs/companies (domains from the board URL and from confirmation senders); Calendar freebusy; `users.digest_hour` (0..23) and `users.timezone` (IANA, default `America/Los_Angeles`); a clock injected in tests.
+
+Units: all stored timestamps UTC timestamptz. Slots carry an explicit offset; display converts to the user's timezone. Durations in seconds: follow-up delay 7 days, slot token expiry 7 days, reminders at T-86400 and T-3600, mail sync hourly.
+
+Rules:
+1. Each Gmail message is processed at most once: `processed_messages` unique `(tenant_id, gmail_message_id)`; the per-user `historyId` advances only after the whole batch committed.
+2. Linking is deterministic first: sender domain equals the company domain or a known ATS domain with the company name in sender/subject/body, then job title match among that user's non-closed applications; zero or several candidates -> one LLM call `inbox-link@1` with the candidate list returning `{application_id|null}`; unlinked messages are never classified and never sent to the LLM for classification.
+3. A linked message gets one `inbox-classify@1` call returning `{classification: confirmation|rejection|interview|offer|other, compensation_flag, booking_link|null, proposed_slots: [{start, end|null, tz_hint, ambiguous}]}`; prompt version stored on the thread.
+4. `nextStatus(current, classification)` is a pure function: `applied -> interviewing` on interview; `applied|interviewing -> offer` on offer; any non-closed -> `closed(rejected)` on rejection; `closed` is a sink (never leaves); `confirmation` and `other` never change status; `pending` is treated as `applied` for transitions only if the message is a confirmation (then it becomes `applied` with `confirmation_source = email`). Transitions are forward-only (no offer -> interviewing).
+5. An interview message on a `closed` application changes nothing and sets a digest flag `activity_on_closed`.
+6. `compensation_flag` true -> the thread is flagged for the digest and the agent sends NOTHING on it; slots in the same message are still offered (rule 8) and the reply template contains no money text.
+7. `booking_link` present -> digest item with the link; no slots, no reply.
+8. Proposed slots: drop `ambiguous` ones with a note; filter conflicts with Calendar freebusy (any overlap); if zero remain -> digest flag `no_free_slot`, no email; else create `interviews` (one per application thread) and `interview_slots` with single-use tokens (32 random bytes, sha256 at rest, expiry 7 days) and send the user ONE confirmation request email with one link per slot via `sendEmail`. The recruiter gets no reply at this point.
+9. `GET /confirm/:token` renders slot details and a POST button and never confirms. `POST /confirm/:token` in one transaction: token hash valid, unexpired, interview has no confirmed slot -> set `confirmed_at`, invalidate sibling tokens, enqueue `book-interview`. Reused, expired or sibling-invalidated token -> 410 "no longer open", nothing written.
+10. `book-interview` job: reply on the recruiter thread with the slot template, create the Calendar event (company, role, link to the prep plan when it exists), store `calendar_event_id`, set status `interviewing`, log `interview_booked`. If the event fails after the reply succeeded, retry event creation only; the reply is recorded and never re-sent.
+11. New times on a confirmed interview -> new slots and a new confirmation request; the existing event is untouched until the user confirms a new slot, then the old event is updated (not duplicated).
+12. Follow-up job (enqueued by submission with startAfter applied_at + 7 days): send only if status is still `applied`, no linked thread exists, `followed_up_at` is null and a contact address is known (not a no-reply); otherwise skip with the reason logged. Sends via `sendEmail`, sets `followed_up_at`.
+13. Reminders: at confirmation enqueue T-24h and T-1h with singleton keys `(interview_id, offset)`; reschedule cancels by key and re-enqueues; a reminder whose interview is no longer confirmed is a no-op.
+14. Digest: once per user per day at `digest_hour` in `timezone`, singleton `(user_id, local_date)`; assembled from `activity_log` since the last digest plus pending items (unconfirmed slots, compensation and booking-link threads, pending CAPTCHAs, blocked sends, interviews in the next 7 days). A day with nothing still sends a short digest. Changing the hour yields at most one digest that day.
+15. Outgoing guard: inside `sendEmail` (packages/shared mail `guards`), regex `\$|\bsalary\b|\bcompensation\b|\bequity\b` case-insensitive over subject and body; a block stores `outgoing_messages` with `blocked = true`, logs `send_blocked`, returns a typed result, and never calls Gmail. User-facing templates scrub employer-quoted text to `[omitted]` BEFORE the guard so a blocked user notification is a bug.
+16. Every outgoing message (sent or blocked) is stored in `outgoing_messages` with application id, kind, to, subject, body, sent_at or blocked reason.
+17. Invalid mailbox credentials (401/invalid_grant) -> `markRevoked`, log `mailbox_reauth_needed`, high-water mark unchanged, no retry storm (job returns without throwing).
+
+Edge cases: a thread that matches two applications at the same company (two roles) goes to the LLM with both candidates. A recruiter message from a personal gmail.com address cannot domain-match; title match plus LLM decides. An offer email with a dollar figure is classified `offer` with `compensation_flag` true; status moves to offer, nothing is sent. "equitable" and "$" inside a URL are not money text: word boundaries for words, and a literal `$` always blocks. A slot in the past is dropped with a note.
+
+Time: freebusy and slot comparison in UTC; local date for the digest singleton computed in the user's timezone; tokens expire by UTC timestamp compared on the database clock.
+
+Failure handling: per message (a failing message is recorded as `processing_failed` and skipped; the batch commits the others; high-water mark advances past it); per job for follow-ups, reminders, digest; Gmail/Calendar API errors other than auth are retried by pg-boss up to 5 times with backoff.
+
+Consistency: thread link, classification result and status transition commit together per message; slot creation and the confirmation email send are two steps where the email is sent after commit and `confirmation_email_sent_at` recorded (a crash between leaves slots without email, repaired by the hourly sync re-sending once).
+
+Outputs: `email_threads`, `processed_messages`, `interviews`, `interview_slots`, `outgoing_messages`; activity entries `thread_linked`, `status_changed`, `slots_offered`, `slot_confirmed`, `interview_booked`, `follow_up_sent|follow_up_skipped`, `reminder_sent`, `digest_sent`, `send_blocked`, `mailbox_reauth_needed`; routes `GET/POST /confirm/:token`, `GET/PUT /api/settings/notifications` (digest_hour, timezone).
+
+Tests: one per rule 1..17; exhaustive `nextStatus` table over every (status, classification); guard cases for `$`, each word in mixed case, `equitable`, a URL with `$`, clean text; two-tenant isolation in linking; GET never confirms, POST once, sibling invalidated, reuse 410, foreign-tenant token 410; reply-then-event-failure retries event only; reschedule leaves the event until confirmed; digest with no activity; hour change yields one digest; CAPTCHA email goes through the guarded sender immediately.
+
+Out of scope: Gmail push, .ics invites (surfaced like booking links), free-form LLM replies to recruiters, SMS, negotiation.

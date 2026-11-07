@@ -1,0 +1,14 @@
+{
+  "id": "msg-rejection",
+  "threadId": "thr-rejection",
+  "date": "2026-03-14T16:02:00Z",
+  "from": "Dana Whitcomb <recruiting@{{domain}}>",
+  "subject": "Your application for {{title}}",
+  "body": "Hi Mara,\n\nThank you for your interest in {{company}}. After careful consideration we have decided not to move forward with your application for {{title}}.\n\nWe wish you the best in your search.\n\nDana Whitcomb",
+  "classification": {
+    "classification": "rejection",
+    "compensation_flag": false,
+    "booking_link": null,
+    "proposed_slots": []
+  }
+}

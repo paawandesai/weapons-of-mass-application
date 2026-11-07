@@ -33,6 +33,15 @@ export interface RosterEntry {
   runHour: number;
 }
 
+export interface DigestRosterEntry {
+  tenantId: string;
+  userId: string;
+  /** Local hour 0-23 in `timezone`. */
+  digestHour: number;
+  /** IANA zone. */
+  timezone: string;
+}
+
 export interface Db {
   readonly pool: pg.Pool;
   forTenant(tenantId: string): TenantHandle;
@@ -44,6 +53,10 @@ export interface Db {
   findUserIdentity(googleSub: string): Promise<{ tenantId: string; userId: string } | null>;
   /** Pre-tenant lookup of a CAPTCHA request by the sha256 of its token (the public /captcha page). */
   resolveCaptchaToken(tokenHash: string): Promise<{ tenantId: string; requestId: string } | null>;
+  /** Pre-tenant lookup of an interview slot by the sha256 of its token (the public /confirm page). */
+  resolveSlotToken(tokenHash: string): Promise<{ tenantId: string; slotId: string } | null>;
+  /** Digest scheduler enumeration: every user with an approved profile, their hour and zone. */
+  digestRoster(): Promise<DigestRosterEntry[]>;
   /** Pre-tenant check whether a user with this email already exists (account conflict). */
   emailExists(email: string): Promise<boolean>;
   /**
@@ -127,6 +140,28 @@ export function createDb(url: string): Db {
       );
       const row = r.rows[0];
       return row ? { tenantId: row.tenant_id, requestId: row.request_id } : null;
+    },
+    async resolveSlotToken(tokenHash) {
+      const r = await pool.query<{ tenant_id: string; slot_id: string }>(
+        'select * from wma_resolve_slot_token($1)',
+        [tokenHash],
+      );
+      const row = r.rows[0];
+      return row ? { tenantId: row.tenant_id, slotId: row.slot_id } : null;
+    },
+    async digestRoster() {
+      const r = await pool.query<{
+        tenant_id: string;
+        user_id: string;
+        digest_hour: number;
+        timezone: string;
+      }>('select * from wma_digest_roster()');
+      return r.rows.map((x) => ({
+        tenantId: x.tenant_id,
+        userId: x.user_id,
+        digestHour: x.digest_hour,
+        timezone: x.timezone,
+      }));
     },
     async emailExists(email) {
       const r = await pool.query<{ exists: boolean }>('select wma_email_exists($1) as exists', [

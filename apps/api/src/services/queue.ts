@@ -22,7 +22,7 @@ export interface BuildQueue {
 let boss: Promise<PgBoss> | null = null;
 
 /** A producer-only pg-boss client, started on first use (the worker owns scheduling/maintenance). */
-function getBoss(): Promise<PgBoss> {
+export function getBoss(): Promise<PgBoss> {
   boss ??= (async () => {
     const b = new PgBoss({
       connectionString: process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL,
