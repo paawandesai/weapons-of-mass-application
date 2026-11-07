@@ -458,6 +458,77 @@ export const SCAN_SCRIPT = String.raw`(opts) => {
     return n;
   };
 
+  // ---- descriptions (rule 22) --------------------------------------------------------------
+  // The text that explains a question: aria-describedby targets; else a sibling or descendant of
+  // the box whose class says description, help or hint; else the box text between the label and the
+  // control. Never the label itself or an option label.
+  const DESC_CLASS = /description|help|hint/i;
+  const DESC_MAX = 1000;
+  function descriptionOf(members, memberSet, box, labelEl, finalLabel, optionLabels) {
+    const first = members[0];
+    const banned = new Set([low(finalLabel)]);
+    (optionLabels || []).forEach((o) => banned.add(low(o)));
+    const pieces = [];
+    const take = (t) => {
+      t = norm(t);
+      if (!t || banned.has(low(t))) return;
+      if (pieces.some((p) => low(p).indexOf(low(t)) >= 0)) return;
+      for (let i = pieces.length - 1; i >= 0; i--) if (low(t).indexOf(low(pieces[i])) >= 0) pieces.splice(i, 1);
+      pieces.push(t);
+    };
+    const isLabelish = (el) => !!labelEl && (labelEl === el || labelEl.contains(el) || el.contains(labelEl));
+    const holdsControl = (el) => controls.some((x) => el.contains(x));
+    // 1. aria-describedby (error and placeholder targets are not descriptions)
+    members.forEach((m) => {
+      String(attr(m, 'aria-describedby') || '')
+        .split(/\s+/)
+        .forEach((id) => {
+          const t = id ? doc.getElementById(id) : null;
+          if (!t || isLabelish(t) || holdsControl(t)) return;
+          if (/(-error|-placeholder)$/i.test(id) || attr(t, 'role') === 'alert' || attr(t, 'aria-live')) return;
+          take(textOf(t, { noButtons: true }));
+        });
+    });
+    // 2. a described element near the box
+    if (!pieces.length) {
+      let a = box;
+      for (let lvl = 0; a && lvl < 3 && root.contains(a) && a !== root; lvl++, a = a.parentElement) {
+        if (hasForeign(a, memberSet)) break;
+        const taken = [];
+        each(a.querySelectorAll('[class]'), (el) => {
+          if (!DESC_CLASS.test(klass(el)) || isLabelish(el) || holdsControl(el) || el.hidden) return;
+          if (taken.some((t) => t.contains(el))) return;
+          if (el.closest('label,button,[role=listbox],[role=option]')) return;
+          if (el.parentElement && el.parentElement.closest('label') && owned.has(el.parentElement.closest('label'))) return;
+          taken.push(el);
+          take(textOf(el, { noButtons: true }));
+        });
+        if (pieces.length) break;
+      }
+    }
+    // 3. the box text between the label and the control
+    if (!pieces.length && labelEl && box && box.contains(labelEl) && !hasForeign(box, memberSet)) {
+      const tw = doc.createTreeWalker(box, 4);
+      let n;
+      let acc = '';
+      while ((n = tw.nextNode())) {
+        if (!n.nodeValue || !n.nodeValue.trim()) continue;
+        if (labelEl.contains(n) || !(labelEl.compareDocumentPosition(n) & 4)) continue;
+        if (!(first.compareDocumentPosition(n) & 2)) continue;
+        let bad = false;
+        for (let p = n.parentElement; p && p !== box; p = p.parentElement) {
+          if (excludedEl(p) || p.tagName === 'LABEL' || holdsControl(p)) {
+            bad = true;
+            break;
+          }
+        }
+        if (!bad) acc += ' ' + n.nodeValue;
+      }
+      take(acc);
+    }
+    return pieces.join(' ').slice(0, DESC_MAX).trim();
+  }
+
   const questions = [];
   const qFirst = [];
   const qBox = [];
@@ -578,6 +649,7 @@ export const SCAN_SCRIPT = String.raw`(opts) => {
       if (twin.length) required = true;
     }
 
+    const description = descriptionOf(members, memberSet, box, labelEl, finalLabel, optionLabels);
     const section = sectionOf(box);
     const hintBits = [section.text, section.classes];
     members.forEach((m) => hintBits.push(attr(m, 'name'), m.id));
@@ -625,6 +697,7 @@ export const SCAN_SCRIPT = String.raw`(opts) => {
       isResume: first === resumeInput,
     };
     if (largeList) q.largeList = true;
+    if (description) q.description = description;
     if (kind === 'combobox' && first.tagName !== 'INPUT') {
       const inner = first.querySelector('input');
       if (inner) q.typeRef = stamp(inner);

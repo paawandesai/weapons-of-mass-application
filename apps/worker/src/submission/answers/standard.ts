@@ -185,7 +185,76 @@ function matchOption(text: string, f: FieldDescriptor): string | null {
 
 type Resolved = { value: string | boolean } | { unexpressible: true } | null;
 
-function valueForField(profile: ProfileDocument, key: StandardKey, f: FieldDescriptor): Resolved {
+const NUMBER_WORDS: Record<string, number> = {
+  a: 1,
+  an: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+};
+const DURATION =
+  /\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*(day|week|month)s?\b/;
+
+function addDuration(from: Date, m: RegExpExecArray): Date {
+  const n = /^\d+$/.test(m[1]!) ? Number(m[1]) : (NUMBER_WORDS[m[1]!] ?? 0);
+  const d = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+  if (m[2] === 'month') d.setUTCMonth(d.getUTCMonth() + n);
+  else d.setUTCDate(d.getUTCDate() + n * (m[2] === 'week' ? 7 : 1));
+  return d;
+}
+
+function addDays(from: Date, days: number): Date {
+  const d = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d;
+}
+
+/**
+ * Rule 23b. The ISO date a date-kind start question is answered with; never null. The profile's
+ * `earliest_start_date` when set; else read from the `start_date` text ("within N days/weeks/months"
+ * is today + N, "immediately"/"asap"/"now" is today + 14 days, "N weeks/months notice" is today +
+ * that); else from `notice_period`; else today + 30 days. A Saturday or Sunday rolls to Monday.
+ */
+export function deriveStartDate(p: ProfileDocument, today: Date): string {
+  const set = p.standard_answers.earliest_start_date?.trim();
+  if (set) return set;
+  const text = (p.standard_answers.start_date ?? '').toLowerCase();
+  const notice = (p.standard_answers.notice_period ?? '').toLowerCase();
+  let d: Date | null = null;
+  const within =
+    /\bwithin\s+(?:the\s+next\s+)?(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*(day|week|month)s?\b/.exec(
+      text,
+    );
+  if (within) d = addDuration(today, within);
+  else if (/\b(immediate\w*|asap|as soon as possible|now|right away)\b/.test(text))
+    d = addDays(today, 14);
+  else {
+    const noticeInText = /notice/.test(text) ? DURATION.exec(text) : null;
+    const fromNotice = noticeInText ?? DURATION.exec(notice);
+    if (fromNotice) d = addDuration(today, fromNotice);
+  }
+  d ??= addDays(today, 30);
+  const dow = d.getUTCDay();
+  if (dow === 6) d = addDays(d, 2);
+  else if (dow === 0) d = addDays(d, 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function valueForField(
+  profile: ProfileDocument,
+  key: StandardKey,
+  f: FieldDescriptor,
+  today: Date,
+): Resolved {
   if (key === 'work_authorization') {
     const text = profileValue(profile, key, f.label);
     if (typeof text !== 'string') return null;
@@ -201,6 +270,8 @@ function valueForField(profile: ProfileDocument, key: StandardKey, f: FieldDescr
     }
     return { value: text };
   }
+  // Rule 23b: a date picker always gets a date; a text box keeps the start-date text.
+  if (key === 'start_date' && f.type === 'date') return { value: deriveStartDate(profile, today) };
   const value = profileValue(profile, key, f.label);
   if (value === null) return null;
   if (typeof value === 'boolean') {
@@ -220,14 +291,14 @@ function valueForField(profile: ProfileDocument, key: StandardKey, f: FieldDescr
  * optional one resolves to a blank.
  */
 export function resolveStandardFields(
-  ctx: Pick<SubmissionContext, 'profile'>,
+  ctx: Pick<SubmissionContext, 'profile'> & Partial<Pick<SubmissionContext, 'clock'>>,
   fields: Array<FieldDescriptor & { standardKey?: StandardKey }>,
 ): AnswerResolution[] {
   const out: AnswerResolution[] = [];
   for (const f of fields) {
     if (f.classification !== 'standard') continue;
     const base = { fieldId: f.id, question: f.label };
-    const key = f.standardKey ?? standardKeyFor(f.label, f.type);
+    const key = f.standardKey ?? standardKeyFor(f.label, f.type, f.description);
     if (!key) {
       out.push(
         f.required
@@ -236,7 +307,7 @@ export function resolveStandardFields(
       );
       continue;
     }
-    const resolved = valueForField(ctx.profile, key, f);
+    const resolved = valueForField(ctx.profile, key, f, ctx.clock?.now() ?? new Date());
     if (resolved === null) {
       out.push(
         f.required

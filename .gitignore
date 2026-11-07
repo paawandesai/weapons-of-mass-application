@@ -21,3 +21,6 @@ apps/web/e2e/.auth/
 # DeepEval local run cache and Python bytecode
 .deepeval/
 __pycache__/
+
+# Worktrees created by Claude sessions
+.claude/worktrees/

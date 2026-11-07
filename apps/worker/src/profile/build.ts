@@ -139,6 +139,7 @@ async function carriedSections(
         work_authorization: null,
         visa_sponsorship_required: null,
         start_date: null,
+        earliest_start_date: null,
         notice_period: null,
         reasons_for_change: null,
       },

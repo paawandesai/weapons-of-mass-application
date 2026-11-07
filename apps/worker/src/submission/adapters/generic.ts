@@ -58,6 +58,8 @@ export interface Question {
   note?: 'unknown-control';
   /** Set by option reading: more than LARGE_LIST options, so `options` is left out. */
   largeList?: boolean;
+  /** Rule 22: the text that explains the question (help text, instructions), bounded to 1,000 chars. */
+  description?: string;
 }
 
 export interface PageScan {
@@ -245,6 +247,7 @@ export function describe(q: Question): FieldDescriptor {
     classification: classifyField({ label: q.label, type, hint: q.context }),
   };
   if (q.options?.length && !q.largeList) d.options = q.options;
+  if (q.description) d.description = q.description;
   if (q.largeList) d.hint = 'large-list';
   else if (q.note) d.hint = q.note;
   return d;

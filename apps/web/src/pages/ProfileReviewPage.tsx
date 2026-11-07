@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { ApiError, api, errorMessage, formatTime } from '../api';
 import { getAt, sameValue, setAt } from '../profilePaths';
 
-type Kind = 'text' | 'area' | 'month' | 'lines' | 'tri';
+type Kind = 'text' | 'area' | 'month' | 'lines' | 'tri' | 'date';
 interface Spec {
   key: string;
   label: string;
@@ -58,7 +58,8 @@ const EDUCATION: Spec[] = [
 const STANDARD: Spec[] = [
   { key: 'work_authorization', label: 'Work authorization' },
   { key: 'visa_sponsorship_required', label: 'Visa sponsorship required', kind: 'tri' },
-  { key: 'start_date', label: 'Earliest start date' },
+  { key: 'start_date', label: 'Start date (as text)' },
+  { key: 'earliest_start_date', label: 'Earliest start date', kind: 'date' },
   { key: 'notice_period', label: 'Notice period' },
   { key: 'reasons_for_change', label: 'Reasons for change', kind: 'area' },
 ];
@@ -109,6 +110,15 @@ function Field({ doc, base, spec, onChange }: FieldProps) {
         rows={3}
         value={((value as string[] | undefined) ?? []).join('\n')}
         onChange={(e) => onChange(path, e.target.value === '' ? [] : e.target.value.split('\n'))}
+      />
+    );
+  } else if (kind === 'date') {
+    control = (
+      <input
+        id={id}
+        type="date"
+        value={(value as string | null) ?? ''}
+        onChange={(e) => onChange(path, e.target.value === '' ? null : e.target.value)}
       />
     );
   } else if (kind === 'tri') {

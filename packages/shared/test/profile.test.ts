@@ -50,6 +50,21 @@ describe('profileDocumentSchema', () => {
     expect(profileDocumentSchema.safeParse(doc).success).toBe(true);
   });
 
+  it('validates earliest_start_date as a real ISO date or null', () => {
+    const doc = clone();
+    for (const ok of ['2026-12-01', null]) {
+      doc.standard_answers.earliest_start_date = ok;
+      expect(profileDocumentSchema.safeParse(doc).success, String(ok)).toBe(true);
+    }
+    for (const bad of ['2026-02-30', '2026-13-01', '2026-1-5', '12/01/2026', 'soon', '']) {
+      doc.standard_answers.earliest_start_date = bad;
+      expect(profileDocumentSchema.safeParse(doc).success, bad).toBe(false);
+    }
+    // Profiles stored before the field existed have no key: it defaults to null.
+    delete doc.standard_answers.earliest_start_date;
+    expect(profileDocumentSchema.parse(doc).standard_answers.earliest_start_date).toBeNull();
+  });
+
   it('defaults the daily target to 12 and bounds it to 1-30', () => {
     const doc = clone();
     delete doc.survey.daily_target;

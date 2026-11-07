@@ -11,7 +11,7 @@ export {
   type ClassifiedField,
   type StandardKey,
 } from './classify';
-export { resolveStandardFields, profileValue } from './standard';
+export { resolveStandardFields, profileValue, deriveStartDate } from './standard';
 export { resolveFreeText, maxChars, DEFAULT_MAX_ANSWER_CHARS } from './freetext';
 
 /** Name of the stored resume file shown as the resolved value of a resume field. */

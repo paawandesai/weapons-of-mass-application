@@ -28,6 +28,7 @@ export const PROFILE: ProfileDocument = {
     work_authorization: 'Authorized to work in the EU',
     visa_sponsorship_required: false,
     start_date: '2026-12-01',
+    earliest_start_date: '2026-12-01',
     notice_period: '30 days',
     reasons_for_change: 'Looking for a larger platform scope.',
   },

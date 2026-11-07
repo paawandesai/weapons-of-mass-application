@@ -22,6 +22,8 @@ export interface FieldDescriptor {
   maxLength: number | null;
   classification: FieldClassification;
   options?: string[];
+  /** The question's help text or instructions, when the page has any (at most 1,000 chars). */
+  description?: string;
   /**
    * Set when the page layer could not describe the control fully: `large-list` (a combobox with
    * more than 60 options, `options` omitted) or `unknown-control` (read as `text`).

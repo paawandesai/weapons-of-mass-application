@@ -12,8 +12,13 @@ import {
   withFreshScan,
   type Question,
 } from '../../src/submission/adapters/generic';
-import { standardKeyFor } from '../../src/submission/answers';
+import {
+  classifyFields,
+  resolveStandardFields,
+  standardKeyFor,
+} from '../../src/submission/answers';
 import type { FieldDescriptor, FormAdapter } from '../../src/submission/types';
+import { PROFILE } from '../fixtures/submission';
 
 const FORMS = join(dirname(fileURLToPath(import.meta.url)), '../fixtures/forms');
 const urlOf = (dir: string, file: string) => pathToFileURL(join(FORMS, dir, file)).toString();
@@ -131,11 +136,54 @@ describe('real captures', () => {
     });
   }, 60_000);
 
+  it('greenhouse: the AI policy question carries its description (rule 22)', async () => {
+    await withPage(async (page) => {
+      await open(page, 'greenhouse-jobboards.html', greenhouseAdapter, 'real');
+      const fields = await greenhouseAdapter.fields(page);
+      const policy = byLabel(fields, 'AI Policy for Application');
+      expect(policy.description).toMatch(/^We believe that AI will have a transformative impact/);
+      expect(policy.description).toMatch(/confirm your understanding by selecting .Yes\..$/);
+      expect(policy.description).not.toContain('AI Policy for Application');
+      expect(byLabel(fields, '(Optional) Personal Preferences').description).toBe(
+        'How do you pronounce your name?',
+      );
+      // No placeholder or error text leaks in as a description.
+      expect(byLabel(fields, 'Country').description).toBeUndefined();
+      expect(fields.every((f) => (f.description ?? '').length <= 1000)).toBe(true);
+      // Rule 24b: its description makes it an acknowledgement, answered Yes.
+      const [classified] = await classifyFields([policy]);
+      expect(classified).toMatchObject({ classification: 'standard', standardKey: 'consent' });
+      expect(resolveStandardFields({ profile: PROFILE }, [classified!])[0]).toMatchObject({
+        status: 'filled',
+        value: 'Yes',
+      });
+    });
+  }, 60_000);
+
+  it('ashby: "When can you start a new role?" is a date question the answer step reads as start_date (rule 23)', async () => {
+    await withPage(async (page) => {
+      await open(page, 'ashby.html', ashbyAdapter, 'real');
+      const fields = await ashbyAdapter.fields(page);
+      const start = byLabel(fields, 'When can you start a new role?');
+      expect(start.type).toBe('date');
+      const [classified] = await classifyFields([start]);
+      expect(classified).toMatchObject({ classification: 'standard', standardKey: 'start_date' });
+    });
+  }, 60_000);
+
   it('ashby (OpenAI): 30 controls -> 16 questions incl. 3 yes/no, 3 self-identification radio groups, 2 consent checkboxes', async () => {
     await withPage(async (page) => {
       await open(page, 'ashby.html', ashbyAdapter, 'real');
       expect((await scanPage(page)).controls).toBe(30);
       const fields = await ashbyAdapter.fields(page);
+      expect(
+        byLabel(
+          fields,
+          'Will you now or in the future require sponsorship for employment visa status in this country?',
+        ).description,
+      ).toBe(
+        'We may provide immigration and sponsorship support to new employees based on their unique circumstances.',
+      );
       expect(rows(fields)).toEqual([
         ['Legal Name', 'text', true, 'standard'],
         ['Preferred Name (if applicable)', 'text', false, 'free-text'],
@@ -359,6 +407,34 @@ describe('control kinds', () => {
       expect(await page.locator('#start').inputValue()).toBe('15/03/2026');
       expect(await page.locator('#picker').isVisible()).toBe(false);
       expect(await page.locator('#native').inputValue()).toBe('2027-03-04');
+    });
+  }, 60_000);
+
+  it('a date picker without a format hint takes the ISO value as MM/DD/YYYY, picker closed', async () => {
+    await withPage(async (page) => {
+      await open(page, 'date-nofmt.html');
+      const fields = await bare.fields(page);
+      const start = byLabel(fields, 'Earliest start');
+      expect(start.type).toBe('date');
+      await bare.fill(page, { [start.id]: '2026-12-01' });
+      expect(await page.locator('#start').inputValue()).toBe('12/01/2026');
+      expect(await page.locator('#picker').isVisible()).toBe(false);
+    });
+  }, 60_000);
+
+  it('question descriptions: aria-describedby, hint siblings, in-box text; never the label or options (rule 22)', async () => {
+    await withPage(async (page) => {
+      await open(page, 'described.html');
+      const fields = await bare.fields(page);
+      expect(byLabel(fields, 'AI policy').description).toBe(
+        'Please review our guidelines and confirm by typing "Yes".',
+      );
+      expect(byLabel(fields, 'Why us?').description).toBe('Two or three sentences are plenty.');
+      expect(byLabel(fields, 'Plain question').description).toBeUndefined();
+      expect(byLabel(fields, 'Long note').description).toHaveLength(1000);
+      const remote = byLabel(fields, 'Remote?');
+      expect(remote.description).toBe('Tell us where you would work from.');
+      expect(remote.options).toEqual(['Yes', 'No']);
     });
   }, 60_000);
 

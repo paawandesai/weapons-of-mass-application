@@ -4,6 +4,7 @@ import { FakeLlm } from '@wma/llm';
 import { describe, expect, it } from 'vitest';
 import {
   classifyFields,
+  deriveStartDate,
   firstBlocker,
   resolveAnswers,
   resolveFreeText,
@@ -237,6 +238,125 @@ describe('resolveStandardFields (task 3.2)', () => {
     });
   });
 
+  describe('start date (rule 23b)', () => {
+    const start = (over: Partial<FieldDescriptor> = {}) =>
+      field({ label: 'When can you start a new role?', classification: 'standard', ...over });
+    const withStart = (earliest: string | null, text: string | null, notice: string | null) => ({
+      ...PROFILE,
+      standard_answers: {
+        ...PROFILE.standard_answers,
+        earliest_start_date: earliest,
+        start_date: text,
+        notice_period: notice,
+      },
+    });
+    const MON = new Date('2026-11-09T10:00:00Z');
+    const derive = (text: string | null, notice: string | null, today = MON) =>
+      deriveStartDate(withStart(null, text, notice), today);
+
+    it('a date question takes the ISO earliest start date, not the text', () => {
+      const [r] = resolveStandardFields({ profile: withStart('2027-01-15', 'asap', null) }, [
+        start({ type: 'date', required: true }),
+      ]);
+      expect(r).toMatchObject({ status: 'filled', value: '2027-01-15', source: 'profile' });
+    });
+
+    it('a text question keeps the start_date text', () => {
+      const [r] = resolveStandardFields(
+        { profile: withStart('2027-01-15', 'Within 30 days', null) },
+        [start()],
+      );
+      expect(r).toMatchObject({ status: 'filled', value: 'Within 30 days' });
+    });
+
+    it('derives from "within N days/weeks/months" text', () => {
+      expect(derive('Within 10 days', null)).toBe('2026-11-19');
+      expect(derive('within 2 weeks', '30 days')).toBe('2026-11-23');
+      expect(derive('Within a month', null)).toBe('2026-12-09');
+    });
+
+    it('immediately, asap and now are today + 14 days', () => {
+      for (const t of ['Immediately', 'ASAP', 'available now']) {
+        expect(derive(t, null), t).toBe('2026-11-23');
+      }
+    });
+
+    it('reads "N weeks/months notice" in the text, else the notice period', () => {
+      expect(derive('6 weeks notice', null)).toBe('2026-12-21');
+      expect(derive('after my notice period', '3 months')).toBe('2027-02-09');
+      expect(derive(null, '1 month')).toBe('2026-12-09');
+      expect(derive('Flexible', '2 weeks')).toBe('2026-11-23');
+    });
+
+    it('falls back to today + 30 days', () => {
+      expect(derive(null, null)).toBe('2026-12-09');
+      expect(derive('Flexible', 'to be agreed')).toBe('2026-12-09');
+    });
+
+    it('rolls a weekend forward to Monday', () => {
+      // Fri 13 Nov + 1 day = Sat 14 -> Mon 16; Sat 14 Nov + 1 day = Sun 15 -> Mon 16.
+      expect(derive('within 1 day', null, new Date('2026-11-13T09:00:00Z'))).toBe('2026-11-16');
+      expect(derive('within 1 day', null, new Date('2026-11-14T09:00:00Z'))).toBe('2026-11-16');
+      expect(derive('within 2 days', null, new Date('2026-11-13T09:00:00Z'))).toBe('2026-11-16');
+    });
+
+    it('never parks: a required date question with nothing in the profile resolves, using the clock', () => {
+      const out = resolveStandardFields(
+        {
+          profile: withStart(null, null, null),
+          clock: { now: () => MON } as never,
+        },
+        [start({ type: 'date', required: true })],
+      );
+      expect(out[0]).toMatchObject({ status: 'filled', value: '2026-12-09', source: 'profile' });
+      expect(firstBlocker(out)).toBeNull();
+    });
+
+    it('records the derived date in form_answers like any answer', () => {
+      const f = start({ type: 'date', required: true });
+      const out = resolveStandardFields(
+        { profile: withStart(null, 'asap', null), clock: { now: () => MON } as never },
+        [f],
+      );
+      expect(toFormAnswers(out)).toEqual({ [f.label]: '2026-11-23' });
+    });
+  });
+
+  describe('AI policy consent (rule 24b)', () => {
+    it('a label asking to confirm the AI guidelines is consent', () => {
+      expect(standardKeyFor('Please confirm you have read our AI guidelines', 'checkbox')).toBe(
+        'consent',
+      );
+      expect(standardKeyFor('I understand the AI partnership guidelines', 'checkbox')).toBe(
+        'consent',
+      );
+    });
+
+    it('the description counts: a bare label with a confirming description is consent -> Yes', async () => {
+      const f = field({
+        label: 'AI Policy for Application',
+        type: 'select',
+        options: ['Yes', 'No'],
+        required: true,
+        description:
+          'We invite you to review our AI partnership guidelines for candidates and confirm your understanding by selecting "Yes."',
+      });
+      const [c] = await classifyFields([f]);
+      expect(c).toMatchObject({ classification: 'standard', standardKey: 'consent' });
+      expect(resolveStandardFields({ profile: PROFILE }, [c!])[0]).toMatchObject({
+        status: 'filled',
+        value: 'Yes',
+      });
+    });
+
+    it('does not fire for AI mentions that do not ask for confirmation, or on a textarea', () => {
+      expect(standardKeyFor('Why do you want to work on AI?', 'text')).toBeNull();
+      expect(
+        standardKeyFor('Describe your AI usage', 'textarea', 'Please review our AI policy'),
+      ).toBeNull();
+    });
+  });
+
   it('makes no model call', () => {
     const llm = new FakeLlm([{}]);
     resolveStandardFields({ profile: PROFILE, llm } as never, fields());
@@ -254,6 +374,17 @@ const UNANSWERABLE = { answer: '', grounded: true, unanswerable: true, ungrounde
 
 describe('resolveFreeText (task 3.3, 3.4, rule 8)', () => {
   const run = (llm: FakeLlm, f: FieldDescriptor) => resolveFreeText(makeCtx(llm), f);
+
+  it('puts the question description in the <question> JSON only when there is one (rule 22)', async () => {
+    const llm = scripted({
+      'answer-form-question/v1': [grounded('Yes'), grounded('Yes')],
+    });
+    await run(llm, field({ label: 'AI Policy', description: 'Confirm by selecting "Yes".' }));
+    await run(llm, field({ label: 'Plain' }));
+    const [withDesc, without] = callsTo(llm, 'answer-form-question/v1');
+    expect(withDesc?.user).toContain('"description":"Confirm by selecting \\"Yes\\"."');
+    expect(without?.user).toContain('"max_length_chars":1200}');
+  });
 
   it('returns a grounded answer and tells the model the 500 character cap', async () => {
     const llm = scripted({

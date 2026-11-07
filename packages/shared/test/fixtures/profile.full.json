@@ -78,6 +78,7 @@
     "work_authorization": "Authorized to work in the EU",
     "visa_sponsorship_required": false,
     "start_date": "Within 30 days",
+    "earliest_start_date": "2026-12-01",
     "notice_period": "30 days",
     "reasons_for_change": "Looking for broader platform ownership"
   },

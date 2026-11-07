@@ -69,6 +69,13 @@ const CONSENT_SUBJECT =
 const CONSENT = new RegExp(`^(?=.*\\b${CONSENT_VERB}\\b)(?=.*${CONSENT_SUBJECT})`);
 const CONSENT_TYPES: ReadonlySet<string> = new Set(['checkbox', 'radio', 'select']);
 
+// Rule 24b: a label or description that asks the candidate to review, read, understand or confirm
+// an AI policy or AI guidelines is an acknowledgement too (Anthropic's "AI Policy for Application").
+// The description is part of the match; an options-less dropdown is read as `text`, so text counts.
+const AI_POLICY =
+  /(?=.*\b(?:review\w*|read|understand\w*|confirm\w*|acknowledg\w*|agree\w*)\b)(?=.*\b(?:ai|artificial intelligence)\b[^.?]{0,40}\b(?:policy|policies|guidelines?)\b)/;
+const AI_POLICY_TYPES: ReadonlySet<string> = new Set(['checkbox', 'radio', 'select', 'text']);
+
 // Relocation willingness: a relocation word with a willingness word, or a bare "Relocation?" label.
 // Assistance / package / cost questions are not willingness and fall to the remaining rules.
 const RELOCATION_WILLINGNESS = new RegExp(
@@ -119,8 +126,15 @@ const FREE_TEXT =
   /\b(why|describe|tell us|tell me|explain|what (interests|excites|motivates|attracts)|how did you (hear|find)|cover letter|additional information|anything else|share|experience (with|in)|have you (ever )?(worked|used|built)|years of|what is your (favorite|biggest|greatest))\b/;
 
 /** Standard-field key for a label, or null (rules only; no LLM). */
-export function standardKeyFor(label: string, type?: string): StandardKey | null {
+export function standardKeyFor(label: string, type?: string, description = ''): StandardKey | null {
   const l = norm(label);
+  if (
+    (type === undefined || AI_POLICY_TYPES.has(type)) &&
+    AI_POLICY.test(`${l} ${norm(description)}`) &&
+    !SELF_ID.test(l)
+  ) {
+    return 'consent';
+  }
   for (const [key, re] of STANDARD_RULES) {
     // Consent is an acknowledgement control; a text box is never one. Without a type (label-only
     // callers) the label alone decides.
@@ -137,7 +151,7 @@ interface RuleVerdict {
 
 /** Rule-based verdict, or null when no rule recognises the field. */
 export function classifyByRules(
-  f: Pick<FieldDescriptor, 'label' | 'type' | 'options'>,
+  f: Pick<FieldDescriptor, 'label' | 'type' | 'options' | 'description'>,
 ): RuleVerdict | null {
   const l = norm(f.label);
   if (SELF_ID.test(l)) return { classification: 'self-identification' };
@@ -149,7 +163,7 @@ export function classifyByRules(
       ? { classification: 'resume' }
       : { classification: 'free-text' };
   }
-  const key = standardKeyFor(f.label, f.type);
+  const key = standardKeyFor(f.label, f.type, f.description);
   if (key) return { classification: 'standard', standardKey: key };
   if (FREE_TEXT.test(l) || f.type === 'textarea') return { classification: 'free-text' };
   return null;

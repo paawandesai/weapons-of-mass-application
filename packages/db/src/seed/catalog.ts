@@ -272,6 +272,7 @@ export const DEMO_PROFILE: ProfileDocument = {
     work_authorization: 'Authorized to work in the United States',
     visa_sponsorship_required: false,
     start_date: 'Within 30 days',
+    earliest_start_date: '2026-12-01',
     notice_period: '2 weeks',
     reasons_for_change: 'Looking for broader platform ownership',
   },

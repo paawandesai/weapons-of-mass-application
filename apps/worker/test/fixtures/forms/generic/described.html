@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Questions with descriptions</title>
+  </head>
+  <body>
+    <form id="app">
+      <div class="entry">
+        <label for="policy">AI policy</label>
+        <input id="policy" type="text" aria-describedby="policy-note policy-error" />
+        <div id="policy-note">Please review our guidelines and confirm by typing "Yes".</div>
+        <div id="policy-error" role="alert"></div>
+      </div>
+      <div class="entry">
+        <label for="why">Why us?</label>
+        <textarea id="why"></textarea>
+        <p class="field-hint">Two or three sentences are plenty.</p>
+      </div>
+      <div class="entry">
+        <label for="plain">Plain question</label>
+        <input id="plain" type="text" />
+      </div>
+      <div class="entry">
+        <label for="long">Long note</label>
+        <input id="long" type="text" aria-describedby="long-note" />
+        <div id="long-note"></div>
+      </div>
+      <fieldset class="entry">
+        <legend>Remote?</legend>
+        <p>Tell us where you would work from.</p>
+        <label><input type="radio" name="remote" value="yes" /> Yes</label>
+        <label><input type="radio" name="remote" value="no" /> No</label>
+      </fieldset>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      document.getElementById('long-note').textContent = 'x'.repeat(1500);
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+      });
+    </script>
+  </body>
+</html>

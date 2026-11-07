@@ -47,6 +47,7 @@ function userMessage(
     field_type: field.type,
     options: field.options ?? null,
     max_length_chars: maxChars(field),
+    ...(field.description ? { description: field.description } : {}),
   };
   const posting = {
     title: ctx.job.title,

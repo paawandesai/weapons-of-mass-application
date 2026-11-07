@@ -350,6 +350,23 @@ describe('profile review', () => {
     expect(state.profile?.document.flags).toEqual([]);
   });
 
+  it('edits the earliest start date as a nullable date input and saves it as ISO', async () => {
+    const user = userEvent.setup();
+    seedProfile();
+    renderAt('/profile/review');
+    const date = await screen.findByLabelText('Earliest start date');
+    expect(date).toHaveAttribute('type', 'date');
+    expect(date).toHaveValue('');
+    await user.type(date, '2027-02-01');
+    await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+    await screen.findByText('Saved as a new version.');
+    expect(state.profile?.document.standard_answers.earliest_start_date).toBe('2027-02-01');
+    await user.clear(screen.getByLabelText('Earliest start date'));
+    await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+    await screen.findByText('Saved as a new version.');
+    expect(state.profile?.document.standard_answers.earliest_start_date).toBeNull();
+  });
+
   it('blocks saving invalid fields with a message', async () => {
     const user = userEvent.setup();
     seedProfile();

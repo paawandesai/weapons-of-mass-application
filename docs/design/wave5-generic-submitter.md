@@ -257,3 +257,37 @@ groups and the Ashby limit notice. One defect:
 - [P2] Make the frame-CAPTCHA test model the real no-op entry — apps/worker/test/submission/generic-job.test.ts:95-97
   Adding `challenge: 'frame'` to `FakeCaptcha` leaves its answer-solving `enter()` behavior intact, whereas the real frame handle's `enter()` does nothing. The test therefore reaches `applied` through a capability the production implementation does not have. Use frame-accurate entry and clearing behavior, and test external clearance separately from a human text answer.
 codex exit 0
+
+## Found by the first real submissions (2026-11-07, evening)
+
+Six submissions (three vendors) loaded, scanned and tailored, then all parked at the answer step,
+before any value was typed. Causes and rules:
+
+22. Question descriptions. The scanner records each question's description: the text of
+    `aria-describedby` targets, a sibling element whose class contains `description`, `help` or
+    `hint`, or the box's text between the label and the control (bounded, 1,000 chars).
+    `FieldDescriptor.description` carries it, `form_answers` keeps keying by the label, and the
+    answer prompt receives it in `<question>` as `description`. (Anthropic's "AI Policy for
+    Application" was sent to the model as the bare label.)
+23. Earliest start date. `standard_answers.earliest_start_date` (ISO date, nullable) joins the
+    profile, editable on the review page next to the start-date text. A `start_date` question
+    whose kind is `date` resolves from it (typed in the picker's placeholder format, default
+    `MM/DD/YYYY`, then Escape); a text start question keeps the text. Null on a required date
+    question parks as `missing-profile-field` naming `standard_answers.earliest_start_date`.
+24. Decision for Andre, not a rule: a question that asks the candidate to confirm an employer's
+    policy on AI use in the application (Anthropic's AI partnership guidelines) is answered by the
+    human, never by the agent; the park (`unanswerable-question`) stays. Recorded as open.
+
+Andre's decisions (2026-11-07, evening), replacing 23 and 24 above:
+23b. Earliest start date is derived, never parked: `earliest_start_date` when set; else parsed
+    from `standard_answers.start_date` text ("within N days/weeks" → today + N; "immediately",
+    "asap", "now" → today + 14 days; "N weeks/months notice" or `notice_period` → today + that);
+    else today + 30 days. Weekends roll forward to Monday. The derived value is recorded in
+    `form_answers` like any answer.
+24b. The agent confirms an employer's AI-use policy question. Rule 10 (consent) widens: a label or
+    description that asks to review, read, understand or confirm an AI policy, AI guidelines or
+    AI partnership guidelines (Anthropic's "AI Policy for Application": "confirm your
+    understanding by selecting Yes") resolves to the affirmative like any acknowledgement; the
+    description is part of the match now that rule 22 captures it.
+25. Take-home exercises (a required URL/file for an exercise, assignment, case study or work
+    sample) stay parked as `unanswerable-question`; out of scope for now.

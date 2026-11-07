@@ -90,10 +90,22 @@ export const surveySchema = z.object({
   daily_target: dailyTargetSchema.default(12),
 });
 
+/** ISO `YYYY-MM-DD` that is also a real calendar date (no 2026-02-30). */
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected a date as YYYY-MM-DD')
+  .refine((s) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  }, 'not a real calendar date');
+
 export const standardAnswersSchema = z.object({
   work_authorization: z.string().nullable(),
   visa_sponsorship_required: z.boolean().nullable(),
   start_date: z.string().nullable(),
+  /** ISO `YYYY-MM-DD` when set: typed into date pickers; `start_date` stays the free-text answer. */
+  // Default so profile documents stored before the field existed still parse.
+  earliest_start_date: isoDateSchema.nullable().default(null),
   notice_period: z.string().nullable(),
   reasons_for_change: z.string().nullable(),
 });
