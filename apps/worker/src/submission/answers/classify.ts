@@ -40,8 +40,10 @@ const norm = (s: string) =>
 
 const SELF_ID =
   /\b(gender|race|ethnic\w*|hispanic|latino|latina|latinx|veteran|military|disabilit\w*|sexual orientation|transgender|lgbtq\w*|self[- ]identif\w*|equal employment|eeo\w*|protected class|pronouns?)\b/;
+// Only a decline that names self-identification: a generic "Prefer not to answer" also appears on
+// criminal-history and other attestation questions, which must reach the user, not be skipped.
 const DECLINE_OPTION =
-  /(decline|prefer not|do(n't| not) wish|choose not|rather not)\b.*\b(self|answer|say|disclose|identify|state)/;
+  /(decline|prefer not|do(n't| not) wish|choose not|rather not)\b.*\b(self[- ]?identif\w*|identify)\b/;
 
 // Sponsorship wording, by polarity. "Do you require sponsorship?" is a different question from
 // "Can you work without sponsorship?" and from "Are you authorized to work without sponsorship?":

@@ -707,6 +707,25 @@ describe('relocation and consent (live-loop rules 9-12)', () => {
     expect(f?.classification).toBe('free-text');
   });
 
+  it('a generic "prefer not to answer" option does not make a question self-identification', async () => {
+    const [felony, community, generic] = await classifyFields([
+      field({
+        label: 'Have you ever been convicted of a felony?',
+        type: 'select',
+        options: ['Yes', 'No', 'Prefer not to answer'],
+      }),
+      field({
+        label: 'Identify your community',
+        type: 'select',
+        options: ['Option A', 'Option B', 'I prefer not to self-identify'],
+      }),
+      field({ label: 'Gender', type: 'select', options: ['Male', 'Female', 'Prefer not to say'] }),
+    ]);
+    expect(felony?.classification).toBe('free-text');
+    expect(community?.classification).toBe('self-identification');
+    expect(generic?.classification).toBe('self-identification');
+  });
+
   it('a self-identification label that says "acknowledge" stays self-identification (rule 10)', async () => {
     const [a, b] = await classifyFields([
       field({
