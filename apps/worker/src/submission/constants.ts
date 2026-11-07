@@ -9,6 +9,18 @@ export const MAX_AGENT_ATTEMPTS = 3;
 export const MAX_HUMAN_ATTEMPTS = 3;
 export const PASSWORD_LENGTH = 24;
 export const FOLLOW_UP_DELAY_DAYS = 7;
+
+/**
+ * The follow-up delay in milliseconds. `GAUNTLET_TIME_SCALE` (demo/gauntlet only) divides it so the
+ * seven-day follow-up fires in minutes during a golden run; unset or 1 is real time. Only this
+ * delay is compressed: reminders and the digest keep their clocks.
+ */
+export function followUpDelayMs(env: NodeJS.ProcessEnv = process.env): number {
+  const scale = Number(env.GAUNTLET_TIME_SCALE ?? 1);
+  if (!Number.isFinite(scale) || scale < 1)
+    throw new Error('GAUNTLET_TIME_SCALE must be a number >= 1');
+  return Math.round((FOLLOW_UP_DELAY_DAYS * 24 * 60 * 60 * 1000) / scale);
+}
 /** Failures allowed before the application is closed: first failure retries, the second closes. */
 export const MAX_FAILED_ATTEMPTS = 2;
 export const SUBMIT_CONCURRENCY = 2;

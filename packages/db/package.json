@@ -14,7 +14,8 @@
     "db:migrate": "tsx src/migrate-cli.ts",
     "db:check": "drizzle-kit check",
     "seed:demo": "tsx src/seed/cli.ts",
-    "gauntlet:mail": "tsx src/seed/mailbox-cli.ts"
+    "gauntlet:mail": "tsx src/seed/mailbox-cli.ts",
+    "gauntlet:autopilot": "tsx src/seed/autopilot-cli.ts"
   },
   "dependencies": {
     "@wma/shared": "workspace:*",
