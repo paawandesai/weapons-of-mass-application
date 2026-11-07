@@ -190,6 +190,9 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState<null | 'save' | 'approve'>(null);
   const [building, setBuilding] = useState(false);
+  /** A build that was already running when the page opened (the first one, started by the survey). */
+  const [initialBuild, setInitialBuild] = useState(false);
+  const [builtFrom, setBuiltFrom] = useState<string[]>([]);
   const alive = useRef(true);
 
   const load = useCallback(async () => {
@@ -200,6 +203,7 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
       setDraft(p.document);
       setBaseline(p.document);
       setVersion(p.version);
+      setBuiltFrom(p.built_from ?? []);
       setApprovedVersion(p.approved_version);
       setApprovedAt(p.approved_at);
       setState('ready');
@@ -213,40 +217,69 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
     }
   }, []);
 
-  useEffect(() => {
-    alive.current = true;
-    void load();
-    return () => {
-      alive.current = false;
-    };
-  }, [load]);
-
-  const rebuild = useCallback(async () => {
-    setMessage(null);
-    setBuilding(true);
-    try {
-      await api.startBuild();
+  /** Polls the build status until it ends, then loads the result. Returns false if unmounted. */
+  const awaitBuild = useCallback(
+    async (doneText: string): Promise<boolean> => {
       for (;;) {
         await new Promise((r) => setTimeout(r, pollMs));
-        if (!alive.current) return;
+        if (!alive.current) return false;
         const s = await api.buildStatus();
         if (s.state === 'done') {
           await load();
-          if (!alive.current) return;
+          if (!alive.current) return false;
           setMessage({
             kind: 'ok',
-            text: 'Your profile was rebuilt. Review the new version below.',
+            text: doneText,
           });
-          break;
+          return true;
         }
         if (s.state === 'failed') {
           setMessage({
             kind: 'error',
             text: `The rebuild did not finish${s.reason ? `: ${s.reason}` : '.'}`,
           });
-          break;
+          return true;
         }
       }
+    },
+    [load, pollMs],
+  );
+
+  useEffect(() => {
+    alive.current = true;
+    void (async () => {
+      let running = false;
+      try {
+        running = (await api.buildStatus()).state === 'running';
+      } catch {
+        // Status is only a hint here; the profile load below reports real failures.
+      }
+      if (!alive.current) return;
+      if (!running) {
+        await load();
+        return;
+      }
+      setInitialBuild(true);
+      try {
+        await awaitBuild('Your profile was built from your sources. Review it below.');
+      } catch (e) {
+        if (alive.current) setMessage({ kind: 'error', text: errorMessage(e) });
+      }
+      if (!alive.current) return;
+      setInitialBuild(false);
+      await load();
+    })();
+    return () => {
+      alive.current = false;
+    };
+  }, [load, awaitBuild]);
+
+  const rebuild = useCallback(async () => {
+    setMessage(null);
+    setBuilding(true);
+    try {
+      await api.startBuild();
+      await awaitBuild('Your profile was rebuilt. Review the new version below.');
     } catch (e) {
       if (!alive.current) return;
       setMessage({
@@ -259,14 +292,30 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
     } finally {
       if (alive.current) setBuilding(false);
     }
-  }, [load, pollMs]);
+  }, [awaitBuild]);
 
+  const neverBuilt = state !== 'ready' || builtFrom.length === 0;
   const RebuildButton = (
     <button type="button" onClick={rebuild} disabled={building}>
-      {building ? 'Rebuilding…' : 'Rebuild from sources'}
+      {building
+        ? neverBuilt
+          ? 'Building…'
+          : 'Rebuilding…'
+        : neverBuilt
+          ? 'Build from sources'
+          : 'Rebuild from sources'}
     </button>
   );
 
+  if (initialBuild)
+    return (
+      <section>
+        <h1>Profile review</h1>
+        <p role="status" className="banner">
+          Building your profile from your connected sources…
+        </p>
+      </section>
+    );
   if (state === 'loading') return <p className="muted">Loading…</p>;
   if (state === 'error')
     return (

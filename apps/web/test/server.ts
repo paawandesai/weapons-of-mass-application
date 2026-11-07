@@ -78,6 +78,8 @@ export interface MockState {
     document: ProfileDocument;
     approved_version: number | null;
     approved_at: string | null;
+    /** Sources the version was built from; defaults to a built profile. */
+    built_from?: string[];
   };
   folders: { id: string; name: string }[];
   buildStatuses: BuildStatus[];
@@ -199,6 +201,7 @@ export const handlers = [
     state.profile
       ? HttpResponse.json({
           ...state.profile,
+          built_from: state.profile.built_from ?? ['resume'],
           flags: state.profile.document.flags,
         })
       : HttpResponse.json({ code: 'no_profile', message: 'No profile yet.' }, { status: 404 }),
@@ -211,6 +214,7 @@ export const handlers = [
       document,
       approved_version: state.profile?.approved_version ?? null,
       approved_at: state.profile?.approved_at ?? null,
+      built_from: state.profile?.built_from,
     };
     return HttpResponse.json({ version: state.profile.version });
   }),

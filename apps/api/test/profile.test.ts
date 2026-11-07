@@ -222,6 +222,21 @@ describe('GET and PUT /profile', () => {
     expect(body.document.identity.full_name).toBe('Ada Example');
   });
 
+  it('GET exposes built_from: empty for the default column, the sources once built', async () => {
+    const t = await env.makeTenant();
+    await insertProfileVersion(t.handle, { userId: t.userId, document: baseDoc() });
+    expect((await (await setup(t).app.request('/profile')).json()).built_from).toEqual([]);
+    await insertProfileVersion(t.handle, {
+      userId: t.userId,
+      document: baseDoc(),
+      builtFrom: ['resume', 'github'],
+    });
+    expect((await (await setup(t).app.request('/profile')).json()).built_from).toEqual([
+      'resume',
+      'github',
+    ]);
+  });
+
   it('PUT saves an edit as a new version, keeps the old one readable, and logs it', async () => {
     const t = await env.makeTenant();
     const { app } = setup(t);

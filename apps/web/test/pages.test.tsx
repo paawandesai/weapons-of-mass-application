@@ -265,6 +265,7 @@ describe('profile review', () => {
     const user = userEvent.setup();
     seedProfile();
     state.buildStatuses = [
+      { state: 'idle' },
       { state: 'running' },
       { state: 'running' },
       { state: 'done', version: 2 },
@@ -364,7 +365,7 @@ describe('profile review', () => {
   it('rebuilds by calling build and polling status until done', async () => {
     const user = userEvent.setup();
     seedProfile();
-    state.buildStatuses = [{ state: 'running' }, { state: 'done', version: 2 }];
+    state.buildStatuses = [{ state: 'idle' }, { state: 'running' }, { state: 'done', version: 2 }];
     render(
       <MemoryRouter>
         <ProfileReviewPage pollMs={10} />
@@ -388,6 +389,55 @@ describe('profile review', () => {
     );
     await user.click(await screen.findByRole('button', { name: 'Rebuild from sources' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Upload a resume/);
+  });
+
+  it('shows the building line while the first build runs, then the loaded profile', async () => {
+    seedProfile();
+    state.profile!.built_from = [];
+    state.buildStatuses = [
+      { state: 'running' },
+      { state: 'running' },
+      { state: 'done', version: 2 },
+    ];
+    render(
+      <MemoryRouter>
+        <ProfileReviewPage pollMs={10} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Building your profile from your connected sources…',
+    );
+    expect(screen.queryByLabelText('Full name')).toBeNull();
+    expect(await screen.findByLabelText('Full name')).toBeInTheDocument();
+    expect(screen.queryByText('Building your profile from your connected sources…')).toBeNull();
+  });
+
+  it('shows the failure banner when the first build fails', async () => {
+    seedProfile();
+    state.profile!.built_from = [];
+    state.buildStatuses = [
+      { state: 'running' },
+      { state: 'failed', reason: 'profile_build_timeout' },
+    ];
+    render(
+      <MemoryRouter>
+        <ProfileReviewPage pollMs={10} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /did not finish: profile_build_timeout/,
+    );
+  });
+
+  it('labels the button Build for a profile never built from sources, Rebuild otherwise', async () => {
+    seedProfile();
+    state.profile!.built_from = [];
+    const first = renderAt('/profile/review');
+    expect(await screen.findByRole('button', { name: 'Build from sources' })).toBeInTheDocument();
+    first.unmount();
+    state.profile!.built_from = ['resume', 'github'];
+    renderAt('/profile/review');
+    expect(await screen.findByRole('button', { name: 'Rebuild from sources' })).toBeInTheDocument();
   });
 
   it('offers a build when no profile exists', async () => {

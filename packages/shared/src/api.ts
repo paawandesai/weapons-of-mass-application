@@ -61,6 +61,8 @@ export interface ProfileResponse {
   approved_version: number | null;
   approved_at: string | null;
   flags: ProfileFlag[];
+  /** Sources the latest version was built from; empty when it never was (survey only). */
+  built_from: string[];
   /** True when the latest version is not the approved one (rebuild or edit awaiting review). */
   pending_review?: boolean;
 }

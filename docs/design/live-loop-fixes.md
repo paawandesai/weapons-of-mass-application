@@ -159,3 +159,28 @@ Four findings, all accepted; none dropped.
   assistance, package, support, reimbursement, bonus, costs or expenses. Other relocation questions
   go to grounded free-text resolution (the model now sees willing_to_relocate under rule 11).
 - P3 run-cap demo test accepts any status: assert `finished` or `short_day` and the hand-off count.
+
+## Rule 7: the first profile build starts on its own (found by the first real sign-in)
+
+Why: Andre signed in with Google, connected resume, LinkedIn and GitHub, saved the survey and
+landed on a review page of blank fields. The survey save writes profile version 1 (survey only)
+and nothing starts the build from the sources; the only trigger was the "Rebuild from sources"
+button at the bottom.
+
+16. `PUT /api/survey` saves the survey, then starts a profile build when all of: the user has a
+    resume, the latest profile version was never built from sources (`built_from` empty), and no
+    build is running (`requestProfileBuild` already returns the running one). The response gains
+    `build_started: boolean`. The activity entry is `profile_build_requested` with
+    `detail.trigger = 'survey'` (the button's entry has no trigger; leave it).
+17. The review page checks the build status on load. While a build is running it shows one line,
+    "Building your profile from your connected sources…", polls with the existing loop, and loads
+    the result when done; a failed build shows the existing failure banner. It never shows the
+    unbuilt version's blank fields while a build runs.
+18. The button reads "Build from sources" when the shown version was never built from sources and
+    "Rebuild from sources" otherwise. `GET /api/profile` exposes `built_from` so the page can tell.
+
+Tests: survey save with resume and unbuilt profile starts a build (fake queue) and logs the
+trigger (16); a second save while that build runs starts none (16); no resume starts none (16); a
+save on a profile already built from sources starts none (16); the review page shows the building
+line and then the loaded profile when status goes running → done (17); the button label for each
+case (18).

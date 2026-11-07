@@ -1,8 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { activity, getProfileVersion, getUserById, insertProfileVersion } from '@wma/db';
+import {
+  activity,
+  getProfileVersion,
+  getUserById,
+  insertProfileVersion,
+  upsertConnection,
+} from '@wma/db';
 import { profileDocumentSchema, type ProfileDocument } from '@wma/shared';
 import fixture from '../../../packages/shared/test/fixtures/profile.full.json';
-import { surveyRoutes } from '../src/routes/survey';
+import { createSurveyRoutes } from '../src/routes/survey';
+import type { BuildQueue, ProfileBuildJobData } from '../src/services/queue';
 import { appFor, json, setupEnv, type TestEnv, type TestTenant } from './support';
 
 let env: TestEnv;
@@ -13,7 +20,27 @@ afterAll(async () => {
   await env.cleanup();
 });
 
-const app = (t: TestTenant) => appFor(t, { '/survey': surveyRoutes });
+function fakeQueue(sent: ProfileBuildJobData[] = [], fail = false): BuildQueue {
+  return {
+    enqueueProfileBuild: async (d) => {
+      if (fail) throw new Error('queue down');
+      sent.push(d);
+    },
+    jobState: async () => 'created',
+  };
+}
+const app = (t: TestTenant, queue: BuildQueue = fakeQueue()) =>
+  appFor(t, { '/survey': createSurveyRoutes({ queue }) });
+const withResume = (t: TestTenant) =>
+  upsertConnection(t.handle, {
+    userId: t.userId,
+    kind: 'resume',
+    config: { text: 'Mara Quill resume text' },
+  });
+const buildEntries = async (t: TestTenant) =>
+  (await activity.listByUser(t.handle, t.userId)).filter(
+    (e) => e.action === 'profile_build_requested',
+  );
 const answers = (over: Record<string, unknown> = {}) => ({
   target_roles: ['Staff Backend Engineer'],
   salary_floor: 95000,
@@ -40,7 +67,7 @@ describe('survey', () => {
     const a = app(t);
     const res = await a.request('/survey', json({ answers: answers() }, 'PUT'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ version: 1 });
+    expect(await res.json()).toEqual({ version: 1, build_started: false });
     const doc = (await getProfileVersion(t.handle, t.userId, 1)).document as ProfileDocument;
     expect(doc.work_history).toEqual([]);
     expect(doc.identity.full_name).toBe('Mara Quill');
@@ -150,5 +177,78 @@ describe('survey', () => {
     });
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe('validation');
+  });
+
+  describe('first build from sources', () => {
+    it('with a resume and an unbuilt profile starts a build and logs the survey trigger', async () => {
+      const t = await env.makeTenant();
+      await withResume(t);
+      const sent: ProfileBuildJobData[] = [];
+      const res = await app(t, fakeQueue(sent)).request(
+        '/survey',
+        json({ answers: answers() }, 'PUT'),
+      );
+      expect(await res.json()).toEqual({ version: 1, build_started: true });
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({ tenantId: t.id, userId: t.userId });
+      const entries = await buildEntries(t);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.detail).toEqual({ job_id: sent[0]!.buildId, trigger: 'survey' });
+    });
+
+    it('a second save while that build runs starts none', async () => {
+      const t = await env.makeTenant();
+      await withResume(t);
+      const sent: ProfileBuildJobData[] = [];
+      const a = app(t, fakeQueue(sent));
+      await a.request('/survey', json({ answers: answers() }, 'PUT'));
+      const res = await a.request(
+        '/survey',
+        json({ answers: answers({ salary_floor: 1 }) }, 'PUT'),
+      );
+      expect(await res.json()).toEqual({ version: 2, build_started: false });
+      expect(sent).toHaveLength(1);
+      expect(await buildEntries(t)).toHaveLength(1);
+    });
+
+    it('without a resume starts none', async () => {
+      const t = await env.makeTenant();
+      const sent: ProfileBuildJobData[] = [];
+      const res = await app(t, fakeQueue(sent)).request(
+        '/survey',
+        json({ answers: answers() }, 'PUT'),
+      );
+      expect((await res.json()).build_started).toBe(false);
+      expect(sent).toHaveLength(0);
+    });
+
+    it('on a profile already built from sources starts none', async () => {
+      const t = await env.makeTenant();
+      await withResume(t);
+      await insertProfileVersion(t.handle, {
+        userId: t.userId,
+        document: profileDocumentSchema.parse(structuredClone(fixture)),
+        builtFrom: ['resume', 'linkedin'],
+      });
+      const sent: ProfileBuildJobData[] = [];
+      const res = await app(t, fakeQueue(sent)).request(
+        '/survey',
+        json({ answers: answers() }, 'PUT'),
+      );
+      expect(await res.json()).toEqual({ version: 2, build_started: false });
+      expect(sent).toHaveLength(0);
+    });
+
+    it('still saves the survey when the build request fails', async () => {
+      const t = await env.makeTenant();
+      await withResume(t);
+      const res = await app(t, fakeQueue([], true)).request(
+        '/survey',
+        json({ answers: answers() }, 'PUT'),
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ version: 1, build_started: false });
+      expect(await buildEntries(t)).toHaveLength(0);
+    });
   });
 });

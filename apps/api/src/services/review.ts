@@ -30,6 +30,17 @@ export async function findLatestProfile(
   }
 }
 
+/**
+ * The sources a profile version was built from, as a list. The column defaults to an empty object
+ * and the worker writes an array, so anything that is not a non-empty list or object is "never
+ * built from sources" and maps to [].
+ */
+export function builtFromList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (value && typeof value === 'object') return Object.keys(value);
+  return [];
+}
+
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
 export async function getProfileResponse(
@@ -46,6 +57,7 @@ export async function getProfileResponse(
     approved_version: user.approvedProfileVersion,
     approved_at: iso(user.approvedProfileAt),
     flags: document.flags,
+    built_from: builtFromList(row.builtFrom),
     pending_review: user.approvedProfileVersion !== row.version,
   };
 }
