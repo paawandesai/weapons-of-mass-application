@@ -72,6 +72,32 @@ const CONSENT_SUBJECT =
 const CONSENT = new RegExp(`^(?=.*\\b${CONSENT_VERB}\\b)(?=.*${CONSENT_SUBJECT})`);
 const CONSENT_TYPES: ReadonlySet<string> = new Set(['checkbox', 'radio', 'select']);
 
+// Rule 31: an option text that is itself an acknowledgement statement ("I will read the arbitration
+// agreement below.", "I confirm I have read the above."). A verb and a subject are both needed.
+const ACK_VERB =
+  /\b(?:acknowledg\w*|agree\w*|accept\w*|consent\w*|certif\w*|confirm\w*|understand\w*|have read|will read)\b/;
+const ACK_SUBJECT =
+  /\b(?:agreements?|terms|policy|policies|notice|conditions|arbitrat\w*|the above|the information provided)\b/;
+
+/** Whether an option text is an acknowledgement statement (rule 31). */
+export function isAcknowledgementOption(option: string): boolean {
+  const o = norm(option);
+  return ACK_VERB.test(o) && ACK_SUBJECT.test(o);
+}
+
+/**
+ * Rule 31: the options themselves are the acknowledgement. A select or radio with exactly one
+ * option that is an acknowledgement statement, or a checkbox group with at least one such option.
+ */
+export function hasAcknowledgementOptions(f: Pick<FieldDescriptor, 'type' | 'options'>): boolean {
+  const options = f.options ?? [];
+  if (f.type === 'select' || f.type === 'radio') {
+    return options.length === 1 && isAcknowledgementOption(options[0]!);
+  }
+  if (f.type === 'checkbox') return options.some(isAcknowledgementOption);
+  return false;
+}
+
 // Rule 24b: a label or description that asks the candidate to review, read, understand or confirm
 // an AI policy or AI guidelines is an acknowledgement too (Anthropic's "AI Policy for Application").
 // The description is part of the match; an options-less dropdown is read as `text`, so text counts.
@@ -123,7 +149,10 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   ['phone', /\bphone\b|\bmobile\b|\bcell\b|telephone/],
   ['linkedin', /linked-?in/],
   ['github', /git-?hub/],
-  ['website', /\bwebsite\b|\bportfolio\b|personal (site|url|page)|\bblog\b/],
+  [
+    'website',
+    /^(?!.*\b(?:posts?|articles?|papers?|favou?rite|read|recommend\w*)\b)(?:.*\b(?:website|portfolio)\b|.*\bpersonal (?:site|page|url|blog)\b|.*\byour blog\b)/,
+  ],
   [
     'location',
     /^(your |current |home )?(location|city|address|city of residence)\b|location \(?(city|current)|where are you (currently )?(located|based|living)|current location|city, state|city and country/,
@@ -173,6 +202,7 @@ export function classifyByRules(
   }
   const key = standardKeyFor(f.label, f.type, f.description);
   if (key) return { classification: 'standard', standardKey: key };
+  if (hasAcknowledgementOptions(f)) return { classification: 'standard', standardKey: 'consent' };
   if (FREE_TEXT.test(l) || f.type === 'textarea') return { classification: 'free-text' };
   return null;
 }

@@ -26,7 +26,7 @@ import {
   UPCOMING_WINDOW_MS,
 } from './constants';
 import type { NotificationDeps } from './deps';
-import { cardUrl } from './links';
+import { cardUrl, origin } from './links';
 import type { NotificationQueue } from './queue';
 import { DeliveryUncertainError } from './reminders';
 import { renderDigest, scrub, type DigestSection } from './templates';
@@ -123,6 +123,9 @@ async function activitySince(
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+// Rule 33: a parked question that asks for a take-home exercise.
+const TAKE_HOME = /exercise|assignment|take[- ]home|case study|work sample/i;
 
 interface Line {
   text: string;
@@ -289,6 +292,23 @@ export async function collectDigestSections(
     }
   }
 
+  // Rule 33: companies whose applications parked on a take-home exercise in the window, once each,
+  // with a link to remove the company from the list. Nothing is removed automatically.
+  const takeHome: Line[] = [];
+  const takeHomeSeen = new Set<string>();
+  for (const e of entries) {
+    if (e.action !== 'unanswerable-question') continue;
+    const question = str(((e.detail ?? {}) as Record<string, unknown>).question);
+    const company = e.applicationId ? labels.get(e.applicationId)?.companyName : undefined;
+    if (!question || !TAKE_HOME.test(question) || !company) continue;
+    if (takeHomeSeen.has(company)) continue;
+    takeHomeSeen.add(company);
+    takeHome.push({
+      text: `${scrub(company)}: the application asks for a take-home exercise and is parked. Remove the company from your list if you do not want to do one.`,
+      url: `${origin(deps.webOrigin)}/connections`,
+    });
+  }
+
   const pending: Line[] = awaiting.map((a) => ({
     text: `${nameOf(a.applicationId)}: times offered ${a.slots
       .map((sl) => formatLocal(sl.startsAt, user.timezone))
@@ -311,6 +331,7 @@ export async function collectDigestSections(
   const all: DigestSection[] = [
     { title: 'Applications submitted', lines: applied },
     { title: 'Answers we guessed today', lines: guessed },
+    { title: 'Take-home exercises', lines: takeHome },
     { title: 'Replies from employers', lines: replies },
     { title: 'Follow-ups sent', lines: followUps },
     { title: 'Interviews booked', lines: booked },

@@ -1301,3 +1301,155 @@ describe('inferred defaults for null standard answers (wave 5 rule 28)', () => {
     });
   });
 });
+
+describe('rules 31 and 32: acknowledgement options and any-of authorization', () => {
+  const resolveOne = async (
+    f: FieldDescriptor,
+    profile: typeof PROFILE = PROFILE,
+    ctx: object = {},
+  ) => {
+    const [c] = await classifyFields([f]);
+    return {
+      classified: c!,
+      res: resolveStandardFields({ profile, ...ctx } as never, [c!])[0],
+    };
+  };
+  const READ = 'I will read the arbitration agreement below.';
+  const AGREE =
+    'I understand and agree to the terms of the Agreement to Arbitrate set forth above.';
+  const ASHBY_ACK =
+    'I acknowledge that I have opened, read, and understood the Arbitration Agreement. I understand that by submitting my application, I am agreeing to be bound by the terms of the Arbitration Agreement.';
+
+  it('takes the single option of the two Greenhouse arbitration selects', async () => {
+    for (const [label, option] of [
+      ['Please read the arbitration agreement below', READ],
+      ['Agreement to Arbitrate', AGREE],
+    ] as const) {
+      const { classified, res } = await resolveOne(
+        field({ label, type: 'select', required: true, options: [option] }),
+      );
+      expect(classified).toMatchObject({ classification: 'standard', standardKey: 'consent' });
+      expect(res).toMatchObject({ status: 'filled', value: option, source: 'profile' });
+    }
+  });
+
+  it('checks every acknowledgement option of the Ashby arbitration checkbox group', async () => {
+    const { classified, res } = await resolveOne(
+      field({
+        label: 'Applicant Arbitration Agreement Acknowledgement',
+        type: 'checkbox',
+        required: true,
+        options: [ASHBY_ACK, 'I confirm I have read the above.'],
+      }),
+    );
+    expect(classified.classification).toBe('standard');
+    expect(res).toMatchObject({
+      status: 'filled',
+      value: [ASHBY_ACK, 'I confirm I have read the above.'],
+      source: 'profile',
+    });
+  });
+
+  it('rule 34: a lone checkbox with one acknowledgement option resolves to true', async () => {
+    const { classified, res } = await resolveOne(
+      field({
+        label: 'Applicant Arbitration Agreement Acknowledgement',
+        type: 'checkbox',
+        required: true,
+        options: [ASHBY_ACK],
+      }),
+    );
+    expect(classified).toMatchObject({ classification: 'standard', standardKey: 'consent' });
+    expect(res).toMatchObject({ status: 'filled', value: true, source: 'profile' });
+  });
+
+  it("rule 35: only the candidate's own site is a website", async () => {
+    const blogPost = "Share your favorite blog post, article, or paper you've read";
+    expect(standardKeyFor(blogPost, 'text')).toBeNull();
+    const [c] = await classifyFields([field({ label: blogPost, type: 'text' })]);
+    expect(c).toMatchObject({ classification: 'free-text' });
+    expect((c as { standardKey?: string }).standardKey).toBeUndefined();
+    for (const l of ['Website', 'Portfolio URL', 'Personal site', 'Your blog']) {
+      expect(standardKeyFor(l, 'text')).toBe('website');
+    }
+  });
+
+  it('leaves a single-option select that is not an acknowledgement as free text', async () => {
+    const { classified } = await resolveOne(
+      field({ label: 'Preferred office', type: 'select', required: true, options: ['Remote'] }),
+    );
+    expect(classified.classification).toBe('free-text');
+  });
+
+  it('checks only the acknowledgement in a group that also has a real option', async () => {
+    const { res } = await resolveOne(
+      field({
+        label: 'Before you submit',
+        type: 'checkbox',
+        required: true,
+        options: ['Email me about future roles', 'I confirm I have read the above.'],
+      }),
+    );
+    expect(res).toMatchObject({ status: 'filled', value: ['I confirm I have read the above.'] });
+  });
+
+  it('keeps self-identification first, even with acknowledgement-like options', async () => {
+    const { classified } = await resolveOne(
+      field({
+        label: 'Gender',
+        type: 'select',
+        options: ['I acknowledge and agree to the terms'],
+      }),
+    );
+    expect(classified.classification).toBe('self-identification');
+  });
+
+  describe('rule 32: "A or B" authorization', () => {
+    const profileWith = (standard: Partial<typeof PROFILE.standard_answers>, location?: string) =>
+      ({
+        ...PROFILE,
+        identity: { ...PROFILE.identity, location: location ?? null },
+        contact: { ...PROFILE.contact, phone: null },
+        standard_answers: { ...PROFILE.standard_answers, ...standard },
+      }) as typeof PROFILE;
+    const ask = (profile: typeof PROFILE, label: string) =>
+      resolveStandardFields({ profile } as never, [
+        field({
+          label,
+          classification: 'standard',
+          required: true,
+          type: 'radio',
+          options: ['Yes', 'No'],
+        }),
+      ])[0];
+    const OR = 'Do you have permanent authorization to work for Warp in the U.S. or Canada?';
+    const AND = 'Are you authorized to work in both the U.S. and Canada?';
+    const US = 'Authorized to work in the United States';
+
+    it('explicit US authorization answers Yes to "U.S. or Canada", parks "both"', () => {
+      const p = profileWith({ work_authorization: US });
+      expect(ask(p, OR)).toMatchObject({ status: 'filled', value: 'Yes', source: 'profile' });
+      expect(ask(p, 'Are you authorized to work in either the US or the UK?')).toMatchObject({
+        value: 'Yes',
+      });
+      expect(ask(p, AND)).toMatchObject({ status: 'missing-profile-field' });
+      expect(ask(p, 'Are you authorized to work in the U.S. and Canada?')).toMatchObject({
+        status: 'missing-profile-field',
+      });
+    });
+
+    it('authorization for neither place stays unanswered for "or"', () => {
+      const p = profileWith({ work_authorization: 'Authorized to work in Germany' });
+      expect(ask(p, OR)).toMatchObject({ status: 'missing-profile-field' });
+    });
+
+    it('inferred authorization follows the same any-of logic', () => {
+      const p = profileWith(
+        { work_authorization: null, visa_sponsorship_required: null },
+        'Austin, TX',
+      );
+      expect(ask(p, OR)).toMatchObject({ value: 'Yes', source: 'inferred' });
+      expect(ask(p, AND)).toMatchObject({ status: 'missing-profile-field' });
+    });
+  });
+});

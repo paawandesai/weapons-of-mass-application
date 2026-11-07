@@ -1,6 +1,11 @@
 import type { ProfileDocument } from '@wma/shared';
 import type { AnswerResolution, FieldDescriptor, SubmissionContext } from '../types';
-import { standardKeyFor, type StandardKey } from './classify';
+import {
+  hasAcknowledgementOptions,
+  isAcknowledgementOption,
+  standardKeyFor,
+  type StandardKey,
+} from './classify';
 
 const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   full_name: 'identity.full_name',
@@ -166,7 +171,7 @@ export function profileValue(
 const PLACES: Array<{ id: string; re: RegExp; covers?: string[] }> = [
   {
     id: 'us',
-    re: /\bu\.s\.?a?\b|\busa\b|united states|\bin the us\b|\bus (?:citizen|work|based|resident)/,
+    re: /\bu\.s\.?a?\b|\busa\b|united states|\b(?:in|the) us\b|\bus (?:citizen|work|based|resident)/,
   },
   {
     id: 'uk',
@@ -201,6 +206,26 @@ function placesIn(text: string): Set<string> {
   return new Set(PLACES.filter((p) => p.re.test(t)).map((p) => p.id));
 }
 
+/**
+ * Rule 32: whether a question naming several places asks about any of them ("the U.S. or Canada",
+ * "either", "any of") rather than every one ("and", "both"). Mixed or ambiguous wording stays
+ * every-place, the conservative reading.
+ */
+function namesAnyOfPlaces(question: string): boolean {
+  const t = question.toLowerCase();
+  const spans = PLACES.map((p) => {
+    const m = p.re.exec(t);
+    return m ? { start: m.index, end: m.index + m[0].length } : null;
+  }).filter((x): x is { start: number; end: number } => x !== null);
+  if (spans.length < 2) return false;
+  const start = Math.min(...spans.map((x) => x.start));
+  const end = Math.max(...spans.map((x) => x.end));
+  const between = t.slice(start, end);
+  const before = t.slice(Math.max(0, start - 24), start);
+  if (/\bboth\b/.test(before) || /\band\b/.test(between)) return false;
+  return /\bor\b/.test(between) || /\b(?:either|any of|one of)\s*(?:the\s+)?$/.test(before);
+}
+
 const AUTH_POSITIVE =
   /authori[sz]ed|citizen|permanent resident|green card|settled status|right to work|work permit|eligible|no restrictions|unrestricted/i;
 const AUTH_NEGATIVE =
@@ -218,13 +243,12 @@ export function isAuthorizedFor(statement: string | null, question: string): boo
   if (asked.size === 0) return true;
   const held = placesIn(text);
   if (held.size === 0) return null;
-  for (const id of asked) {
-    const covered = [...held].some(
-      (h) => h === id || (PLACES.find((p) => p.id === h)?.covers ?? []).includes(id),
-    );
-    if (!covered) return null;
-  }
-  return true;
+  const covers = (id: string) =>
+    [...held].some((h) => h === id || (PLACES.find((p) => p.id === h)?.covers ?? []).includes(id));
+  // Rule 32: "A or B" needs one covered place, "A and B" every one.
+  return (namesAnyOfPlaces(question) ? [...asked].some(covers) : [...asked].every(covers))
+    ? true
+    : null;
 }
 
 const YES = /^(?:yes|y|true)\b/i;
@@ -254,7 +278,8 @@ function matchOption(text: string, f: FieldDescriptor): string | null {
   return hit ?? null;
 }
 
-type Resolved = { value: string | boolean; inferred?: true } | { unexpressible: true } | null;
+type Resolved =
+  { value: string | boolean | string[]; inferred?: true } | { unexpressible: true } | null;
 
 const NUMBER_WORDS: Record<string, number> = {
   a: 1,
@@ -482,6 +507,19 @@ function valueForField(
     }
     return { value: text, ...flag };
   }
+  // Rule 31: the options are the acknowledgement. A lone select/radio option is taken as it is; a
+  // checkbox group has every acknowledgement option checked and nothing else.
+  if (key === 'consent' && f.options?.length) {
+    if ((f.type === 'select' || f.type === 'radio') && f.options.length === 1) {
+      if (isAcknowledgementOption(f.options[0]!)) return { value: f.options[0]! };
+    } else if (f.type === 'checkbox' && f.options.length === 1) {
+      // Rule 34: a lone checkbox carries its own statement as its only option; it takes a boolean.
+      if (isAcknowledgementOption(f.options[0]!)) return { value: true };
+    } else if (f.type === 'checkbox') {
+      const acks = f.options.filter(isAcknowledgementOption);
+      if (acks.length > 0) return { value: acks };
+    }
+  }
   // Rule 23b: a date picker always gets a date; a text box keeps the start-date text.
   if (key === 'start_date' && f.type === 'date') return { value: deriveStartDate(profile, today) };
   let value = profileValue(profile, key, f.label, prior);
@@ -518,7 +556,10 @@ export function resolveStandardFields(
   for (const f of fields) {
     if (f.classification !== 'standard') continue;
     const base = { fieldId: f.id, question: f.label };
-    const key = f.standardKey ?? standardKeyFor(f.label, f.type, f.description);
+    const key =
+      f.standardKey ??
+      standardKeyFor(f.label, f.type, f.description) ??
+      (hasAcknowledgementOptions(f) ? 'consent' : null);
     if (!key) {
       out.push(
         f.required

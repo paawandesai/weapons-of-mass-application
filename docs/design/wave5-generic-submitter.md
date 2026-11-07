@@ -352,3 +352,46 @@ the most likely value the profile supports, records that it guessed, and tells t
 
 Decision log: 2026-11-07, educated guesses allowed (Andre); credentials, compensation and
 self-identification stay hard parks.
+
+## Found by the fourth real submission round (2026-11-07, evening)
+
+Inferred defaults, start date and AI policy all passed. Parks: Anthropic (4) on the two
+arbitration questions ("Please read the arbitration agreement below" → one option "I will read
+the arbitration agreement below."; "Agreement to Arbitrate" → one option "I understand and agree
+to the terms of the Agreement to Arbitrate set forth above."), OpenAI (2) on "Applicant
+Arbitration Agreement Acknowledgement" (a checkbox group whose options are the acknowledgement
+sentences), Warp on "permanent authorization to work for Warp in the U.S. or Canada" (the
+profile implies the US; the rule required every named place), Perplexity (2) on the take-home.
+
+31. Acknowledgement by option text. The consent rule also matches when the question's options
+    (a select or radio with one option, or a checkbox group) are themselves acknowledgement
+    statements: an option text with an acknowledgement verb (acknowledge, agree, accept,
+    consent, certify, confirm, understand, have read, will read) and a subject (agreement, terms,
+    policy, notice, conditions, arbitration, the above, the information provided). Resolution:
+    a single-option select or radio takes that option; a checkbox group checks every option
+    that is an acknowledgement statement; a Yes/No set takes Yes. Decision (Andre, rule 10 and
+    24b rationale): the user authorised the agent to apply, and these acknowledgements are a
+    condition of applying; arbitration agreements included. Recorded in form_answers with
+    source `profile` like other consents.
+32. Authorization for "A or B". When a work-authorization question names several places joined
+    by "or" / "either" / "any of", the answer is Yes when the profile's authorization covers at
+    least one of them; "and" / "both" keeps the every-place rule. Inferred authorization (rule
+    28) follows the same logic.
+33. A company whose postings park on a take-home exercise is reported in the digest with a
+    "remove from your list" link; no automatic removal.
+
+## Found by the dry answer-planning pass (2026-11-07, evening)
+
+A read-only pass that loads every pending form and resolves every answer without filling: the
+four Anthropic forms resolve completely. Two gaps:
+
+34. A lone checkbox keeps its own statement. The scanner reports a single checkbox with
+    `options: [<the checkbox's own label text>]` whenever that text differs from the question
+    label (Ashby: question "Applicant Arbitration Agreement Acknowledgement", checkbox "I
+    acknowledge that I have opened, read, and understood the Arbitration Agreement…"). Rule 31
+    then applies: a lone checkbox whose single option is an acknowledgement statement resolves
+    to `true`. `form_answers` records the question label as before.
+35. The website rule matches only the candidate's own site: "website", "portfolio", "personal
+    (site|page|url|blog)", "your blog"; never a label containing "post", "article", "paper",
+    "favorite", "favourite", "read" or "recommend" (Warp: "Share your favorite blog post,
+    article, or paper you've read" is free text, answered in guess mode or parked).

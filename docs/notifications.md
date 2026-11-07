@@ -42,6 +42,8 @@ Content: activity in (checkpoint, cutoff], where the cutoff is the clock reading
 
 The "Answers we guessed today" section tells the user which answers the agent inferred from the profile or guessed rather than took from it, so they can correct the profile if one was wrong; the question and value are scrubbed like every other employer-derived text.
 
+A "Take-home exercises" section lists each company whose application parked today on an `unanswerable-question` that asks for an exercise, assignment, take-home, case study or work sample, with a link to `/connections` to remove the company; it is omitted when empty and nothing is removed automatically (rule 33).
+
 A day with nothing in any section still sends a short digest saying so.
 
 A failed send writes `digest_failed` to the activity log and the job is retried by the queue three times, ten minutes apart (inside the hour). Only a successful send writes `digest_sent` and moves the checkpoint.

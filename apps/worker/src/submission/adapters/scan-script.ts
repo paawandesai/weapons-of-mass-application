@@ -369,6 +369,30 @@ export const SCAN_SCRIPT = String.raw`(opts) => {
     return '';
   }
 
+  // Rule 34: a lone checkbox's own statement (label[for], wrapping label, aria-label, or the text
+  // beside it), without the value fallback an option label has. Empty when there is none.
+  function ownStatement(c) {
+    const ls = labelsOf(c);
+    for (let i = 0; i < ls.length; i++) {
+      const t = ls[i].contains(c) ? wrapLabelText(ls[i], c) : textOf(ls[i]);
+      if (t) return t;
+    }
+    const al = norm(attr(c, 'aria-label'));
+    if (al) return al;
+    const lb = idsText(attr(c, 'aria-labelledby'));
+    if (lb) return lb;
+    if (c.tagName !== 'INPUT') {
+      const t = textOf(c);
+      if (t) return t;
+    }
+    let beside = '';
+    for (let s = c.nextSibling; s && !beside; s = s.nextSibling) {
+      if (s.nodeType === 3) beside = norm(s.nodeValue);
+      else if (s.nodeType === 1 && !controlSet.has(s)) beside = textOf(s);
+    }
+    return beside;
+  }
+
   // ---- reading and sectioning --------------------------------------------------------------
   // A checked input, or an ARIA toggle: a button has a type property but no checked state.
   const isOn = (x) =>
@@ -697,6 +721,10 @@ export const SCAN_SCRIPT = String.raw`(opts) => {
       isResume: first === resumeInput,
     };
     if (largeList) q.largeList = true;
+    if (kind === 'checkbox' && !options) {
+      const own = cleanLabel(ownStatement(first));
+      if (own && low(own) !== low(finalLabel)) q.options = [own];
+    }
     if (description) q.description = description;
     if (kind === 'combobox' && first.tagName !== 'INPUT') {
       const inner = first.querySelector('input');

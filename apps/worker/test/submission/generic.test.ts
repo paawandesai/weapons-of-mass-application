@@ -756,6 +756,52 @@ describe('required audit and group answers (review)', () => {
     });
   }, 60_000);
 
+  it('rule 34: a lone checkbox reports its own statement as its only option when it differs from the question', async () => {
+    await withPage(async (page) => {
+      await open(page, 'lone-checkbox.html');
+      const fields = await bare.fields(page);
+      const ack = byLabel(fields, 'Arbitration Agreement Acknowledgement');
+      expect(ack).toMatchObject({
+        type: 'checkbox',
+        required: true,
+        options: ['I acknowledge that I have read and understood the Arbitration Agreement.'],
+      });
+      // Its own label is the question label: no options.
+      const news = byLabel(fields, 'Keep me posted');
+      expect(news.type).toBe('checkbox');
+      expect(news.options).toBeUndefined();
+      // The resolved boolean still sets the lone checkbox, options or not.
+      const [classified] = await classifyFields([ack]);
+      const [res] = resolveStandardFields({ profile: PROFILE }, [classified!]);
+      expect(res).toMatchObject({ status: 'filled', value: true });
+      await bare.fill(page, { [ack.id]: true });
+      expect(await page.locator('#ack').isChecked()).toBe(true);
+    });
+  }, 60_000);
+
+  it('rule 34: the Ashby arbitration and certification checkboxes carry their own statement', async () => {
+    await withPage(async (page) => {
+      await open(page, 'ashby.html', ashbyAdapter, 'real');
+      const fields = await ashbyAdapter.fields(page);
+      const arb = byLabel(fields, 'Applicant Arbitration Agreement Acknowledgement');
+      expect(arb.options).toHaveLength(1);
+      expect(arb.options![0]).toMatch(
+        /^I acknowledge that I have opened, read, and understood the Arbitration Agreement/,
+      );
+      const cert = fields.find((f) =>
+        /^I hereby certify that I have not knowingly withheld/.test(f.label),
+      )!;
+      expect(cert.options).toEqual(['I confirm I have read the above.']);
+      const classified = await classifyFields([arb, cert]);
+      for (const c of classified) {
+        expect(c).toMatchObject({ classification: 'standard', standardKey: 'consent' });
+      }
+      for (const r of resolveStandardFields({ profile: PROFILE }, classified)) {
+        expect(r).toMatchObject({ status: 'filled', value: true });
+      }
+    });
+  }, 60_000);
+
   it('a standalone aria-pressed toggle reads its state from aria-pressed', async () => {
     await withPage(async (page) => {
       await open(page, 'pressed-toggle.html');

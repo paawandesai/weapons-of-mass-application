@@ -227,6 +227,58 @@ describe('rule 14: digest content', () => {
   });
 });
 
+describe('rule 33: take-home exercises', () => {
+  it('lists each company that parked on a take-home once, with the connections link', async () => {
+    const t = await tenant();
+    const deps = makeDeps(new Date(), { store: 'db' });
+    const park = async (question: string) => {
+      const s = await seedApplication(t);
+      await activity.logActivity(t.handle, {
+        userId: t.userId,
+        applicationId: s.application.id,
+        actor: 'agent',
+        action: 'unanswerable-question',
+        detail: { question, attempt: 1 },
+      });
+      return s;
+    };
+    const first = await park('Please upload your take-home exercise');
+    await activity.logActivity(t.handle, {
+      userId: t.userId,
+      applicationId: first.application.id,
+      actor: 'agent',
+      action: 'unanswerable-question',
+      detail: { question: 'Work sample (link)', attempt: 2 },
+    });
+    await park('What is your favorite color?');
+
+    deps.clock.set(new Date());
+    const out = await runDigest(t.handle, { userId: t.userId }, deps);
+    expect(out.status).toBe('sent');
+    const text = deps.sender.sent[0]!.text;
+    expect(text).toContain('Take-home exercises');
+    expect(text.match(/take-home exercise and is parked/g)).toHaveLength(1);
+    expect(text).toContain('/connections');
+    expect(text).not.toContain('favorite color');
+  });
+
+  it('omits the section when no application parked on an exercise', async () => {
+    const t = await tenant();
+    const deps = makeDeps(new Date(), { store: 'db' });
+    const s = await seedApplication(t);
+    await activity.logActivity(t.handle, {
+      userId: t.userId,
+      applicationId: s.application.id,
+      actor: 'agent',
+      action: 'unanswerable-question',
+      detail: { question: 'Describe your ideal manager' },
+    });
+    deps.clock.set(new Date());
+    await runDigest(t.handle, { userId: t.userId }, deps);
+    expect(deps.sender.sent[0]!.text).not.toContain('Take-home exercises');
+  });
+});
+
 describe('rule 15: employer text is scrubbed before the guard', () => {
   it('a digest quoting "$150k" from a recruiter renders [omitted] and is sent, not blocked', async () => {
     const t = await tenant();
