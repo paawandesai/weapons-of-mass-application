@@ -593,3 +593,13 @@ Gauntlet recruiter test for rounds unchanged; sync.test: classification `resched
 
 Out of scope: merging two interviews after a missed reschedule; UI changes; the recruiter
 scripts.
+
+57. Acknowledgements are not proposals (found by `pnpm score` on the passing golden run: eight
+    `no_free_slot` flags in a run where every interview was booked). The employer's "Confirmed:
+    Tuesday, 2:00 PM" repeats the time the user just booked; the classifier extracts it as a
+    proposed slot, the calendar shows the interview itself as busy, and a false "no free slot"
+    digest flag follows every booking. In `recordOffer`, when the thread's newest interview is
+    confirmed and the message is not a reschedule, the booked slot's start time is dropped from the
+    proposal; with nothing left the result is `already_booked` (no row, no flag, no email). Other
+    times in the same message still open a new round.
+

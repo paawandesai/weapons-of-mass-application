@@ -296,6 +296,28 @@ describe('interview rounds (rule 55)', () => {
     expect(log.some((e) => (e.detail as { reschedule: boolean }).reschedule)).toBe(false);
   });
 
+  it('confirmed + the booked time repeated (an acknowledgement): nothing happens, no flag (rule 57)', async () => {
+    const { s, h, id } = await confirmed();
+    const before = await countInterviewsForThread(s.t.handle, s.thread.id);
+    const out = await offerSlots(
+      s.t.handle,
+      { ...offerInput(s, [proposed('2037-11-12T10:00:00-08:00')]), messageId: 'm2' },
+      h.deps,
+    );
+    expect(out).toMatchObject({ status: 'already_booked', interviewId: id, offered: 0 });
+    expect(await countInterviewsForThread(s.t.handle, s.thread.id)).toBe(before);
+    const log = await activity.listByUser(s.t.handle, s.t.userId);
+    expect(log.some((e) => e.action === 'digest_flag')).toBe(false);
+    // The booked time among new ones is dropped; the rest open a new round.
+    const mixed = await offerSlots(
+      s.t.handle,
+      { ...offerInput(s, [proposed('2037-11-12T10:00:00-08:00'), ...later()]), messageId: 'm3' },
+      h.deps,
+    );
+    expect(mixed).toMatchObject({ status: 'offered', offered: 2 });
+    expect(mixed.interviewId).not.toBe(id);
+  });
+
   it('confirmed + reschedule + start in the past: a second row', async () => {
     const { s, h, id } = await confirmed();
     await updateInterview(s.t.handle, id, { startsAt: new Date(NOW.getTime() - 3_600_000) });

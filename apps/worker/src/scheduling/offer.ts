@@ -195,7 +195,9 @@ export async function recordOffer(
 
   const ctx = await loadApplicationContext(handle, input.userId, input.applicationId);
   const now = deps.clock.now();
-  const { slots, notes } = normalizeSlots(input.slots, now, ctx.user.timezone);
+  const normalized = normalizeSlots(input.slots, now, ctx.user.timezone);
+  let slots = normalized.slots;
+  const { notes } = normalized;
   const base = { thread_id: input.threadId, message_id: input.messageId };
 
   // The newest interview on the thread. A confirmed one is moved only when the message says so and
@@ -208,6 +210,21 @@ export async function recordOffer(
     existing!.startsAt != null &&
     existing!.startsAt > now;
   const newRound = confirmed && !reschedule;
+
+  // Rule 57: the employer's acknowledgement repeats the time just booked ("Confirmed: Tuesday
+  // 2:00 PM"). That is not a proposal: the booked time is dropped, and when nothing else is left
+  // the message changes nothing (no interview, no digest flag).
+  if (confirmed && !reschedule) {
+    const bookedSlot = (await listSlotsForInterview(handle, existing!.id)).find(
+      (s) => s.id === existing!.confirmedSlotId,
+    );
+    if (bookedSlot) {
+      slots = slots.filter((s) => s.start.getTime() !== bookedSlot.startsAt.getTime());
+      if (slots.length === 0) {
+        return none('already_booked', { interviewId: existing!.id, notes });
+      }
+    }
+  }
 
   // The same times offered again while their request is out: nothing to do.
   if (existing && !confirmed && existing.confirmationEmailSentAt && slots.length > 0) {

@@ -88,7 +88,8 @@ export interface RecordedOffer extends OfferResult {
 }
 
 export interface OfferResult {
-  status: 'offered' | 'no_slots' | 'no_free_slot' | 'already_offered' | 'blocked';
+  status:
+    'offered' | 'no_slots' | 'no_free_slot' | 'already_offered' | 'already_booked' | 'blocked';
   interviewId: string | null;
   /** True when this offer replaced a confirmed interview's time (rule 11). */
   reschedule: boolean;
