@@ -17,3 +17,7 @@ test-results/
 
 # e2e session state
 apps/web/e2e/.auth/
+
+# DeepEval local run cache and Python bytecode
+.deepeval/
+__pycache__/

@@ -1,0 +1,42 @@
+[
+  {
+    "input": "Title: Senior Backend Engineer, Data Platform\nCompany: Northwind Labs\nLocation: Remote - EU\n\nBuild the streaming pipelines behind Northwind's analytics. Go and Postgres No on-call Salary: EUR 110,000 - 140,000. Apply by 2026-11-20.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Account Executive\nCompany: Northwind Labs\nLocation: London\n\nSell things.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Platform Engineer\nCompany: Initrode\nLocation: Lisbon, Portugal\n\nOwn the internal developer platform at Quillbase.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Office Manager\nCompany: Initrode\nLocation: Berlin\n\nKeep the office running.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Platform Engineer\nCompany: Harbor Robotics\nLocation: San Francisco, CA\n\nOwn the fleet telemetry platform that every warehouse robot reports to.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Backend Engineer\nCompany: Lumen Labs\nLocation: Remote (US)\n\nBuild the ingestion services behind a sensor analytics product.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Software Engineer, Data Pipelines\nCompany: Northwind Grid\nLocation: Oakland, CA\n\nMove energy-market batch jobs to a streaming architecture.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Staff Software Engineer, Scheduling\nCompany: Cedar Health\nLocation: Remote (US)\n\nDesign the appointment scheduling core for a clinic network.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Principal Engineer, Developer Tools\nCompany: Quarry Systems\nLocation: San Jose, CA\n\nLead the build and test infrastructure used by every engineering team.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  },
+  {
+    "input": "Title: Senior Engineer, Payments Reliability\nCompany: Tidewater Pay\nLocation: San Francisco, CA\n\nKeep a card-processing platform correct under load.",
+    "expected_output": "A resume that states only employers, titles, dates, degrees, skills, technologies and numbers found in the candidate profile; posting requirements the profile lacks are left out or listed as unmet, never claimed."
+  }
+]

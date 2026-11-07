@@ -1,0 +1,42 @@
+[
+  {
+    "input": "Gender",
+    "expected_output": "self-identification"
+  },
+  {
+    "input": "Are you a protected veteran?",
+    "expected_output": "self-identification"
+  },
+  {
+    "input": "Identify your community",
+    "expected_output": "self-identification"
+  },
+  {
+    "input": "Veteran Status",
+    "expected_output": "self-identification"
+  },
+  {
+    "input": "Why do you want to work here?",
+    "expected_output": "free-text"
+  },
+  {
+    "input": "Describe a hard bug",
+    "expected_output": "free-text"
+  },
+  {
+    "input": "Tell us about leadership",
+    "expected_output": "free-text"
+  },
+  {
+    "input": "Why Initrode?",
+    "expected_output": "free-text"
+  },
+  {
+    "input": "Describe your certification number",
+    "expected_output": "free-text"
+  },
+  {
+    "input": "Which of these have you used in production?\nOptions: Go | PostgreSQL | Kubernetes | TypeScript",
+    "expected_output": "free-text"
+  }
+]

@@ -1,0 +1,146 @@
+[
+  {
+    "input": "Date: 2026-03-13T12:00:00Z\nFrom: Dana Whitcomb <recruiting@lumenlabs.example>\nSubject: Pick a time to talk about Senior Backend Engineer\n\nHi Mara,\n\nPlease choose a time that suits you on my calendar: https://cal.lumenlabs.example/dana/intro-call\n\nDana Whitcomb",
+    "expected_output": "{\"classification\": \"interview\", \"compensation_flag\": false, \"booking_link\": \"https://cal.lumenlabs.example/dana/intro-call\", \"slot_starts\": [], \"ambiguous\": false}"
+  },
+  {
+    "input": "Date: 2026-03-13T11:00:00Z\nFrom: Dana Whitcomb <recruiting@lumenlabs.example>\nSubject: Next steps for Senior Backend Engineer\n\nHi Mara,\n\nBefore we schedule, what are your salary expectations for the Senior Backend Engineer role? We can talk on Monday March 30, 2026 at 11:00 AM Pacific.\n\nDana Whitcomb",
+    "expected_output": "{\"classification\": \"interview\", \"compensation_flag\": true, \"booking_link\": null, \"slot_starts\": [\"2026-03-30T11:00:00-07:00\"], \"ambiguous\": false}"
+  },
+  {
+    "input": "Date: 2026-03-11T09:14:00Z\nFrom: Dana Whitcomb <recruiting@lumenlabs.example>\nSubject: We received your application for Senior Backend Engineer\n\nHi Mara,\n\nThank you for applying for the Senior Backend Engineer role at Lumen Labs. We have received your application and our team will review it.\n\nDana Whitcomb\nTalent team, Lumen Labs",
+    "expected_output": "{\"classification\": \"confirmation\", \"compensation_flag\": false, \"booking_link\": null, \"slot_starts\": [], \"ambiguous\": false}"
+  },
+  {
+    "input": "Date: 2026-03-13T10:30:00Z\nFrom: Dana Whitcomb <recruiting@lumenlabs.example>\nSubject: Interview for Senior Backend Engineer at Lumen Labs\n\nHi Mara,\n\nWe would like to speak with you about the Senior Backend Engineer role. Could you do any of these times?\n\n- Tuesday March 24, 2026 at 10:00 AM Pacific\n- Wednesday March 25, 2026 at 2:00 PM Pacific\n- Sometime Thursday morning\n\nEach call is 45 minutes.\n\nDana Whitcomb",
+    "expected_output": "{\"classification\": \"interview\", \"compensation_flag\": false, \"booking_link\": null, \"slot_starts\": [\"2026-03-24T10:00:00-07:00\", \"2026-03-25T14:00:00-07:00\", \"2026-03-26T09:00:00-07:00\"], \"ambiguous\": true}"
+  },
+  {
+    "input": "Date: 2026-03-18T15:00:00Z\nFrom: Dana Whitcomb <recruiting@lumenlabs.example>\nSubject: Offer of employment: Senior Backend Engineer\n\nHi Mara,\n\nWe are delighted to offer you the Senior Backend Engineer position at Lumen Labs. The base salary is $185,000 per year with an equity grant described in the attached letter.\n\nPlease reply by Friday.\n\nDana Whitcomb",
+    "expected_output": "{\"classification\": \"offer\", \"compensation_flag\": true, \"booking_link\": null, \"slot_starts\": [], \"ambiguous\": false}"
+  },
+  {
+    "input": "Date: 2026-03-12T08:00:00Z\nFrom: Dana Whitcomb <recruiting@lumenlabs.example>\nSubject: A quick question about your Senior Backend Engineer application\n\nHi Mara,\n\nCould you send us a link to your portfolio for the Senior Backend Engineer role? Thanks!\n\nDana Whitcomb",
+    "expected_output": "{\"classification\": \"other\", \"compensation_flag\": false, \"booking_link\": null, \"slot_starts\": [], \"ambiguous\": false}"
+  },
+  {
+    "input": "Date: 2026-03-14T16:02:00Z\nFrom: Dana Whitcomb <recruiting@lumenlabs.example>\nSubject: Your application for Senior Backend Engineer\n\nHi Mara,\n\nThank you for your interest in Lumen Labs. After careful consideration we have decided not to move forward with your application for Senior Backend Engineer.\n\nWe wish you the best in your search.\n\nDana Whitcomb",
+    "expected_output": "{\"classification\": \"rejection\", \"compensation_flag\": false, \"booking_link\": null, \"slot_starts\": [], \"ambiguous\": false}"
+  },
+  {
+    "input": "Date: 2026-03-12T07:00:00Z\nFrom: Weekly Digest <news@gardenclub.example>\nSubject: This week at the garden club\n\nSeed swap on Saturday. Bring cuttings.",
+    "expected_output": "{\"classification\": \"other\", \"compensation_flag\": false, \"booking_link\": null, \"slot_starts\": [], \"ambiguous\": false}"
+  },
+  {
+    "input": "Date: 2025-03-04T09:12:45-05:00\nFrom: Daniel Whitaker <daniel.whitaker@brightpathtalent.com>\nSubject: Senior Data Analyst opportunity at Northwind Analytics\n\nHi Mara,\n\nI came across your profile and was impressed by your background in data visualization and SQL. We are hiring a Senior Data Analyst at Northwind Analytics, and I think you could be a great fit. Would you be open to a 20-minute introductory call this week? You can pick a time that suits you here: https://calendly.com/daniel-whitaker/intro-call\n\nLooking forward to hearing from you.\n\nBest regards,\nDaniel Whitaker\nSenior Technical Recruiter, BrightPath Talent\n+1 (555) 014-2290",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":\"https://calendly.com/daniel-whitaker/intro-call\",\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-03-06T14:30:00+00:00\nFrom: Priya Raman <priya.raman@helixsoftware.io>\nSubject: Interview scheduling: Product Analyst, second round\n\nDear Mara,\n\nThank you for taking the time to speak with our team last week. We would like to invite you to a second-round interview with the Product Analytics group. Please select a 45-minute slot that works for you using our scheduling page: https://helixsoftware.io/schedule/mara-second-round\n\nKindly book a time by Friday, March 14, if possible.\n\nKind regards,\nPriya Raman\nTalent Acquisition Coordinator\nHelix Software",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":\"https://helixsoftware.io/schedule/mara-second-round\",\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-03-10T08:05:19-07:00\nFrom: Tom\u00e1s Alvarez <t.alvarez@cobaltgrid.com>\nSubject: Quick request: complete your candidate profile\n\nHello Mara,\n\nThanks for your interest in the Business Intelligence Lead role at Cobalt Grid. To move your application forward, could you please complete a short candidate profile and upload your portfolio at https://careers.cobaltgrid.com/profile/update? It should take about 10 minutes.\n\nPlease let me know if you run into any issues.\n\nWarm regards,\nTom\u00e1s Alvarez\nRecruiting Partner, Cobalt Grid\ntalent@cobaltgrid.com",
+    "expected_output": "{\"classification\":\"other\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-03-12T16:48:02+01:00\nFrom: Eleanor Nguyen <eleanor.nguyen@lumencreative.co>\nSubject: Coffee chat about a Marketing Operations role?\n\nHi Mara,\n\nI hope this message finds you well. A mutual connection, Jonas Berg, suggested I reach out. We are growing our Marketing Operations team at Lumen Creative and I would love to share more about the role. If you are interested, please grab a time on my calendar here: https://cal.com/eleanor-nguyen/coffee-chat\n\nThank you, and I hope to connect soon.\n\nSincerely,\nEleanor Nguyen\nHead of People, Lumen Creative",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":\"https://cal.com/eleanor-nguyen/coffee-chat\",\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-03-14T11:20:33-04:00\nFrom: Marcus Oyelaran <marcus.oyelaran@pinnaclehealthgroup.org>\nSubject: Reschedule request for your Thursday interview\n\nDear Mara,\n\nI apologize for the inconvenience, but our hiring manager has a conflict and we need to reschedule your interview originally planned for Thursday at 2:00 PM. Could you please choose a new time from the available options at https://pinnaclehealthgroup.org/interviews/reschedule/mara-k?\n\nThank you so much for your flexibility and understanding.\n\nBest,\nMarcus Oyelaran\nHR Coordinator\nPinnacle Health Group\n(555) 019-7741",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":\"https://pinnaclehealthgroup.org/interviews/reschedule/mara-k\",\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-03-04T09:15:22-05:00\nFrom: Daniel Okafor <daniel.okafor@brightpathtech.com>\nSubject: Senior Product Designer Opportunity at BrightPath Technologies\n\nHi Mara,\n\nThank you for applying for the Senior Product Designer role at BrightPath Technologies. Your portfolio really stood out to our hiring team. Before we move forward, could you share your salary expectations for this position? I'd also love to set up a 30-minute introductory call this Thursday, March 6th, at 2:00 PM EST. Please let me know if that works for you.\n\nBest regards,\nDaniel Okafor\nSenior Technical Recruiter\nBrightPath Technologies\n(212) 555-0147",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[\"2025-03-06T14:00:00-05:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-04-11T16:42:07+01:00\nFrom: Priya Nambiar <priya.nambiar@lumenanalytics.io>\nSubject: Data Analyst Role - Next Steps\n\nDear Mara,\n\nI hope you're having a great week. I'm reaching out from Lumen Analytics regarding the Data Analyst opening you recently expressed interest in. What compensation range are you targeting for a role like this? If you're available, I'd like to propose a quick phone screen on Monday, April 14th at 10:30 AM BST.\n\nLooking forward to hearing from you.\n\nWarm regards,\nPriya Nambiar\nTalent Acquisition Partner\nLumen Analytics\npriya.nambiar@lumenanalytics.io | +44 20 7946 0321",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[\"2025-04-14T10:30:00+01:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-05-19T08:03:51-07:00\nFrom: Marcus Feldman <m.feldman@harborview-health.org>\nSubject: Re: Marketing Manager Position at Harborview Health\n\nHello Mara,\n\nThanks for getting back to me with your updated resume. We're excited about your background in healthcare marketing. Could you let me know your expected base salary for the Marketing Manager role? If it suits your schedule, I'd like to schedule a video call with you and our department head on Wednesday, May 21st at 11:00 AM PDT.\n\nThank you,\nMarcus Feldman\nRecruiting Coordinator\nHarborview Health\nDirect: (415) 555-0192",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[\"2025-05-21T11:00:00-07:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-06-02T13:27:45Z\nFrom: Sofia Alvarez <sofia.alvarez@northwindlogistics.com>\nSubject: Quick chat about Operations Coordinator opening?\n\nHi Mara,\n\nI came across your profile and think you could be a great fit for an Operations Coordinator position here at Northwind Logistics. Would you be comfortable sharing your salary expectations so we can make sure we're aligned from the start? I'd like to propose a 20-minute call on Friday, June 6th at 3:30 PM UTC to walk you through the role.\n\nCheers,\nSofia Alvarez\nSenior Recruiter, Northwind Logistics\nsofia.alvarez@northwindlogistics.com\nwww.northwindlogistics.com/careers",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[\"2025-06-06T15:30:00+00:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-07-23T18:10:09+09:00\nFrom: Kenji Watanabe <kenji.watanabe@sakuracloud.jp>\nSubject: Interview Invitation: Customer Success Lead, Sakura Cloud\n\nDear Ms. Mara,\n\nI am writing on behalf of Sakura Cloud to follow up on your application for the Customer Success Lead position. May I ask what your current salary expectations are, including any flexibility? We would like to invite you to an initial conversation on Tuesday, July 29th at 4:00 PM JST. Please confirm if this time is convenient or suggest an alternative.\n\nSincerely,\nKenji Watanabe\nHR Manager\nSakura Cloud Inc.\nTel: +81 3-5550-0188",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[\"2025-07-29T16:00:00+09:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-03-04T09:12:45Z\nFrom: Talent Acquisition Team <no-reply@careers.brightwave-analytics.com>\nSubject: We received your application for Data Analyst (Req #DA-20417)\n\nDear Jordan Ellis,\n\nThank you for applying for the Data Analyst position at Brightwave Analytics. We confirm that your application was received on 2025-03-03 and is now under review by our recruiting team.\n\nIf your qualifications match our requirements, a recruiter will contact you within 10 business days to discuss next steps. Please do not reply to this message, as this mailbox is not monitored.\n\nSincerely,\nMaria Chen\nTalent Acquisition Team\nBrightwave Analytics",
+    "expected_output": "{\"classification\":\"confirmation\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-03-11T14:30:02-05:00\nFrom: Daniel Okafor <daniel.okafor@northstarlogistics.com>\nSubject: Interview Invitation: Operations Coordinator at Northstar Logistics\n\nDear Jordan Ellis,\n\nFollowing our review of your application, we would like to invite you to a 45-minute video interview for the Operations Coordinator position. The interview will be conducted by the hiring manager and a member of our operations team.\n\nPlease select a time slot from the following options by replying to this email no later than 2025-03-14T17:00:00-05:00:\n- 2025-03-18 at 10:00 AM CT\n- 2025-03-18 at 2:30 PM CT\n- 2025-03-19 at 11:00 AM CT\n\nA video conference link will be sent once your time is confirmed.\n\nKind regards,\nDaniel Okafor\nRecruiting Team\nNorthstar Logistics",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[\"2025-03-18T10:00:00-05:00\",\"2025-03-18T14:30:00-05:00\",\"2025-03-19T11:00:00-05:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-02-20T16:48:19Z\nFrom: Priya Raman <careers-update@solaris-health.org>\nSubject: Update on your application for Junior Project Manager\n\nDear Jordan Ellis,\n\nThank you for your interest in the Junior Project Manager role at Solaris Health and for the time you invested in the application process. After careful consideration, we have decided to move forward with other candidates whose experience more closely matches the current needs of the position.\n\nWe will keep your resume on file and encourage you to apply for future openings that match your background. We wish you success in your job search.\n\nBest regards,\nPriya Raman\nPeople Operations Team\nSolaris Health",
+    "expected_output": "{\"classification\":\"rejection\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-04-02T08:05:33+01:00\nFrom: Hiring Assessments <assessments@kestrelsoftware.io>\nSubject: Action Required: Complete your online coding assessment (Backend Engineer)\n\nDear Jordan Ellis,\n\nThank you for applying for the Backend Engineer position at Kestrel Software. As the next step in our selection process, we invite you to complete an online coding assessment.\n\nThe assessment takes approximately 90 minutes and must be completed within 5 days of this message, by 2025-04-07T23:59:00+01:00. You can access it using the personal link below:\nhttps://assess.kestrelsoftware.io/start/8f3a21c9\n\nPlease ensure you have a stable internet connection and a quiet environment. If you require any accommodations, contact us at least 48 hours before you begin.\n\nYours sincerely,\nAlan Whitfield\nTechnical Recruiting Team\nKestrel Software",
+    "expected_output": "{\"classification\":\"other\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-05-15T11:20:00Z\nFrom: Sofia Alvarez <sofia.alvarez@harborlinefinancial.com>\nSubject: Offer of Employment: Financial Analyst, Harborline Financial\n\nDear Jordan Ellis,\n\nWe are pleased to offer you the position of Financial Analyst at Harborline Financial, with a proposed start date of 2025-06-16. The details of compensation, benefits, and reporting structure are outlined in the attached offer letter.\n\nThis offer is contingent upon the successful completion of a background check and employment verification. Please sign and return the offer letter by 2025-05-22 to confirm your acceptance. Should you have any questions, do not hesitate to contact me.\n\nWarm regards,\nSofia Alvarez\nHuman Resources Team\nHarborline Financial",
+    "expected_output": "{\"classification\":\"offer\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-04-02T16:42:00+01:00\nFrom: Oliver Hartley <o.hartley@northwindanalytics.co.uk>\nSubject: Next steps: Data Analyst role - panel interview\n\nDear Mara,\n\nFollowing your initial phone screen, we are pleased to invite you to a 90-minute panel interview for the Data Analyst position. The panel will include three members of our analytics team. Could you please indicate your availability among the options below?\n\n- Monday, 14 April 2025, 09:30 BST\n- Tuesday, 15 April 2025, 14:00 BST\n- Friday, 18 April 2025, 10:00 BST\n\nPlease note that the interview will take place at our London office, and we can arrange a virtual option if preferred.\n\nKind regards,\nOliver Hartley\nTalent Acquisition Partner\nNorthwind Analytics Ltd.\n+44 20 7946 0321",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[\"2025-04-14T09:30:00+01:00\",\"2025-04-15T14:00:00+01:00\",\"2025-04-18T10:00:00+01:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-05-06T08:05:00-07:00\nFrom: Priya Raman <priya.raman@cobaltsystems.io>\nSubject: Quick chat about the Engineering Manager opening?\n\nHello Mara,\n\nI came across your profile and think you could be a great fit for our Engineering Manager opening at Cobalt Systems. Would you be open to a brief introductory call of about 30 minutes? I have the following slots available next week:\n\n- Monday morning, around 10\n- Wednesday, May 14 at 1:00 PM (Pacific, I think, but happy to adjust)\n- Thursday, May 15 at 4:00 PM\n\nLet me know what works, and feel free to suggest other times if none of these fit.\n\nThanks,\nPriya Raman\nRecruiting Lead, Cobalt Systems\npriya.raman@cobaltsystems.io",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[\"2025-05-14T13:00:00-07:00\",\"2025-05-15T16:00:00-07:00\"],\"ambiguous\":true}"
+  },
+  {
+    "input": "Date: 2025-06-12T13:27:45+09:00\nFrom: Kenji Watanabe <kenji.watanabe@sakuratech.jp>\nSubject: Final Round Interview - Marketing Operations Lead (Sakura Tech)\n\nDear Ms. Mara,\n\nCongratulations on advancing to the final round for the Marketing Operations Lead position. This round will be a 60-minute conversation with our VP of Marketing and the Head of People. Because you are located in Chicago, I have listed the times in both JST and CDT for your convenience:\n\n- Monday, June 23, 2025 at 9:00 AM JST (Sunday, June 22, 7:00 PM CDT)\n- Tuesday, June 24, 2025 at 8:00 AM JST (Monday, June 23, 6:00 PM CDT)\n- Thursday, June 26, 2025 at 10:00 AM JST (Wednesday, June 25, 8:00 PM CDT)\n\nPlease reply by June 16 so that we can confirm the attendees.\n\nWith appreciation,\nKenji Watanabe\nHR Manager\nSakura Tech Inc.\n+81 3 5550 0192",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[\"2025-06-23T09:00:00+09:00\",\"2025-06-24T08:00:00+09:00\",\"2025-06-26T10:00:00+09:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-07-21T11:50:12Z\nFrom: Hannah Brooks <hannah.brooks@greenleafhealth.org>\nSubject: Interview Request - Clinical Program Coordinator\n\nHi Mara,\n\nThanks for applying to the Clinical Program Coordinator role at GreenLeaf Health. We'd like to invite you to a 30-minute screening call with me, followed by a possible 45-minute conversation with the program director. Here are some proposed windows for the screening call:\n\n- Wednesday, July 30, 2025, 9:00-9:30 AM ET\n- Wednesday, July 30, 2025, 9:15-9:45 AM ET\n- Thursday, July 31, 2025, 3:00-3:30 PM ET\n- Friday, August 1, 2025, 12:00 PM (time zone TBD)\n\nPlease let me know your preference and the best number to reach you.\n\nWarm regards,\nHannah Brooks\nTalent Coordinator\nGreenLeaf Health\n(617) 555-0173",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[\"2025-07-30T09:00:00-04:00\",\"2025-07-30T09:15:00-04:00\",\"2025-07-31T15:00:00-04:00\"],\"ambiguous\":true}"
+  },
+  {
+    "input": "Date: Mon, 03 Mar 2025 09:14:22 -0500\nFrom: Rebecca Hartwell <rebecca.hartwell@northbridgetalent.com>\nSubject: Offer of Employment - Senior Data Analyst, Meridian Health Systems\n\nDear Mr. Alvarez,\n\nOn behalf of Meridian Health Systems, I am pleased to extend an offer for the position of Senior Data Analyst, reporting to Dr. Linda Cho, Director of Analytics. The offer includes an annual base salary of $112,000, a signing bonus of $5,000, and a start date of April 14, 2025. Please review the attached offer letter and return a signed copy by Friday, March 7, 2025, at 5:00 PM EST.\n\nShould you have any questions regarding compensation or benefits, please do not hesitate to contact me directly at (212) 555-0147.\n\nSincerely,\nRebecca Hartwell\nSenior Recruiter\nNorthbridge Talent Partners",
+    "expected_output": "{\"classification\":\"offer\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: Tue, 11 Feb 2025 14:02:05 +0000\nFrom: James O'Connell <j.oconnell@brightwaveconsulting.co.uk>\nSubject: Interview Invitation - Project Manager Role (Ref: PM-2291)\n\nDear Ms. Patel,\n\nThank you for your application for the Project Manager position at Brightwave Consulting. We would like to invite you to a second-round interview on Thursday, February 20, 2025, at 10:30 AM GMT at our London office, 45 Carter Lane. The interview will last approximately 90 minutes and will include a short presentation on a budget of \u00a3250,000 for a hypothetical client project. Kindly confirm your attendance by Friday, February 14, 2025.\n\nKind regards,\nJames O'Connell\nHead of Talent Acquisition\nBrightwave Consulting Ltd.",
+    "expected_output": "{\"classification\":\"interview\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[\"2025-02-20T10:30:00+00:00\"],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: Wed, 19 Mar 2025 16:45:10 -0700\nFrom: Priya Raman <priya.raman@solstice-software.com>\nSubject: Follow-Up: Compensation Details for Software Engineer II Position\n\nDear Mr. Thompson,\n\nFollowing our conversation on Monday, I am writing to confirm the compensation package for the Software Engineer II role at Solstice Software. The package includes a base salary of $138,500, an annual performance bonus of up to 12%, and 2,000 restricted stock units vesting over four years. To proceed, we require your completed background check authorization form by Wednesday, March 26, 2025. Please note that this offer expires on Friday, March 28, 2025.\n\nBest regards,\nPriya Raman\nTechnical Recruiting Manager\nSolstice Software, Inc.",
+    "expected_output": "{\"classification\":\"offer\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: Fri, 07 Mar 2025 11:30:48 -0600\nFrom: Marcus Delgado <mdelgado@lonestarlogistics.com>\nSubject: Application Status Update - Operations Coordinator\n\nDear Ms. Nguyen,\n\nThank you for taking the time to interview for the Operations Coordinator position at Lone Star Logistics. After careful consideration, we have decided to move forward with another candidate whose experience more closely matches our current needs. We were impressed with your background and would like to keep your resume on file for six months in case a suitable opening arises. We wish you success in your job search.\n\nSincerely,\nMarcus Delgado\nHR Manager\nLone Star Logistics, LLC",
+    "expected_output": "{\"classification\":\"rejection\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: Thu, 24 Apr 2025 08:20:37 +0200\nFrom: Sabine Keller <sabine.keller@alpenfinanz.ch>\nSubject: Reminder: Onboarding Documents Due - Financial Controller\n\nDear Mr. Rossi,\n\nWe are delighted that you have accepted the position of Financial Controller at AlpenFinanz AG, starting June 2, 2025, with an annual gross salary of CHF 145,000. To complete your onboarding, please submit a copy of your passport, your signed employment contract, and your bank details through our secure portal no later than Friday, May 9, 2025. A relocation allowance of CHF 8,000 will be issued upon receipt of these documents.\n\nWith best regards,\nSabine Keller\nHead of Human Resources\nAlpenFinanz AG",
+    "expected_output": "{\"classification\":\"other\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2025-03-04T09:15:00Z\nFrom: Priya Nair <priya.nair@northwindtech.com>\nSubject: Senior Backend Engineer Role - Portfolio Request\n\nHi Jordan,\n\nThank you for applying to the Senior Backend Engineer position at Northwind Technologies. Could you please send us a link to your portfolio or GitHub so our engineering team can review your work?\n\nBest regards,\nPriya Nair",
+    "expected_output": "{\"classification\":\"other\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2024-03-14T09:42:17Z\nFrom: Rebecca Lawson <rebecca.lawson@brightwaveanalytics.com>\nSubject: Your Application for Data Analyst \u2013 Update\n\nDear Mr. Patel,\n\nThank you for taking the time to apply for the Data Analyst position at Brightwave Analytics and for interviewing with our team last week. We truly appreciated the opportunity to learn more about your background and experience.\n\nAfter careful consideration, we have decided to move forward with another candidate whose experience more closely matches the current needs of the role. This decision was not an easy one, as we were impressed by your technical skills and your thoughtful answers during the interview.\n\nWe will keep your resume on file and encourage you to apply for future openings that match your qualifications. We wish you every success in your job search.\n\nSincerely,\n\nRebecca Lawson\nSenior Talent Acquisition Partner\nBrightwave Analytics\n+1 (555) 014-2290",
+    "expected_output": "{\"classification\":\"rejection\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2023-11-27T11:20:05+01:00\nFrom: Sophie Lindqvist <s.lindqvist@auroraworks.eu>\nSubject: Outcome of your application: Junior UX Designer\n\nDear Jonas Becker,\n\nThank you very much for your application for the Junior UX Designer role at Aurora Works, and for presenting your portfolio during the final interview round on 20 November.\n\nWe regret to inform you that we have decided not to offer you the position. The selection process was highly competitive, and the final decision came down to a very narrow margin. We were particularly impressed by your case study on accessible mobile navigation.\n\nWe would be happy to stay in touch and would welcome an application from you again in the future. Should you wish to receive feedback on your interview, please reply to this email and we will arrange a short call.\n\nBest regards,\n\nSophie Lindqvist\nHead of People & Culture\nAurora Works GmbH",
+    "expected_output": "{\"classification\":\"rejection\",\"compensation_flag\":false,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  },
+  {
+    "input": "Date: 2024-03-04T09:15:00-05:00\nFrom: Margaret Ellison <margaret@greenthumbsgardenclub.org>\nSubject: March Newsletter - Seed Swap & Spring Planting Tips\n\nHi everyone!\n\nHope you're all dusting off your trowels. Our annual seed swap is happening Saturday, March 16th at 10am at the Maple Street Community Center. Bring any extra seeds, labeled if you can! Also, we're collecting $15 dues for the year, so please bring cash or a check to Pat at the door. Early tomatoes should be started indoors now. See you there!\n\nMargaret",
+    "expected_output": "{\"classification\":\"other\",\"compensation_flag\":true,\"booking_link\":null,\"slot_starts\":[],\"ambiguous\":false}"
+  }
+]
