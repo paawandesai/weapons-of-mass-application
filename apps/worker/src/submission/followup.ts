@@ -1,9 +1,7 @@
 import type { PgBoss } from 'pg-boss';
 import { listFollowUpsOwed, markFollowUpEnqueued, type Db, type TenantHandle } from '@wma/db';
-import { FOLLOW_UP_DELAY_DAYS, FOLLOW_UP_JOB } from './constants';
+import { FOLLOW_UP_JOB, followUpDelayMs } from './constants';
 import type { FollowUpJobData, FollowUpQueue } from './deps';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Enqueues the follow-up job for an applied application. The job id is the application id, so a
@@ -24,8 +22,7 @@ export function createFollowUpQueue(boss: PgBoss): FollowUpQueue {
   };
 }
 
-export const followUpStart = (appliedAt: Date) =>
-  new Date(appliedAt.getTime() + FOLLOW_UP_DELAY_DAYS * DAY_MS);
+export const followUpStart = (appliedAt: Date) => new Date(appliedAt.getTime() + followUpDelayMs());
 
 /**
  * Queues the follow-up for one applied application, then records that it is queued. A crash

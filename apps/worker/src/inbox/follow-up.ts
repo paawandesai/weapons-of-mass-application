@@ -11,13 +11,11 @@ import {
 } from '@wma/db';
 import { markRevoked } from '@wma/google';
 import { sendEmailRecovering } from '@wma/shared';
-import { FOLLOW_UP_DELAY_DAYS } from '../submission/constants';
+import { followUpDelayMs } from '../submission/constants';
 import { senderAddress } from '../submission/domains';
 import type { InboxDeps } from './deps';
 import { isAuthError } from './gmail-reader';
 import { renderFollowUp } from './templates/follow-up';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type FollowUpSkip =
   | 'application_missing'
@@ -93,7 +91,7 @@ export async function runFollowUp(
       if (app.status !== 'applied') return logSkip('not_applied', { status: app.status });
       if (
         !app.appliedAt ||
-        app.appliedAt.getTime() + FOLLOW_UP_DELAY_DAYS * DAY_MS > deps.clock.now().getTime()
+        app.appliedAt.getTime() + followUpDelayMs() > deps.clock.now().getTime()
       ) {
         return logSkip('too_early');
       }

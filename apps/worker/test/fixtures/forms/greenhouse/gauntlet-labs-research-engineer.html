@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Research Engineer at Gauntlet Labs</title>
+  </head>
+  <body>
+    <!-- Gauntlet Labs is fictional, part of the Gauntlet golden set for local end-to-end testing.
+         Challenge: a minimal form; the recruiter never writes after the confirmation -->
+    <div id="app_body">
+      <h1 class="app-title">Research Engineer</h1>
+      <div class="company-name">Gauntlet Labs</div>
+      <p>
+        Turn research prototypes into production: TypeScript and Go services on PostgreSQL,
+        streaming data pipelines, and the evaluation tooling that proves they work.
+      </p>
+      <form id="application_form" data-confirm="gauntlet-confirmation.html">
+        <div id="main_fields">
+          <div class="field">
+            <label class="field-label" for="first_name"
+              >First Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="first_name" name="job_application[first_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="last_name"
+              >Last Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="last_name" name="job_application[last_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="email">Email <span class="asterisk">*</span></label>
+            <input type="email" id="email" name="job_application[email]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="phone">Phone</label>
+            <input type="tel" id="phone" name="job_application[phone]" />
+          </div>
+          <div class="field" id="resume_fieldset">
+            <label class="field-label" for="resume"
+              >Resume/CV <span class="asterisk">*</span></label
+            >
+            <input type="file" id="resume" name="job_application[resume]" required />
+          </div>
+        </div>
+
+        <div id="custom_fields">
+          <div class="field">
+            <label class="field-label" for="q0">LinkedIn Profile</label>
+            <input type="text" id="q0" name="job_application[answers_attributes][0][text_value]" />
+          </div>
+        </div>
+
+        <button type="submit" id="submit_app" class="btn">Submit Application</button>
+      </form>
+    </div>
+    <script src="../_shared/fixture.js"></script>
+  </body>
+</html>

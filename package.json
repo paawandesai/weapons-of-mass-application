@@ -17,7 +17,10 @@
     "db:test-reset": "scripts/db-test-reset.sh",
     "dev": "concurrently -k -n api,worker,web -c blue,green,magenta \"pnpm -F @wma/api dev\" \"pnpm -F @wma/worker dev\" \"pnpm -F @wma/web dev\"",
     "test:e2e": "pnpm -F @wma/web test:e2e",
-    "seed:demo": "pnpm --filter @wma/db seed:demo"
+    "seed:demo": "pnpm --filter @wma/db seed:demo",
+    "gauntlet:mail": "pnpm --filter @wma/db gauntlet:mail",
+    "gauntlet:autopilot": "pnpm --filter @wma/db gauntlet:autopilot",
+    "gauntlet:score": "pnpm --filter @wma/db gauntlet:score"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

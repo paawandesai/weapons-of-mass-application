@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Data Engineer at Gauntlet Data</title>
+  </head>
+  <body>
+    <!-- Gauntlet Data is fictional, part of the Gauntlet golden set for local end-to-end testing.
+         Challenge: a date picker for the start date and an optional cover letter; the recruiter later moves the booked call -->
+    <div id="app_body">
+      <h1 class="app-title">Data Engineer</h1>
+      <div class="company-name">Gauntlet Data</div>
+      <p>
+        Design and run the pipelines that feed our AI products: streaming ingestion, PostgreSQL
+        warehousing, and the TypeScript services that serve the results.
+      </p>
+      <form id="application_form" data-confirm="gauntlet-confirmation.html">
+        <div id="main_fields">
+          <div class="field">
+            <label class="field-label" for="first_name"
+              >First Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="first_name" name="job_application[first_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="last_name"
+              >Last Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="last_name" name="job_application[last_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="email">Email <span class="asterisk">*</span></label>
+            <input type="email" id="email" name="job_application[email]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="phone">Phone</label>
+            <input type="tel" id="phone" name="job_application[phone]" />
+          </div>
+          <div class="field" id="resume_fieldset">
+            <label class="field-label" for="resume"
+              >Resume/CV <span class="asterisk">*</span></label
+            >
+            <input type="file" id="resume" name="job_application[resume]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="cover_letter">Cover Letter</label>
+            <input type="file" id="cover_letter" name="job_application[cover_letter]" />
+          </div>
+        </div>
+
+        <div id="custom_fields">
+          <div class="field">
+            <label class="field-label" for="q0">When can you start?</label>
+            <input type="date" id="q0" name="job_application[answers_attributes][0][text_value]" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="q1"
+              >Which data pipeline are you proudest of, and why?</label
+            >
+            <textarea
+              id="q1"
+              name="job_application[answers_attributes][1][text_value]"
+              maxlength="1500"
+            ></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="q2"
+              >How many years have you worked with PostgreSQL?
+              <span class="asterisk">*</span></label
+            >
+            <select id="q2" name="job_application[answers_attributes][2][text_value]" required>
+              <option value="">Please select</option>
+              <option>Less than 1</option>
+              <option>1 to 3</option>
+              <option>3 to 5</option>
+              <option>More than 5</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" id="submit_app" class="btn">Submit Application</button>
+      </form>
+    </div>
+    <script src="../_shared/fixture.js"></script>
+  </body>
+</html>

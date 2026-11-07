@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>LLM Evaluation Engineer at Gauntlet Evals</title>
+  </head>
+  <body>
+    <!-- Gauntlet Evals is fictional, part of the Gauntlet golden set for local end-to-end testing.
+         Challenge: a multi-select with an Other option and a required dropdown; the recruiter proposes "Thursday at 2" with no time zone -->
+    <div id="app_body">
+      <h1 class="app-title">LLM Evaluation Engineer</h1>
+      <div class="company-name">Gauntlet Evals</div>
+      <p>
+        Own the harnesses that score our language models: streaming pipelines, PostgreSQL result
+        stores, TypeScript services and the dashboards built on them.
+      </p>
+      <form id="application_form" data-confirm="gauntlet-confirmation.html">
+        <div id="main_fields">
+          <div class="field">
+            <label class="field-label" for="first_name"
+              >First Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="first_name" name="job_application[first_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="last_name"
+              >Last Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="last_name" name="job_application[last_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="email">Email <span class="asterisk">*</span></label>
+            <input type="email" id="email" name="job_application[email]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="phone">Phone</label>
+            <input type="tel" id="phone" name="job_application[phone]" />
+          </div>
+          <div class="field" id="resume_fieldset">
+            <label class="field-label" for="resume"
+              >Resume/CV <span class="asterisk">*</span></label
+            >
+            <input type="file" id="resume" name="job_application[resume]" required />
+          </div>
+        </div>
+
+        <div id="custom_fields">
+          <fieldset class="field">
+            <legend class="field-label">
+              Which of these have you used in production? Select all that apply.
+            </legend>
+            <label class="option"
+              ><input type="checkbox" name="q0[]" value="TypeScript" /> TypeScript</label
+            >
+            <label class="option"><input type="checkbox" name="q0[]" value="Go" /> Go</label>
+            <label class="option"
+              ><input type="checkbox" name="q0[]" value="Python" /> Python</label
+            >
+            <label class="option"><input type="checkbox" name="q0[]" value="Rust" /> Rust</label>
+            <label class="option"
+              ><input type="checkbox" name="q0[]" value="PostgreSQL" /> PostgreSQL</label
+            >
+            <label class="option"
+              ><input type="checkbox" name="q0[]" value="Kubernetes" /> Kubernetes</label
+            >
+            <label class="option"><input type="checkbox" name="q0[]" value="Other" /> Other</label>
+          </fieldset>
+          <div class="field">
+            <label class="field-label" for="q1"
+              >How did you hear about this role? <span class="asterisk">*</span></label
+            >
+            <select id="q1" name="job_application[answers_attributes][1][text_value]" required>
+              <option value="">Please select</option>
+              <option>LinkedIn</option>
+              <option>Referral</option>
+              <option>Job board</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="q2"
+              >What would you measure first in a new evaluation harness, and why?</label
+            >
+            <textarea
+              id="q2"
+              name="job_application[answers_attributes][2][text_value]"
+              maxlength="1200"
+            ></textarea>
+          </div>
+        </div>
+
+        <button type="submit" id="submit_app" class="btn">Submit Application</button>
+      </form>
+    </div>
+    <script src="../_shared/fixture.js"></script>
+  </body>
+</html>

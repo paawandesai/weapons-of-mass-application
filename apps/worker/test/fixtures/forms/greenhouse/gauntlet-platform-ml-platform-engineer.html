@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>ML Platform Engineer at Gauntlet Platform</title>
+  </head>
+  <body>
+    <!-- Gauntlet Platform is fictional, part of the Gauntlet golden set for local end-to-end testing.
+         Challenge: required work-authorization and sponsorship questions plus a required consent box; the recruiter then asks about salary -->
+    <div id="app_body">
+      <h1 class="app-title">ML Platform Engineer</h1>
+      <div class="company-name">Gauntlet Platform</div>
+      <p>
+        Own the services that train, deploy and monitor our models: TypeScript and Go APIs on
+        PostgreSQL, streaming feature pipelines, and the observability that keeps them honest.
+      </p>
+      <form id="application_form" data-confirm="gauntlet-confirmation.html">
+        <div id="main_fields">
+          <div class="field">
+            <label class="field-label" for="first_name"
+              >First Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="first_name" name="job_application[first_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="last_name"
+              >Last Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="last_name" name="job_application[last_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="email">Email <span class="asterisk">*</span></label>
+            <input type="email" id="email" name="job_application[email]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="phone">Phone</label>
+            <input type="tel" id="phone" name="job_application[phone]" />
+          </div>
+          <div class="field" id="resume_fieldset">
+            <label class="field-label" for="resume"
+              >Resume/CV <span class="asterisk">*</span></label
+            >
+            <input type="file" id="resume" name="job_application[resume]" required />
+          </div>
+        </div>
+
+        <div id="custom_fields">
+          <div class="field">
+            <label class="field-label" for="q0"
+              >Are you legally authorized to work in the United States?
+              <span class="asterisk">*</span></label
+            >
+            <select id="q0" name="job_application[answers_attributes][0][boolean_value]" required>
+              <option value="">Please select</option>
+              <option value="1">Yes</option>
+              <option value="0">No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="q1"
+              >Will you now or in the future require visa sponsorship?
+              <span class="asterisk">*</span></label
+            >
+            <select id="q1" name="job_application[answers_attributes][1][boolean_value]" required>
+              <option value="">Please select</option>
+              <option value="1">Yes</option>
+              <option value="0">No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="q2"
+              >Why do you want to work at {company}? <span class="asterisk">*</span></label
+            >
+            <textarea
+              id="q2"
+              name="job_application[answers_attributes][2][text_value]"
+              maxlength="1000"
+              required
+            ></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="privacy">
+              <input type="checkbox" id="privacy" name="privacy" required /> I acknowledge the
+              Gauntlet Platform privacy policy <span class="asterisk">*</span>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" id="submit_app" class="btn">Submit Application</button>
+      </form>
+    </div>
+    <script src="../_shared/fixture.js"></script>
+  </body>
+</html>

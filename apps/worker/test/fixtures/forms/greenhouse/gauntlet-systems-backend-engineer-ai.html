@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Backend Engineer, AI at Gauntlet Systems</title>
+  </head>
+  <body>
+    <!-- Gauntlet Systems is fictional, part of the Gauntlet golden set for local end-to-end testing.
+         Challenge: two required essays with a 500-character limit; the recruiter then runs three interview rounds -->
+    <div id="app_body">
+      <h1 class="app-title">Backend Engineer, AI</h1>
+      <div class="company-name">Gauntlet Systems</div>
+      <p>
+        Build the backend behind our AI assistant: high-throughput TypeScript services, PostgreSQL,
+        streaming pipelines, and careful work on reliability and latency.
+      </p>
+      <form id="application_form" data-confirm="gauntlet-confirmation.html">
+        <div id="main_fields">
+          <div class="field">
+            <label class="field-label" for="first_name"
+              >First Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="first_name" name="job_application[first_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="last_name"
+              >Last Name <span class="asterisk">*</span></label
+            >
+            <input type="text" id="last_name" name="job_application[last_name]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="email">Email <span class="asterisk">*</span></label>
+            <input type="email" id="email" name="job_application[email]" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="phone">Phone</label>
+            <input type="tel" id="phone" name="job_application[phone]" />
+          </div>
+          <div class="field" id="resume_fieldset">
+            <label class="field-label" for="resume"
+              >Resume/CV <span class="asterisk">*</span></label
+            >
+            <input type="file" id="resume" name="job_application[resume]" required />
+          </div>
+        </div>
+
+        <div id="custom_fields">
+          <div class="field">
+            <label class="field-label" for="q0"
+              >Describe the most demanding production system you have owned.
+              <span class="asterisk">*</span></label
+            >
+            <textarea
+              id="q0"
+              name="job_application[answers_attributes][0][text_value]"
+              maxlength="500"
+              required
+            ></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="q1"
+              >Tell us about a time you reduced latency or improved reliability. What changed, and
+              how did you measure it? <span class="asterisk">*</span></label
+            >
+            <textarea
+              id="q1"
+              name="job_application[answers_attributes][1][text_value]"
+              maxlength="500"
+              required
+            ></textarea>
+          </div>
+          <div class="field">
+            <label class="field-label" for="q2">GitHub or portfolio URL</label>
+            <input type="url" id="q2" name="job_application[answers_attributes][2][text_value]" />
+          </div>
+        </div>
+
+        <button type="submit" id="submit_app" class="btn">Submit Application</button>
+      </form>
+    </div>
+    <script src="../_shared/fixture.js"></script>
+  </body>
+</html>
