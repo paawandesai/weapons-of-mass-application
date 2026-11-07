@@ -11,10 +11,12 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@types/three": "0.182.0",
     "@wma/shared": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.5",
+    "three": "0.182.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
