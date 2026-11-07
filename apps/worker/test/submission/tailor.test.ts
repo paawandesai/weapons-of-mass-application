@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { applicationFileKey } from '@wma/db';
-import { compareFacts, normalizeName, tailorResume } from '../../src/submission/tailor';
+import {
+  compareFacts,
+  compareSkills,
+  normalizeName,
+  tailorResume,
+} from '../../src/submission/tailor';
 import { factsFromContent, parseDate } from '../../src/submission/tailor/facts';
 import type { ResumeFacts } from '../../src/submission/tailor/schema';
 import type { RenderedPdf } from '../../src/submission/pdf';
@@ -256,6 +261,36 @@ const BAD_FACTS = {
   ],
 };
 
+describe('compareSkills', () => {
+  const withSkills = (skills: string[], technologies = ['TypeScript']) => ({
+    ...GOOD_RESUME,
+    skills,
+    projects: GOOD_RESUME.projects.map((p) => ({ ...p, technologies })),
+  });
+
+  it('passes profile skills and project technologies, ignoring case and spacing', () => {
+    expect(compareSkills(PROFILE, GOOD_RESUME)).toEqual([]);
+    expect(compareSkills(PROFILE, withSkills(['typescript', ' PostgreSQL ']))).toEqual([]);
+  });
+
+  it('fails skills inferred from highlights and posting synonyms', () => {
+    expect(compareSkills(PROFILE, withSkills(['Team leadership', 'SQL', 'PostgreSQL']))).toEqual([
+      'Skill "Team leadership" is not in the profile.',
+      'Skill "SQL" is not in the profile.',
+    ]);
+  });
+
+  it('checks project technologies and keeps symbols distinct', () => {
+    expect(compareSkills(PROFILE, withSkills(['TypeScript'], ['TypeScript', 'Rust']))).toEqual([
+      'Skill "Rust" is not in the profile.',
+    ]);
+    const cSharp = { ...PROFILE, skills: [{ name: 'C#', category: null }] };
+    expect(compareSkills(cSharp, withSkills(['C++'], []))).toEqual([
+      'Skill "C++" is not in the profile.',
+    ]);
+  });
+});
+
 describe('tailorResume (task 2.3)', () => {
   it('first draft passes: stores the PDF and returns the unmet requirements', async () => {
     const llm = scripted({
@@ -291,6 +326,21 @@ describe('tailorResume (task 2.3)', () => {
     expect(gens).toHaveLength(2);
     expect(gens[1]?.user).toContain('<rejected>');
     expect(gens[1]?.user).toContain('Employer "Initech" is not in the profile.');
+  });
+
+  it('regenerates when the skills list claims a skill the profile lacks', async () => {
+    const llm = scripted({
+      'tailor-resume/v1': [
+        { ...GOOD_RESUME, skills: ['TypeScript', 'Team leadership'] },
+        GOOD_RESUME,
+      ],
+      'extract-resume-facts/v1': [GOOD_FACTS],
+    });
+    const r = await tailorResume(makeCtx(llm), { render: fakeRender });
+    expect(r.ok && r.regenerated).toBe(true);
+    expect(callsTo(llm, 'tailor-resume/v1')[1]?.user).toContain(
+      'Skill "Team leadership" is not in the profile.',
+    );
   });
 
   it('fails with tailoring-check-failed after the second failed check, storing nothing', async () => {
