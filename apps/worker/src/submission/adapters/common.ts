@@ -12,6 +12,7 @@ import type {
   FormNotice,
   SignInOutcome,
   SubmissionContext,
+  SubmitTrace,
 } from '../types';
 import {
   attachResumeGeneric,
@@ -179,6 +180,98 @@ const ENABLE_WAIT_MS = 1_500;
 const unmapped = (field: { id: string; label: string }) =>
   new SubmissionFailure('unmapped-field', { field: field.label, fields: [field] });
 
+const CODE_PROMPT_TEXT =
+  /security code|verification code|one[- ]time code|code (we|that was) sent|enter the (\d-digit )?code|check your (email|inbox)/i;
+
+/**
+ * Rule 40: the page shows a code prompt (matching text and a short visible text/number input).
+ * Tags the input `data-wma-code` so the verification path can type into it.
+ */
+async function codePromptOn(page: Page): Promise<boolean> {
+  return page
+    .evaluate(
+      `((source) => {
+        const text = new RegExp(source, 'i');
+        const shown = (e) => {
+          const r = e.getBoundingClientRect();
+          const st = getComputedStyle(e);
+          return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none';
+        };
+        document.querySelectorAll('[data-wma-code]').forEach((e) => e.removeAttribute('data-wma-code'));
+        const inputs = [...document.querySelectorAll('input')].filter(
+          (e) =>
+            shown(e) &&
+            ['text', 'number', 'tel', ''].includes((e.getAttribute('type') || '').toLowerCase()) &&
+            (!e.maxLength || e.maxLength < 0 || e.maxLength <= 12),
+        );
+        const describe = (e) => {
+          const labels = e.labels ? [...e.labels].map((l) => l.textContent || '') : [];
+          return [e.getAttribute('aria-label'), e.placeholder, e.name, e.id, ...labels].join(' ');
+        };
+        const labelled = inputs.find((e) => text.test(describe(e)) || /code/i.test(describe(e)));
+        const body = document.body ? document.body.innerText : '';
+        const target = labelled || (text.test(body) && inputs.length <= 2 ? inputs[0] : null);
+        if (!target || !(text.test(body) || text.test(describe(target)))) return false;
+        target.setAttribute('data-wma-code', '1');
+        return true;
+      })(${JSON.stringify(CODE_PROMPT_TEXT.source)})`,
+    )
+    .then((v) => v === true)
+    .catch(() => false);
+}
+
+const TRACE_SHOT_DELAY_MS = 3_000;
+
+/**
+ * Rule 36: listens from just before the click for POST requests (host, path, status), console
+ * errors and a viewport screenshot 3 s after the click. Evidence only; nothing here decides.
+ */
+function startTrace(page: Page): { finish(): Promise<SubmitTrace>; stop(): void } {
+  const posts: SubmitTrace['posts'] = [];
+  const consoleErrors: string[] = [];
+  const byRequest = new Map<unknown, SubmitTrace['posts'][number]>();
+  const onRequest = (req: { method(): string; url(): string }) => {
+    if (req.method() !== 'POST') return;
+    let entry: SubmitTrace['posts'][number];
+    try {
+      const u = new URL(req.url());
+      entry = { host: u.host, path: u.pathname, status: null };
+    } catch {
+      return;
+    }
+    posts.push(entry);
+    byRequest.set(req, entry);
+  };
+  const onResponse = (res: { request(): unknown; status(): number }) => {
+    const entry = byRequest.get(res.request());
+    if (entry) entry.status = res.status();
+  };
+  const onConsole = (msg: { type(): string; text(): string }) => {
+    if (msg.type() === 'error' && consoleErrors.length < 20) {
+      consoleErrors.push(sanitizeMessage(msg.text()));
+    }
+  };
+  page.on('request', onRequest);
+  page.on('response', onResponse);
+  page.on('console', onConsole);
+  const stop = () => {
+    page.off('request', onRequest);
+    page.off('response', onResponse);
+    page.off('console', onConsole);
+  };
+  const clicked = Date.now();
+  return {
+    stop,
+    async finish() {
+      const wait = clicked + TRACE_SHOT_DELAY_MS - Date.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      const screenshot = await page.screenshot({ fullPage: false }).catch(() => null);
+      stop();
+      return { posts, console: consoleErrors, screenshot };
+    },
+  };
+}
+
 /** The generic submitter: vendor hints plus the page layer in generic.ts. */
 export class VendorAdapter implements FormAdapter {
   readonly ats: AtsId;
@@ -343,7 +436,7 @@ export class VendorAdapter implements FormAdapter {
     await attachResumeGeneric(page, this.hints.resumeInput, pdf);
   }
 
-  async submit(page: Page): Promise<void> {
+  async submit(page: Page): Promise<SubmitTrace> {
     let scan = await scanPage(page);
     if (!scan.submit) throw unmapped({ id: 'submit', label: 'Submit' });
     if (scan.submit.step !== null && scan.steps.active !== scan.submit.step) {
@@ -369,12 +462,23 @@ export class VendorAdapter implements FormAdapter {
     // submission, and an error already showing that is still there afterwards is a rejection.
     await recordBaseline(page);
     const before = new Set((await probePage(page).catch(() => null))?.errors ?? []);
-    await button.click({ timeout: 5_000 });
+    const tracer = startTrace(page);
+    try {
+      await button.click({ timeout: 5_000 });
+      await this.watchSubmitWindow(page, before);
+    } catch (e) {
+      tracer.stop();
+      throw e;
+    }
+    return tracer.finish();
+  }
 
-    // Rule 12, in order: confirmation, validation errors, a CAPTCHA; else leave it to the caller.
+  /** Rule 12, in order: confirmation, validation errors, a CAPTCHA; else leave it to the caller. */
+  private async watchSubmitWindow(page: Page, before: Set<string>): Promise<void> {
     const started = Date.now();
     while (Date.now() - started < SUBMIT_WINDOW_MS) {
       if (await this.confirmationShown(page)) return;
+      if (await codePromptOn(page)) return;
       let probe;
       try {
         probe = await probePage(page);
@@ -403,6 +507,19 @@ export class VendorAdapter implements FormAdapter {
       if (Date.now() - started >= CONFIRM_TIMEOUT_MS) return false;
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
+  }
+
+  codePrompt(page: Page): Promise<boolean> {
+    return codePromptOn(page);
+  }
+
+  async advanceCode(page: Page): Promise<void> {
+    const button = page
+      .locator('button:visible, [role="button"]:visible, input[type="submit"]:visible')
+      .filter({ hasText: /^\s*(verify|continue|confirm|submit code)/i })
+      .filter({ hasNot: page.locator('[data-wma-nav="submit"]') })
+      .first();
+    if (await button.count()) await button.click({ timeout: 2_000 }).catch(() => {});
   }
 
   async findCaptcha(page: Page): Promise<CaptchaHandle | null> {

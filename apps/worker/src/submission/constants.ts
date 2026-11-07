@@ -28,3 +28,6 @@ export const SUBMIT_QUEUE_OPTIONS = {
   retryBackoff: true,
   expireInSeconds: 60 * 60,
 } as const;
+
+/** The browser context's time zone when the user's is unknown. */
+export const DEFAULT_TIMEZONE = 'America/Los_Angeles';

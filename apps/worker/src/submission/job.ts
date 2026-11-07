@@ -25,6 +25,7 @@ import { resolveCaptcha } from './captcha';
 import { awaitConfirmation, findConfirmationEmail, type ConfirmationSource } from './confirmation';
 import {
   CONFIRM_CAP_S,
+  DEFAULT_TIMEZONE,
   CONFIRM_POLL_S,
   MAX_FAILED_ATTEMPTS,
   SUBMIT_CONCURRENCY,
@@ -37,10 +38,11 @@ import {
   SubmissionFailure,
 } from './failure';
 import { scheduleFollowUp } from './followup';
+import { enterVerificationCode, waitForVerification } from './accounts/verification';
 import { pollUntil } from './poll';
 import { planFill } from './fill';
 import { recordStep } from './record';
-import type { SubmissionContext } from './types';
+import type { SubmissionContext, SubmitTrace } from './types';
 import { guardedJob } from '../guarded';
 
 export interface SubmissionJobData {
@@ -131,6 +133,38 @@ async function companyNameFor(ctx: SubmissionContext): Promise<string> {
     if (company) return company.name;
   }
   return parseAtsJobUrl(ctx.job.url)?.boardSlug ?? new URL(ctx.job.url).hostname;
+}
+
+const NON_VENDOR_HOST =
+  /(^|\.)(recaptcha\.net|hcaptcha\.com|google\.com|gstatic\.com|google-analytics\.com)$/i;
+
+/** True when the trace shows a POST to a host other than a CAPTCHA provider or Google (rule 38). */
+export function postedToVendor(trace: SubmitTrace | void): boolean {
+  return (trace?.posts ?? []).some((p) => !NON_VENDOR_HOST.test(p.host.replace(/:\d+$/, '')));
+}
+
+/** Stores the screenshot and writes the one `submit-trace` entry (rule 36). */
+async function recordTrace(ctx: SubmissionContext, trace: SubmitTrace | void): Promise<void> {
+  if (!trace) return;
+  const attempt = ctx.application.attemptCount + 1;
+  let screenshot: string | null = null;
+  if (trace.screenshot) {
+    try {
+      const key = applicationFileKey(
+        ctx.handle.tenantId,
+        ctx.application.id,
+        `submit-${attempt}.png`,
+      );
+      await ctx.files.put(key, trace.screenshot);
+      screenshot = key;
+    } catch {
+      // the trace is evidence; losing the picture does not fail the attempt
+    }
+  }
+  await recordStep(ctx, {
+    action: 'submit-trace',
+    detail: { posts: trace.posts, console: trace.console, screenshot },
+  });
 }
 
 /** Records the outcome of a failed step: pending with a retry, or closed on the second failure. */
@@ -298,7 +332,10 @@ async function attempt(
   const openPage = async (): Promise<PageLike> => {
     if (page) return page;
     const browser = await deps.launchBrowser();
-    context = await browser.newContext();
+    const timezoneId = await getUserById(handle, userId)
+      .then((u) => u.timezone || DEFAULT_TIMEZONE)
+      .catch(() => DEFAULT_TIMEZONE);
+    context = await browser.newContext({ timezoneId });
     page = await context.newPage();
     return page;
   };
@@ -394,15 +431,57 @@ async function attempt(
 
     await recordStep(ctx, { action: 'submitting' });
     const submittedAt = deps.clock.now();
-    await adapter.submit(formPage);
+    let trace = await adapter.submit(formPage);
+    await recordTrace(ctx, trace);
     for (let round = 0; round < 2; round++) {
       const challenge = await adapter.findCaptcha(formPage);
       if (!challenge) break;
       await resolveCaptcha(ctx, challenge, captchaOpts);
-      if (!(await adapter.confirmed(formPage))) await adapter.submit(formPage);
+      if (await adapter.confirmed(formPage)) continue;
+      // Rule 38: a second click could duplicate an application the vendor already received.
+      if (postedToVendor(trace)) {
+        await recordStep(ctx, {
+          action: 'submit-skipped',
+          detail: { reason: 'vendor-post-seen' },
+        });
+        continue;
+      }
+      trace = await adapter.submit(formPage);
+      await recordTrace(ctx, trace);
     }
 
-    const confirmation = await awaitConfirmation(ctx, adapter, formPage, submittedAt);
+    // Rule 40: a page that asks for an emailed code is answered from Gmail, then the same submit
+    // is clicked again (each click mails a fresh code). This is not the rule 38 second click.
+    let clickedAt = submittedAt;
+    let verifications = 0;
+    const verifyByEmail = async (): Promise<boolean> => {
+      if (verifications >= 2 || !(await adapter.codePrompt?.(formPage))) return false;
+      verifications++;
+      const found = await waitForVerification(ctx, clickedAt, { newest: true });
+      await recordStep(ctx, { action: 'email-verification', detail: { source: found.kind } });
+      if (found.kind === 'code') {
+        await enterVerificationCode(formPage, found.code);
+        await adapter.advanceCode?.(formPage);
+        clickedAt = deps.clock.now();
+        const again = await adapter.submit(formPage).catch((e: unknown) => {
+          // Enter alone may already have submitted; a vanished button is then not a failure.
+          if (e instanceof SubmissionFailure && e.reason === 'unmapped-field') return undefined;
+          throw e;
+        });
+        await recordTrace(ctx, again);
+      } else {
+        const linkPage = await (context as ContextLike | null)!.newPage();
+        await linkPage.goto(found.url);
+      }
+      return true;
+    };
+    const confirmation = await awaitConfirmation(
+      ctx,
+      adapter,
+      formPage,
+      submittedAt,
+      verifyByEmail,
+    );
     if (!confirmation) throw new SubmissionFailure('unconfirmed', { waited_s: 600 });
     return await markApplied(deps, ctx, confirmation.source, {
       ...(confirmation.messageId ? { message_id: confirmation.messageId } : {}),

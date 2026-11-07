@@ -27,7 +27,8 @@ export interface ContextLike {
 
 /** One per worker process; each application opens and closes its own context on it. */
 export interface BrowserLike {
-  newContext(): Promise<ContextLike>;
+  /** `timezoneId` is the user's IANA zone; the browser's default applies when it is unknown. */
+  newContext(opts?: { timezoneId?: string }): Promise<ContextLike>;
 }
 
 export interface FollowUpJobData {

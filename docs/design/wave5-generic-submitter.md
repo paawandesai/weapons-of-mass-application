@@ -395,3 +395,61 @@ four Anthropic forms resolve completely. Two gaps:
     (site|page|url|blog)", "your blog"; never a label containing "post", "article", "paper",
     "favorite", "favourite", "read" or "recommend" (Warp: "Share your favorite blog post,
     article, or paper you've read" is free text, answered in guess mode or parked).
+
+## Found by the first real submit clicks (2026-11-07, 19:46)
+
+Hex (Ashby, 14 fields) and OpenAI (Ashby, 16 fields) were filled correctly end to end (resume
+attached, location, date, Yes/No, arbitration boxes, EEO left blank; screenshots on file) and the
+submit button was clicked. Both pages stayed on the form; no confirmation on the page and no
+Gmail confirmation within 600 s → `unconfirmed`. A probe that clicks Submit on an empty Ashby
+form in the worker's browser shows no validation message and no submit request, only a reCAPTCHA
+Enterprise reload: the handler runs, gets a reCAPTCHA verdict and stops. The worker runs
+Playwright's bundled headless shell, which reCAPTCHA Enterprise scores as a bot.
+
+36. Submit trace. From the click until the submit window ends, the adapter records every POST
+    request (host and path only, no query, headers or bodies) with its status, console errors
+    (first 200 chars, sanitised), and a viewport screenshot taken 3 s after the click stored as
+    `submit-<attempt>.png`. The job writes them as one `submit-trace` activity entry. Evidence,
+    not a decision: `unconfirmed` stays the outcome when nothing else is detected.
+37. Real browser. The worker launches Google Chrome (`channel: 'chrome'`, new headless) with a
+    user agent that does not say Headless, the user's timezone and `en-US` locale, a 1280x900
+    viewport and `--disable-blink-features=AutomationControlled`; the bundled Chromium remains
+    the fallback when Chrome is not installed (tests, CI) and for PDF rendering. The console
+    `--no-sandbox` flag is used only when the process is not root-capable; on this machine
+    Chrome runs without it.
+38. No blind second click. The job's "submit again when not confirmed" fallback runs only when
+    the submit trace shows no POST to the vendor after the first click; otherwise a second click
+    could duplicate an application that went through without a visible confirmation.
+
+Evidence for rule 37 (probe, 2026-11-07 20:05): clicking Submit on an EMPTY OpenAI Ashby form.
+Bundled headless shell: one reCAPTCHA `reload` POST, no submit request, no validation text, body
+unchanged. Google Chrome (channel 'chrome', new headless, user agent without "Headless",
+`--disable-blink-features=AutomationControlled`, en-US, America/Los_Angeles, 1280x900): reCAPTCHA
+`reload` → `userverify` → `clr`, then `POST /api/non-user-graphql?op=ApiSubmitMultipleFormsAction`
+(200) and the page's own error container "Your form needs corrections: Missing entry for required
+field: Legal Name…" (class `_errorsContainer_…`, matched by the form-rejected detector). Nothing
+was submitted (empty form).
+
+39. Country from location. When a `location` question is a country list (a combobox or select
+    whose options are countries, or a label that is just "Country"/"Country of residence"), the
+    answer is the country derived from `identity.location` (US state abbreviations and city
+    names → "United States"; the same place table as rule 28 for UK, Canada, EU countries),
+    chosen among the options by normalised name ("United States" also matches "United States of
+    America", "USA", "US"); a city/state question keeps the location text. No derivable country
+    → blank when optional, `missing-profile-field` when required.
+
+## Found right after the first real submit requests (2026-11-07, 20:10)
+
+Andre sees "security code" emails from Greenhouse: the new job-boards flow verifies the
+applicant's email with a one-time code after the submit click, so the two Anthropic submissions
+got past reCAPTCHA and are sitting on a code prompt that the post-submit wait does not recognise.
+
+40. Post-submit email verification. During the submit window and the confirmation wait, a page
+    that shows a code prompt (visible text or label matching /security code|verification code|
+    one[- ]time code|code (we|that was) sent|enter the (\d-digit )?code|check your (email|inbox)/i
+    together with a short text/number input) triggers the existing account-verification path:
+    poll Gmail (`waitForVerification`: sender domains of the vendor and the company, messages
+    received after the click, 15 s interval, 5 min cap), extract the code or follow the link,
+    enter it (`enterVerificationCode`), press the prompt's continue/verify button, then resume
+    the confirmation wait. Timeout → `verification-timeout` (existing reason) with screenshot.
+    Activity: `email-verification` with {source: 'code' | 'link'}. The code is never stored.

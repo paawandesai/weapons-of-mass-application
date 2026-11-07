@@ -36,6 +36,7 @@ import type {
   GmailPort,
   InboundMessage,
   SignInOutcome,
+  SubmitTrace,
   TailorResult,
 } from '../../src/submission/types';
 import { setupEnv, type TestEnv, type TestTenant } from '../helpers';
@@ -298,6 +299,11 @@ export class FakeAdapter implements FormAdapter {
   loadDelayMs = 0;
   loadError: Error | null = null;
   beforeSubmit: () => Promise<void> | void = () => {};
+  /** Handed out by submit, in order (the last one repeats); empty means no trace. */
+  traces: SubmitTrace[] = [];
+  /** How many times the page shows an emailed-code prompt before it stops. */
+  codePrompts = 0;
+  advances = 0;
   /** Handed out by findCaptcha, in order; null entries mean "no challenge". */
   captchas: Array<CaptchaHandle | null> = [];
   /** After signUp the page still asks for an account (verification pending) until this is set. */
@@ -345,6 +351,15 @@ export class FakeAdapter implements FormAdapter {
     await this.beforeSubmit();
     this.submits++;
     this.submitted = true;
+    return this.traces[Math.min(this.submits - 1, this.traces.length - 1)];
+  }
+  async codePrompt() {
+    if (this.codePrompts <= 0) return false;
+    this.codePrompts--;
+    return true;
+  }
+  async advanceCode() {
+    this.advances++;
   }
   async confirmed() {
     if (this.confirmedOnLoad) return true;

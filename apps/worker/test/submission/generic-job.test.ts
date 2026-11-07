@@ -5,6 +5,7 @@ import { runSubmission } from '../../src/submission/job';
 import { SubmissionFailure } from '../../src/submission/failure';
 import {
   FakeAdapter,
+  FakeCaptcha,
   FrameCaptcha,
   approveProfile,
   makeDeps,
@@ -147,5 +148,98 @@ describe('wave 5: what the generic page layer reports to the job', () => {
     expect(frame.entered.every((a) => a === 'ABC123')).toBe(true);
     const [req] = await listCaptchaRequestsForApplication(t.handle, s.application.id);
     expect(req?.resolvedBy).toBeNull();
+  });
+});
+
+describe('rules 36 and 38: the submit trace and the second click', () => {
+  const trace = (hosts: string[]) => ({
+    posts: hosts.map((host) => ({ host, path: '/x', status: 200 })),
+    console: ['boom'],
+    screenshot: Buffer.from('png'),
+  });
+  async function runWithCaptcha(hosts: string[]) {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    adapter.confirmedAfterSubmit = false;
+    adapter.traces = [trace(hosts)];
+    adapter.captchas = [null, new FakeCaptcha('ABC123')];
+    const deps = makeDeps(env.db, { adapter, llm: new FakeLlm([{ answer: 'ABC123' }]) });
+    await runSubmission(deps, env.db, data(t, s.application.id));
+    const log = await activity.listByApplication(t.handle, s.application.id);
+    return { t, s, adapter, log };
+  }
+
+  it('writes one submit-trace entry per click and stores the screenshot', async () => {
+    const { t, s, adapter, log } = await runWithCaptcha(['www.google.com']);
+    const entries = log.filter((e) => e.action === 'submit-trace');
+    expect(adapter.submits).toBe(2);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.detail).toMatchObject({
+      posts: [{ host: 'www.google.com', path: '/x', status: 200 }],
+      console: ['boom'],
+      screenshot: `tenants/${t.id}/applications/${s.application.id}/submit-1.png`,
+    });
+    expect(
+      await getFile(t.handle, `tenants/${t.id}/applications/${s.application.id}/submit-1.png`),
+    ).not.toBeNull();
+  });
+
+  it('skips the second click when the first posted to the vendor', async () => {
+    const { adapter, log } = await runWithCaptcha(['api.ashbyhq.com']);
+    expect(adapter.submits).toBe(1);
+    const skipped = log.find((e) => e.action === 'submit-skipped');
+    expect(skipped?.detail).toMatchObject({ reason: 'vendor-post-seen' });
+  });
+
+  it('clicks again when the only POSTs went to a CAPTCHA provider or Google', async () => {
+    const { adapter, log } = await runWithCaptcha(['www.google.com', 'hcaptcha.com']);
+    expect(adapter.submits).toBe(2);
+    expect(log.some((e) => e.action === 'submit-skipped')).toBe(false);
+  });
+});
+
+describe('rule 40: the emailed code after submit', () => {
+  const mail = (
+    company: string,
+    clock: Date,
+    body = 'Copy and paste this code: 48151623 After you enter the code, resubmit your application.',
+  ) => ({
+    from: 'no-reply@us.greenhouse-mail.io',
+    subject: `Security code for your application to ${company}`,
+    text: body,
+    receivedAt: new Date(clock.getTime() + 1000),
+  });
+
+  it('reads the newest code from Gmail, types it, clicks submit again and logs only the source', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    adapter.codePrompts = 1;
+    const deps = makeDeps(env.db, { adapter });
+    deps.gmailBox.add({
+      ...mail(s.companyName, deps.clock.now(), 'Code: 11111111'),
+      receivedAt: new Date(deps.clock.now().getTime() + 500),
+    });
+    deps.gmailBox.add(mail(s.companyName, deps.clock.now()));
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out).toEqual({ outcome: 'applied', source: 'page', prior: false });
+    expect(adapter.submits).toBe(2);
+    expect(deps.browser.pages[0]!.typed.map((x) => x.value)).toEqual(['48151623']);
+    const log = await activity.listByApplication(t.handle, s.application.id);
+    const entry = log.find((e) => e.action === 'email-verification');
+    expect(entry?.detail).toEqual({ source: 'code' });
+    expect(JSON.stringify(log)).not.toContain('48151623');
+  });
+
+  it('no code within the cap is verification-timeout', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    adapter.codePrompts = 1;
+    const deps = makeDeps(env.db, { adapter });
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out).toEqual({ outcome: 'pending', reason: 'verification-timeout' });
+    expect(adapter.submits).toBe(1);
   });
 });

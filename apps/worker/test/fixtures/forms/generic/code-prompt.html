@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Submit that asks for an emailed code</title>
+  </head>
+  <body>
+    <div id="page">
+      <form id="app">
+        <div class="entry"><label for="name">Full name</label><input id="name" type="text" /></div>
+        <div id="prompt" hidden>
+          <label for="sec">Security code</label>
+          <p>Copy and paste the code we sent to your email into the security code field.</p>
+          <input id="sec" type="text" maxlength="8" />
+        </div>
+        <button type="submit">Submit application</button>
+      </form>
+    </div>
+    <script>
+      document.getElementById('sec').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') e.preventDefault();
+      });
+      var state = 'start';
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var code = document.getElementById('sec').value;
+        if (state === 'start' || !/^\d{6}$/.test(code)) {
+          state = 'prompted';
+          document.getElementById('prompt').hidden = false;
+          return;
+        }
+        document.getElementById('page').innerHTML =
+          '<h2>Thank you for applying!</h2><p>We will be in touch.</p>';
+      });
+    </script>
+  </body>
+</html>

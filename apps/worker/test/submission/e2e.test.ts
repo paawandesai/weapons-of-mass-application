@@ -135,6 +135,7 @@ describe.skipIf(!available)('task 8.1: hand-off to applied on the three vendor f
         'tailored',
         'filled',
         'submitting',
+        'submit-trace',
         'submitted',
       ]);
       expect(deps.followUps).toHaveLength(1);

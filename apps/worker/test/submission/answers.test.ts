@@ -1453,3 +1453,73 @@ describe('rules 31 and 32: acknowledgement options and any-of authorization', ()
     });
   });
 });
+
+describe('rule 39: country from location', () => {
+  const ask = (location: string | null, f: Partial<FieldDescriptor> & { label: string }) => {
+    const profile = { ...PROFILE, identity: { ...PROFILE.identity, location } };
+    return resolveStandardFields({ profile } as never, [
+      field({ classification: 'standard', required: true, ...f }),
+    ])[0];
+  };
+  const COUNTRIES = [
+    'Canada',
+    'France',
+    'Germany',
+    'India',
+    'Japan',
+    'Mexico',
+    'Spain',
+    'United Kingdom',
+    'United States of America',
+    'Brazil',
+    'Australia',
+  ];
+
+  it('classifies a Country label and a country-option select as location', () => {
+    expect(standardKeyFor('Country')).toBe('location');
+    expect(standardKeyFor('Country of residence')).toBe('location');
+    const verdict = (label: string) =>
+      classifyFields([field({ label, type: 'select', options: COUNTRIES })]).then(
+        (r) => r[0]?.standardKey,
+      );
+    return Promise.all([
+      expect(verdict('Where are you based?')).resolves.toBe('location'),
+      expect(verdict('Country of citizenship')).resolves.toBeUndefined(),
+    ]);
+  });
+
+  it('a Greenhouse large-list Country combobox gets the canonical name', () => {
+    expect(ask('South San Francisco, CA', { label: 'Country', hint: 'large-list' })).toMatchObject({
+      status: 'filled',
+      value: 'United States',
+    });
+  });
+
+  it('a native select picks the option by alias', () => {
+    expect(
+      ask('Austin, TX', { label: 'Country', type: 'select', options: COUNTRIES }),
+    ).toMatchObject({ status: 'filled', value: 'United States of America' });
+  });
+
+  it('a country named in the location resolves to it', () => {
+    expect(ask('Berlin, Germany', { label: 'Country' })).toMatchObject({ value: 'Germany' });
+    expect(
+      ask('London, UK', { label: 'Country', type: 'select', options: COUNTRIES }),
+    ).toMatchObject({ value: 'United Kingdom' });
+  });
+
+  it('a city/state question keeps the location text', () => {
+    expect(ask('South San Francisco, CA', { label: 'Current location' })).toMatchObject({
+      status: 'filled',
+      value: 'South San Francisco, CA',
+    });
+  });
+
+  it('no derivable country: missing-profile-field when required, blank when optional', () => {
+    expect(ask('Narnia', { label: 'Country' })).toMatchObject({
+      status: 'missing-profile-field',
+      profileField: 'identity.location',
+    });
+    expect(ask(null, { label: 'Country', required: false })).toMatchObject({ status: 'blank' });
+  });
+});

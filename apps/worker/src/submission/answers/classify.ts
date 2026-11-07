@@ -41,6 +41,121 @@ const norm = (s: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+// Rule 39: country lists. Each entry is a canonical name followed by its aliases.
+const COUNTRY_ALIASES: string[][] = [
+  ['United States', 'United States of America', 'USA', 'US', 'U.S.', 'U.S.A.'],
+  ['United Kingdom', 'UK', 'U.K.', 'Great Britain', 'Britain'],
+  ['Canada'],
+  ['Germany'],
+  ['France'],
+  ['Spain'],
+  ['Netherlands', 'The Netherlands'],
+  ['Ireland'],
+  ['Italy'],
+  ['Portugal'],
+  ['Poland'],
+  ['Sweden'],
+  ['Belgium'],
+  ['Austria'],
+  ['Denmark'],
+  ['Finland'],
+  ['Australia'],
+  ['India'],
+  ['Brazil'],
+  ['Argentina'],
+  ['Mexico'],
+  ['Chile'],
+  ['Colombia'],
+  ['Peru'],
+  ['Norway'],
+  ['Switzerland'],
+  ['Czech Republic', 'Czechia'],
+  ['Romania'],
+  ['Hungary'],
+  ['Greece'],
+  ['Turkey', 'Türkiye', 'Turkiye'],
+  ['Ukraine'],
+  ['Russia', 'Russian Federation'],
+  ['Israel'],
+  ['United Arab Emirates', 'UAE'],
+  ['Saudi Arabia'],
+  ['Egypt'],
+  ['South Africa'],
+  ['Nigeria'],
+  ['Kenya'],
+  ['China'],
+  ['Japan'],
+  ['South Korea', 'Korea, Republic of', 'Republic of Korea', 'Korea'],
+  ['Singapore'],
+  ['Hong Kong'],
+  ['Taiwan'],
+  ['Thailand'],
+  ['Vietnam', 'Viet Nam'],
+  ['Philippines', 'The Philippines'],
+  ['Indonesia'],
+  ['Malaysia'],
+  ['Pakistan'],
+  ['Bangladesh'],
+  ['New Zealand'],
+  ['Estonia'],
+  ['Latvia'],
+  ['Lithuania'],
+  ['Croatia'],
+  ['Serbia'],
+  ['Bulgaria'],
+  ['Slovakia'],
+  ['Slovenia'],
+  ['Luxembourg'],
+  ['Iceland'],
+  ['Costa Rica'],
+  ['Uruguay'],
+];
+
+/** Lower-case, accent-free-ish, punctuation-free form used to compare country names. */
+function countryKey(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\./g, '')
+    .replace(/[^a-z0-9à-ɏ]+/g, ' ')
+    .replace(/^the /, '')
+    .trim();
+}
+
+const COUNTRY_BY_KEY = new Map<string, string>();
+for (const [canonical, ...aliases] of COUNTRY_ALIASES) {
+  for (const n of [canonical!, ...aliases]) COUNTRY_BY_KEY.set(countryKey(n), canonical!);
+}
+
+/** The canonical country name an option or name denotes, or null. */
+export function canonicalCountry(name: string): string | null {
+  return COUNTRY_BY_KEY.get(countryKey(name)) ?? null;
+}
+
+/** Every canonical country name the list knows, for finding one inside a location string. */
+export const COUNTRY_NAMES: string[] = COUNTRY_ALIASES.map((a) => a[0]!);
+
+/** Rule 39: at least 10 options and most of them countries. */
+export function hasCountryOptions(options: string[] | undefined): boolean {
+  if (!options || options.length < 10) return false;
+  const hits = options.filter((o) => canonicalCountry(o) !== null).length;
+  return hits * 2 > options.length;
+}
+
+// Labels whose country list asks something other than where the candidate lives.
+const NOT_RESIDENCE_COUNTRY =
+  /\b(citizen\w*|nationalit\w*|birth|born|origin|passport|phone|dial\w*|calling|code|authori[sz]\w*|eligible|sponsor\w*|work\w*|employ\w*)\b/;
+
+/**
+ * Rule 39: whether a `location` question is a country list: a label that is just "Country", or a
+ * select/combobox whose read options are mostly countries (and whose label does not ask about
+ * citizenship, birth or a phone code).
+ */
+export function isCountryListField(f: Pick<FieldDescriptor, 'label' | 'options'>): boolean {
+  const l = norm(f.label);
+  if (/^country( of residence)?$|which country/.test(l)) return true;
+  return hasCountryOptions(f.options) && !NOT_RESIDENCE_COUNTRY.test(l);
+}
+
 const SELF_ID =
   /\b(gender|race|ethnic\w*|hispanic|latino|latina|latinx|veteran|military|disabilit\w*|sexual orientation|transgender|lgbtq\w*|self[- ]identif\w*|equal employment|eeo\w*|protected class|pronouns?)\b/;
 // Only a decline that names self-identification: a generic "Prefer not to answer" also appears on
@@ -155,7 +270,7 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   ],
   [
     'location',
-    /^(your |current |home )?(location|city|address|city of residence)\b|location \(?(city|current)|where are you (currently )?(located|based|living)|current location|city, state|city and country/,
+    /^(your |current |home )?(location|city|address|city of residence)\b|^country( of residence)?$|which country|location \(?(city|current)|where are you (currently )?(located|based|living)|current location|city, state|city and country/,
   ],
 ];
 
@@ -203,6 +318,7 @@ export function classifyByRules(
   const key = standardKeyFor(f.label, f.type, f.description);
   if (key) return { classification: 'standard', standardKey: key };
   if (hasAcknowledgementOptions(f)) return { classification: 'standard', standardKey: 'consent' };
+  if (isCountryListField(f)) return { classification: 'standard', standardKey: 'location' };
   if (FREE_TEXT.test(l) || f.type === 'textarea') return { classification: 'free-text' };
   return null;
 }

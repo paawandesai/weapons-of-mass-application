@@ -1,8 +1,11 @@
 import type { ProfileDocument } from '@wma/shared';
 import type { AnswerResolution, FieldDescriptor, SubmissionContext } from '../types';
 import {
+  canonicalCountry,
+  COUNTRY_NAMES,
   hasAcknowledgementOptions,
   isAcknowledgementOption,
+  isCountryListField,
   standardKeyFor,
   type StandardKey,
 } from './classify';
@@ -380,9 +383,8 @@ const CA_CITIES =
 const UK_CITIES =
   /\b(?:london|manchester|edinburgh|glasgow|bristol|birmingham|cambridge|oxford)\b/i;
 
-/** The country (a PLACES id) the profile's location or phone implies, or null. */
-function profileCountry(p: ProfileDocument): string | null {
-  const loc = p.identity.location?.trim() ?? '';
+/** The country (a PLACES id) a location text names or implies, or null. */
+function locationCountryId(loc: string): string | null {
   if (loc) {
     const named = placesIn(loc);
     for (const id of Object.keys(PLACE_NAME)) if (named.has(id)) return id;
@@ -394,10 +396,30 @@ function profileCountry(p: ProfileDocument): string | null {
     if (code && US_STATE_CODES.includes(code[1]!)) return 'us';
     if (US_STATE_NAMES.test(loc) || US_CITIES.test(loc)) return 'us';
   }
+  return null;
+}
+
+/** The country (a PLACES id) the profile's location or phone implies, or null. */
+function profileCountry(p: ProfileDocument): string | null {
+  const fromLocation = locationCountryId(p.identity.location?.trim() ?? '');
+  if (fromLocation) return fromLocation;
   const phone = p.contact.phone?.replace(/[\s().-]/g, '') ?? '';
   if (/^\+1\d{10}$/.test(phone)) return 'us';
   if (/^\+44/.test(phone)) return 'uk';
   return null;
+}
+
+/**
+ * Rule 39: the canonical country name `identity.location` implies (rule 28's place table, then any
+ * country in the list named in the text), or null.
+ */
+function countryNameFromLocation(loc: string | null | undefined): string | null {
+  const text = loc?.trim() ?? '';
+  if (!text) return null;
+  const id = locationCountryId(text);
+  if (id) return canonicalCountry(PLACE_NAME[id]!);
+  const lower = text.toLowerCase();
+  return COUNTRY_NAMES.find((n) => new RegExp(`\\b${n.toLowerCase()}\\b`).test(lower)) ?? null;
 }
 
 /**
@@ -506,6 +528,19 @@ function valueForField(
       return hit ? { value: hit, ...flag } : { unexpressible: true };
     }
     return { value: text, ...flag };
+  }
+  // Rule 39: a country list takes the country the profile's location implies; a city/state
+  // question keeps the location text (the generic path below).
+  if (key === 'location' && isCountryListField(f)) {
+    const country = countryNameFromLocation(profile.identity.location);
+    if (!country) return null;
+    if (f.options?.length) {
+      const hit = f.options.find((o) => canonicalCountry(o) === country);
+      return hit ? { value: hit } : { unexpressible: true };
+    }
+    // No options recorded (a large-list combobox): the canonical name; the fill picks the
+    // containing match.
+    return { value: country };
   }
   // Rule 31: the options are the acknowledgement. A lone select/radio option is taken as it is; a
   // checkbox group has every acknowledgement option checked and nothing else.

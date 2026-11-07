@@ -67,6 +67,16 @@ export interface FormNotice {
   days: number;
 }
 
+/** What a submit click did, as evidence only (design rule 36). */
+export interface SubmitTrace {
+  /** Every POST from the click to the end of the window: host and path, never query or body. */
+  posts: Array<{ host: string; path: string; status: number | null }>;
+  /** Console errors, sanitised, first 200 chars. */
+  console: string[];
+  /** A viewport screenshot taken 3 s after the click; null when it could not be taken. */
+  screenshot: Buffer | null;
+}
+
 /** One per vendor; selected by URL pattern. */
 export interface FormAdapter {
   readonly ats: AtsId;
@@ -78,8 +88,13 @@ export interface FormAdapter {
   fields(page: AdapterPage): Promise<FieldDescriptor[]>;
   fill(page: AdapterPage, values: FieldValues): Promise<void>;
   attachResume(page: AdapterPage, pdf: { filename: string; bytes: Buffer }): Promise<void>;
-  submit(page: AdapterPage): Promise<void>;
+  /** Clicks submit and waits out the window; returns what the page did meanwhile (rule 36). */
+  submit(page: AdapterPage): Promise<SubmitTrace | void>;
   confirmed(page: AdapterPage): Promise<boolean>;
+  /** True when the page asks for an emailed one-time code (rule 40); marks the code input. */
+  codePrompt?(page: AdapterPage): Promise<boolean>;
+  /** Presses the prompt's own continue/verify button after the code is typed, when it has one. */
+  advanceCode?(page: AdapterPage): Promise<void>;
   findCaptcha(page: AdapterPage): Promise<CaptchaHandle | null>;
   /** Visible notices on the form, e.g. an application limit (`form-notice` activity entry). */
   notices?(page: AdapterPage): Promise<FormNotice[]>;

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Submit that posts</title>
+  </head>
+  <body>
+    <div id="page">
+      <form id="app">
+        <div class="entry"><label for="name">Full name</label><input id="name" type="text" /></div>
+        <button type="submit">Submit application</button>
+      </form>
+    </div>
+    <script>
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+        console.error('submit handler reached the server');
+        fetch('/apply?token=secret', { method: 'POST', body: 'name=private' }).then(function () {
+          document.getElementById('page').innerHTML =
+            '<h2>Thank you for applying!</h2><p>We will be in touch.</p>';
+        });
+      });
+    </script>
+  </body>
+</html>

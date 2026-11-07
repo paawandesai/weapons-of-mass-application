@@ -35,6 +35,7 @@ export function extractVerification(msg: InboundMessage): Verification | null {
 export async function waitForVerification(
   ctx: SubmissionContext,
   since: Date,
+  opts: { newest?: boolean } = {},
 ): Promise<Verification> {
   const fromDomains = senderDomains(ctx.job);
   const company = { name: ctx.companyName, job: ctx.job };
@@ -48,7 +49,11 @@ export async function waitForVerification(
       );
       const sorted = messages
         .filter((m) => m.receivedAt.getTime() >= since.getTime() && matchesCompany(m, company))
-        .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime());
+        .sort((a, b) =>
+          opts.newest
+            ? b.receivedAt.getTime() - a.receivedAt.getTime()
+            : a.receivedAt.getTime() - b.receivedAt.getTime(),
+        );
       for (const m of sorted) {
         const v = extractVerification(m);
         if (v) return v;
@@ -61,6 +66,10 @@ export async function waitForVerification(
 }
 
 const CODE_INPUTS = [
+  'input[data-wma-code="1"]',
+  'input[aria-label*="security" i]',
+  'input[name*="security" i]',
+  'input[id*="security" i]',
   'input[autocomplete="one-time-code"]',
   'input[name*="code" i]',
   'input[id*="code" i]',

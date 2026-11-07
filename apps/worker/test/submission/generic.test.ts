@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright';
@@ -17,6 +20,7 @@ import {
   resolveStandardFields,
   standardKeyFor,
 } from '../../src/submission/answers';
+import { enterVerificationCode } from '../../src/submission/accounts/verification';
 import type { FieldDescriptor, FormAdapter } from '../../src/submission/types';
 import { PROFILE } from '../fixtures/submission';
 
@@ -997,6 +1001,65 @@ describe('validation errors (review)', () => {
       expect(((err as SubmissionFailure).detail.errors as string[])[0]).toContain(
         'That name is not accepted',
       );
+    });
+  }, 60_000);
+});
+
+describe('rule 36: the submit trace', () => {
+  it('records the POST the submit handler makes (host and path only), console errors and a screenshot', async () => {
+    const html = readFileSync(join(FORMS, 'generic', 'submit-post.html'));
+    const server: Server = createServer((req, res) => {
+      if (req.method === 'POST') {
+        req.resume();
+        res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
+      } else {
+        res.writeHead(200, { 'content-type': 'text/html' }).end(html);
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      await withPage(async (page) => {
+        await bare.load(page, `http://127.0.0.1:${port}/`);
+        const [name] = await bare.fields(page);
+        await bare.fill(page, { [name!.id]: 'Mara Quill' });
+        const trace = await bare.submit(page);
+        expect(trace.posts).toEqual([{ host: `127.0.0.1:${port}`, path: '/apply', status: 200 }]);
+        expect(JSON.stringify(trace)).not.toContain('secret');
+        expect(trace.console).toEqual(['submit handler reached the server']);
+        expect(trace.screenshot!.subarray(0, 4)).toEqual(PNG_MAGIC);
+        expect(await bare.confirmed(page)).toBe(true);
+      });
+    } finally {
+      server.close();
+    }
+  }, 60_000);
+});
+
+describe('rule 40: a code prompt after submit', () => {
+  it('is detected by its text and field, the code goes in, and the same submit finishes it', async () => {
+    await withPage(async (page) => {
+      await open(page, 'code-prompt.html');
+      const [name] = await bare.fields(page);
+      await bare.fill(page, { [name!.id]: 'Mara Quill' });
+      expect(await bare.codePrompt!(page)).toBe(false);
+      await bare.submit(page);
+      expect(await bare.codePrompt!(page)).toBe(true);
+      expect(await bare.confirmed(page)).toBe(false);
+      await enterVerificationCode(page as never, '481516');
+      await bare.advanceCode!(page);
+      await bare.submit(page);
+      expect(await bare.confirmed(page)).toBe(true);
+    });
+  }, 60_000);
+
+  it('a confirmation page with "check your email" text but no code input is not a prompt', async () => {
+    await withPage(async (page) => {
+      await open(page, 'confirm-text.html');
+      await page.evaluate(
+        `document.body.innerHTML = '<h2>Thank you</h2><p>Check your email for details.</p>'`,
+      );
+      expect(await bare.codePrompt!(page)).toBe(false);
     });
   }, 60_000);
 });
