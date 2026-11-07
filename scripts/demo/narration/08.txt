@@ -1,0 +1,1 @@
+The card is now in Interviewing. The agent replied to the recruiter with the chosen time, the recruiter acknowledged it, and a calendar event holds the slot. It also prepared a plan for the interview: likely questions, topics to review, company research, and what is known about the interviewer. No outgoing message ever mentions pay.

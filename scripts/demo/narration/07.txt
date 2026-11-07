@@ -1,0 +1,1 @@
+A recruiter proposes three interview times. The agent read the email, matched it to the right card, and sent Jordan one message with a confirm link per slot. It said nothing to the recruiter. Jordan opens a link, sees the slot, and confirms it. That click is the only thing in the loop a person has to do.
