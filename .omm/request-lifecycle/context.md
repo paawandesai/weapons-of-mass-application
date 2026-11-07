@@ -1,0 +1,1 @@
+Status codes the web client relies on: 401 from `requireSession`, 404 for other-tenant or unknown ids (never 403, so ids do not leak), 409 with the current status on a stale board move, 410 on a second confirm POST, 400 for a panic search under two characters.

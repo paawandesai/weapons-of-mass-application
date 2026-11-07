@@ -1,0 +1,1 @@
+`apps/web/`: React 18 single-page app built with Vite. React Router routes in `src/App.tsx`, one typed fetch client in `src/api.ts`, pages under `src/pages/`, the kanban board components and card extras under `src/components/`. Talks only to the API over a same-origin session cookie. Depends on `@wma/shared` for the status and API types.

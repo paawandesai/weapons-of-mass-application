@@ -1,0 +1,41 @@
+graph LR
+    sources["Connected sources\napps/api/src/services/resume.ts linkedin.ts github.ts drive.ts"]
+    profile-doc["Approved profile\nprofiles.approved_version"]
+    survey["Survey and preferences\napi/src/routes/survey.ts settings.ts"]
+    postings["Postings\napps/worker/src/discovery/adapters/"]
+    candidates["Run candidates\nrun_candidates with Judgment"]
+    selection["Selected jobs\njobs + applications PENDING"]
+    resume-pdf["Tailored resume PDF\nfile store"]
+    form-answers["Form answers\napplications.form_answers"]
+    submitted["Submitted application\nstatus applied, activity_log"]
+    mail["Recruiter and vendor mail\nemail_threads processed_messages"]
+    status["Card status\napplications.status"]
+    interview["Interview and slots\ninterviews interview_slots"]
+    prep-plan["Prep plan\ninterviews.prep_plan"]
+    pay-data["Pay comparables\ninterviews negotiation data"]
+    outgoing["Outgoing mail receipts\noutgoing_messages"]
+
+    sources -->|"profile-build, extract-resume-facts"| profile-doc
+    profile-doc -->|"profile view"| candidates
+    survey -->|"preferences, non-financial answers"| candidates
+    postings -->|"dedupe, judge cap"| candidates
+    candidates -->|"apply true, rank by fit, top N"| selection
+    selection -->|"tailor-resume, facts check"| resume-pdf
+    selection -->|"classify-form-field, answer-form-question"| form-answers
+    profile-doc -->|"standard answers"| form-answers
+    survey -->|"relocation, consent, preferences"| form-answers
+    resume-pdf -->|"upload"| submitted
+    form-answers -->|"fill and submit"| submitted
+    submitted -->|"confirmation poll, follow-up"| mail
+    mail -->|"inbox-link, inbox-classify, nextStatus"| status
+    mail -->|"interview proposal: slots offered"| interview
+    interview -->|"user confirms: event, reply, prep-plan row"| prep-plan
+    mail -->|"offer: comparables-extract from levels.fyi"| pay-data
+    interview -->|"slot offers, reminders"| outgoing
+    submitted -->|"digest"| outgoing
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class profile-doc,candidates,selection,resume-pdf,form-answers,submitted,mail,status,interview,prep-plan,pay-data,outgoing store

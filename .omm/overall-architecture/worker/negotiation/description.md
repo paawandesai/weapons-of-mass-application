@@ -1,0 +1,1 @@
+`src/negotiation/levels.ts`, `run.ts`, `schema.ts`, job `negotiation`. Renders the levels.fyi public page in the shared browser, extracts comparables with `comparables-extract`, and stores pay data on the offer for the user to read. Nothing here sends mail: compensation messages are never automated.

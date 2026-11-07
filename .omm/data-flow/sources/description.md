@@ -1,0 +1,1 @@
+Resume (PDF via pdf-parse, DOCX via mammoth), LinkedIn public profile URL, GitHub public repos, Drive documents from chosen folders (read by the worker through the vaulted Drive port at build time). Stored as `source_connections` plus extracted text.

@@ -1,0 +1,1 @@
+`packages/discovery/` knows the three hosted ATSs: public board URLs and JSON API URLs (`boards.ts`, EU regions for Greenhouse and Lever), board URL parsing and a guarded `http.ts`. The worker's `src/discovery/adapters/` turn those plus the HN Firebase API and LinkedIn guest search into `Candidate` rows. All read-only.

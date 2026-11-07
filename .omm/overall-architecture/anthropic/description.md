@@ -1,0 +1,1 @@
+Anthropic Messages API, reached only through `packages/llm`. `ANTHROPIC_API_KEY` is required by api and worker at start. Build-time spend cap was $25; real-model smoke tests ran once per prompt family and their replies are recorded fixtures.

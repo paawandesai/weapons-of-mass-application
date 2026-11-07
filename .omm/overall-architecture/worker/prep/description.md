@@ -1,0 +1,1 @@
+`src/prep/research.ts`, `generate.ts`, `schema.ts`, job `prep-plan`. Researches the company and role, runs the `prep-plan` prompt against the structured-output schema and stores the plan on the interview (`pending`, `ready`, `failed`). Idempotent: a redelivered job rewrites the plan.

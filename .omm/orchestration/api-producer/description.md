@@ -1,0 +1,1 @@
+`apps/api/src/services/queue.ts` (producer-only client, `profile.build` with build id as job id) and `confirm.ts` (`book-interview` plus `schedule-reminders`). `POST /api/runs` enqueues a `daily-run` with trigger `manual` through the same singleton key as the scheduled run.

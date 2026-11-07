@@ -1,0 +1,1 @@
+`record.ts`, `failure.ts`, `followup.ts`. Writes each step to the activity log, sets the final status conditionally on the current one, stores form answers and the resume reference, and queues the `follow-up` job for applied applications; an hourly reconcile repairs applied rows whose follow-up was never queued.

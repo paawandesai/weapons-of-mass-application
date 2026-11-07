@@ -1,0 +1,1 @@
+About thirty tables in `schema.ts`, all with `tenant_id`; enums for source kinds, run status, application status, pending reason, credential status, CAPTCHA stage, thread kind, outgoing state. Repos in `src/repos/` are the only SQL.

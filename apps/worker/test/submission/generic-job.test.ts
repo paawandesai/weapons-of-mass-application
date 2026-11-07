@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { activity, getApplication, getFile, listCaptchaRequestsForApplication } from '@wma/db';
 import { FakeLlm } from '@wma/llm';
+import { startTrace } from '../../src/submission/adapters/common';
 import { runSubmission } from '../../src/submission/job';
 import { SubmissionFailure } from '../../src/submission/failure';
 import {
@@ -241,5 +242,78 @@ describe('rule 40: the emailed code after submit', () => {
     const out = await runSubmission(deps, env.db, data(t, s.application.id));
     expect(out).toEqual({ outcome: 'pending', reason: 'verification-timeout' });
     expect(adapter.submits).toBe(1);
+  });
+});
+
+describe('rule 41: the page is re-checked on every tick of the confirmation wait', () => {
+  it('a page that turns confirmed 20 s after the click resolves applied from the page, without mail', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    adapter.confirmedAfterSubmit = false;
+    const deps = makeDeps(env.db, { adapter });
+    let clickedAt = 0;
+    const submit = adapter.submit.bind(adapter);
+    adapter.submit = async () => {
+      clickedAt = deps.clock.now().getTime();
+      return submit();
+    };
+    adapter.confirmed = async () =>
+      clickedAt > 0 && deps.clock.now().getTime() - clickedAt >= 20_000;
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out).toEqual({ outcome: 'applied', source: 'page', prior: false });
+    // Found on the third tick after 20 s, long before the 600 s mail cap.
+    expect(deps.clock.sleeps.reduce((a, b) => a + b, 0)).toBeLessThan(60_000);
+  });
+
+  it('a validation error shown during the wait is form-rejected with the error texts', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    adapter.confirmedAfterSubmit = false;
+    const deps = makeDeps(env.db, { adapter });
+    let clickedAt = 0;
+    const submit = adapter.submit.bind(adapter);
+    adapter.submit = async () => {
+      clickedAt = deps.clock.now().getTime();
+      return submit();
+    };
+    adapter.validationErrors = async () =>
+      clickedAt > 0 && deps.clock.now().getTime() - clickedAt >= 12_000
+        ? ['Your form needs corrections: Missing entry for required field: Legal Name']
+        : [];
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out).toEqual({ outcome: 'pending', reason: 'form-rejected' });
+    const entry = (await activity.listByApplication(t.handle, s.application.id)).find(
+      (e) => e.action === 'form-rejected',
+    );
+    expect(entry?.detail).toMatchObject({
+      errors: ['Your form needs corrections: Missing entry for required field: Legal Name'],
+    });
+  });
+});
+
+describe('rule 42: the submit trace path', () => {
+  it('keeps op/operationName for a graphql path and drops every other query string', async () => {
+    const listeners = new Map<string, (arg: unknown) => void>();
+    const page = {
+      on: (ev: string, fn: (arg: unknown) => void) => void listeners.set(ev, fn),
+      off: () => {},
+      screenshot: async () => Buffer.from('png'),
+    };
+    const post = (url: string) =>
+      listeners.get('request')!({ method: () => 'POST', url: () => url });
+    const tracer = startTrace(page as never);
+    post('https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiSubmitMultipleFormsAction');
+    post('https://x.test/graphql?operationName=Submit&token=abc');
+    post('https://x.test/graphql?token=abc');
+    post('https://x.test/api/apply?op=Nope&email=a@b.c');
+    const trace = await tracer.finish();
+    expect(trace.posts.map((p) => p.path)).toEqual([
+      '/api/non-user-graphql?op=ApiSubmitMultipleFormsAction',
+      '/graphql?operationName=Submit',
+      '/graphql',
+      '/api/apply',
+    ]);
   });
 });

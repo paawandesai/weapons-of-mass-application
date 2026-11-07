@@ -1,0 +1,38 @@
+graph LR
+    browser(["Browser\napps/web/src/api.ts"])
+    caddy["Caddy\ndeploy/Caddyfile"]
+    spa["Static SPA\n/srv index.html fallback"]
+    hono["Hono createApp\napps/api/src/app.ts"]
+    context-middleware["Db and clock injection\napp.use('*')"]
+    health["GET /health"]
+    auth-routes["/auth/*\napps/api/src/auth/routes.ts"]
+    require-session["requireSession\napps/api/src/middleware/session.ts"]
+    api-routes["/api/* route groups\napps/api/src/routes/"]
+    token-routes["/confirm/:token /captcha/:token\napps/api/src/routes/confirm.ts captcha.ts"]
+    services["Services\napps/api/src/services/"]
+    tenant-handle["TenantHandle repos\npackages/db/src/repos/"]
+    producer["pg-boss send\napps/api/src/services/queue.ts confirm.ts"]
+    error-handler["notFound and onError\napp.notFound app.onError"]
+
+    browser -->|"HTTPS, session cookie"| caddy
+    caddy -->|"anything else"| spa
+    caddy -->|"/api /auth /confirm /captcha /health"| hono
+    hono -->|"every request"| context-middleware
+    context-middleware -->|"liveness"| health
+    context-middleware -->|"Google code exchange, demo token, signout"| auth-routes
+    context-middleware -->|"guards /api/*"| require-session
+    require-session -->|"401 without a live session"| error-handler
+    require-session -->|"user and tenant handle on context"| api-routes
+    context-middleware -->|"single-use token is the credential"| token-routes
+    api-routes -->|"validate with zod, call"| services
+    token-routes -->|"book slot, record CAPTCHA answer"| services
+    services -->|"tenant-scoped SQL, transactions"| tenant-handle
+    services -->|"profile.build, book-interview, schedule-reminders"| producer
+    api-routes -->|"JSON 404 under /api, generic 500"| error-handler
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class caddy,hono,token-routes entry
+    class tenant-handle,producer store

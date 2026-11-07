@@ -1,0 +1,1 @@
+`apps/api/src/services/`: logic behind the routes (board read model and stage moves, builds and review gate, source fetchers, confirm and CAPTCHA, prep and negotiation outbox writes, survey, feedback).

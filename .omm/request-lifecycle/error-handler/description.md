@@ -1,0 +1,1 @@
+`app.notFound`: JSON `{code: 'not_found'}` under `/api/`, text otherwise. `app.onError`: logs only the error name, answers `{code: 'internal'}` 500. Route-level errors use typed codes from `packages/db/src/errors.ts`.

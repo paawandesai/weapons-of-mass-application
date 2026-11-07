@@ -1,0 +1,1 @@
+`tailor/facts.ts`, `format.ts`, `schema.ts`, `index.ts`, plus `pdf.ts`. Runs `tailor-resume` against the approved profile and the posting, checks the tailored facts against the profile (a check failure parks the application with `tailoring-check-failed`), renders the PDF from `apps/worker/templates/` and stores it under the tenant's file-store directory.

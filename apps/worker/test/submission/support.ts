@@ -353,6 +353,8 @@ export class FakeAdapter implements FormAdapter {
     this.submitted = true;
     return this.traces[Math.min(this.submits - 1, this.traces.length - 1)];
   }
+  /** Visible validation errors on the page now (rule 41). */
+  validationErrors: () => Promise<string[]> = async () => [];
   async codePrompt() {
     if (this.codePrompts <= 0) return false;
     this.codePrompts--;

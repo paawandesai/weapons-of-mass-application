@@ -1,0 +1,2 @@
+- Click through real Google OAuth on the deployed host.
+- Observe one digest and one reminder delivery end to end in a live run.

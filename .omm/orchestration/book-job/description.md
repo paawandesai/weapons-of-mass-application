@@ -1,0 +1,1 @@
+`BOOK_QUEUE_OPTIONS`: exclusive, 5 retries, 60 s backoff. Both the API and `inbox/wiring.ts` create this queue with the same options; whichever starts first wins, so the options are shared in `@wma/shared/queues.ts`.

@@ -1,0 +1,1 @@
+`src/auth/routes.ts`, `connections.ts`, `demo.ts`, `sessions.ts`. Google OAuth code flow (`@wma/google` config): the refresh token is sealed into the vault and the Google connection is recorded as a source. `/auth/demo` is a non-production sign-in gated by `DEMO_LOGIN_TOKEN` for the fictional demo persona. `/auth/signout` deletes the session.

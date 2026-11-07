@@ -163,7 +163,12 @@ async function recordTrace(ctx: SubmissionContext, trace: SubmitTrace | void): P
   }
   await recordStep(ctx, {
     action: 'submit-trace',
-    detail: { posts: trace.posts, console: trace.console, screenshot },
+    detail: {
+      posts: trace.posts,
+      console: trace.console,
+      screenshot,
+      ...(trace.clicks ? { clicks: trace.clicks } : {}),
+    },
   });
 }
 

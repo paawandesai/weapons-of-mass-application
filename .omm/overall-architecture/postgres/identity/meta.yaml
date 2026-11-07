@@ -1,0 +1,9 @@
+created: 2026-11-07T20:03:41.947Z
+updated: 2026-11-07T20:03:41.947Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: identity
+children: []
+parentPath:
+  - postgres

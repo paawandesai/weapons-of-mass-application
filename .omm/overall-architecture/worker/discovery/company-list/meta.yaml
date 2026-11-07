@@ -1,0 +1,10 @@
+created: 2026-11-07T20:03:40.660Z
+updated: 2026-11-07T20:03:40.660Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: company-list
+children: []
+parentPath:
+  - worker
+  - discovery

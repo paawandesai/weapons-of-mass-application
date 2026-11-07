@@ -1,0 +1,1 @@
+`src/discovery/company-list.ts`. The user's companies plus, for real tenants, companies the `company-list` prompt proposes from the profile, resolved to boards and cached in the global `companies` table. Demo tenants never generate a list (a real sweep once fetched 4,148 postings).

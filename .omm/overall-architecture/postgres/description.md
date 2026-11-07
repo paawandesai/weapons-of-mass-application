@@ -1,0 +1,1 @@
+`packages/db/`: Drizzle schema in `src/schema.ts`, migrations under `drizzle/` (`pnpm db:migrate`, `db:check`), a `TenantHandle` client (`src/client.ts`) and one repo module per table under `src/repos/`. Also hosts the activity log helper, the credential vault, the file-store helper and the demo seed (`src/seed/`). Every table carries `tenant_id`.

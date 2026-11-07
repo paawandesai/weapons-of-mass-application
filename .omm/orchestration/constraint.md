@@ -1,0 +1,3 @@
+- A tick job never does work itself; it only sends per-user jobs, so a slow user cannot block the hour.
+- Jobs that may be redelivered are idempotent: the prep plan is rewritten, the recruiter reply is recorded before the calendar event, outgoing mail has a receipt before the send.
+- A failure recorded on the application row (parked `pending` with a reason) is not a pg-boss failure; only unrecorded failures are rethrown for retry.

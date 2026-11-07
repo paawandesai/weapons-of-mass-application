@@ -1,0 +1,39 @@
+graph LR
+    api["API\napps/api/"]
+    worker["Worker\napps/worker/"]
+    anthropic["Anthropic Messages API\npackages/llm/src/client.ts"]
+    google-oauth["Google OAuth 2\npackages/google/src/oauth.ts"]
+    google-drive["Google Drive v3\npackages/google/src/client.ts apps/worker/src/drive.ts"]
+    gmail["Gmail v1\npackages/google/src/send.ts apps/worker/src/inbox/gmail-reader.ts"]
+    google-calendar["Google Calendar v3\napps/worker/src/scheduling/ports.ts"]
+    board-apis["Ashby, Greenhouse, Lever board APIs\npackages/discovery/src/boards.ts"]
+    ats-forms["Ashby, Greenhouse, Lever forms\napps/worker/src/submission/adapters/"]
+    hn["Hacker News Firebase API\napps/worker/src/discovery/adapters/hn.ts"]
+    linkedin["LinkedIn public profile and guest job search\napps/api/src/services/linkedin.ts apps/worker/src/discovery/adapters/linkedin.ts"]
+    github["GitHub REST\napps/api/src/services/github.ts"]
+    levels["levels.fyi page\napps/worker/src/negotiation/levels.ts"]
+    demo-ports["Demo ports\napps/worker/src/demo/factory.ts"]
+
+    worker -->|"13 prompt families, structured output"| anthropic
+    api -->|"sign-in, refresh token to vault"| google-oauth
+    api -->|"folder list for connections page"| google-drive
+    worker -->|"read documents at profile build"| google-drive
+    worker -->|"read recruiter and vendor mail; send guarded mail"| gmail
+    worker -->|"availability, interview event"| google-calendar
+    worker -->|"postings, read-only"| board-apis
+    worker -->|"Playwright fill and submit, account creation"| ats-forms
+    worker -->|"Who is Hiring, read-only"| hn
+    api -->|"public profile at connect"| linkedin
+    worker -->|"guest search, best effort"| linkedin
+    api -->|"public repos at connect"| github
+    worker -->|"comparables, read-only"| levels
+    demo-ports -.->|"replace for demo tenants"| gmail
+    demo-ports -.->|"replace for demo tenants"| google-calendar
+    demo-ports -.->|"fixture forms server"| ats-forms
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class anthropic,google-oauth,google-drive,gmail,google-calendar,board-apis,ats-forms,hn,linkedin,github,levels external
+    class demo-ports concern

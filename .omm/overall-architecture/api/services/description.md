@@ -1,0 +1,1 @@
+`src/services/`: `board.ts` (columns, stage moves), `builds.ts` and `review.ts` (profile build lifecycle and approval gate), `resume.ts`, `linkedin.ts`, `github.ts`, `drive.ts` (source fetchers; `http.ts` is the guarded fetch), `discovery.ts` (run queries), `captcha.ts` and `confirm.ts` (token flows), `feedback.ts`, `prep.ts`, `survey.ts`, `connections.ts`.

@@ -1,0 +1,17 @@
+created: 2026-11-07T20:03:40.912Z
+updated: 2026-11-07T20:03:40.966Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: submission
+children:
+  - accounts
+  - answers
+  - captcha
+  - confirmation
+  - fill
+  - form-adapters
+  - record
+  - tailor
+parentPath:
+  - worker

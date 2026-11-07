@@ -1,0 +1,1 @@
+`src/discovery/applied.ts`. Computes `dedupeKey` (`ats:ats_job_id` or the normalized URL, `@wma/shared`) for each candidate and drops those with an existing application row for the user, plus in-run duplicates.

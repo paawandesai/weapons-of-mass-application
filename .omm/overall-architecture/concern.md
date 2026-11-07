@@ -1,0 +1,3 @@
+- Single host, single Postgres, single worker process: the worker's shared Playwright browser and pg-boss consumers are one failure domain.
+- The CAPTCHA detector handles text-and-image widgets only; real vendors use iframe challenges, so on live forms the chain goes straight to the human stage.
+- Real Google sign-in and digest delivery have not been clicked through on the droplet (status doc, "Not verified").

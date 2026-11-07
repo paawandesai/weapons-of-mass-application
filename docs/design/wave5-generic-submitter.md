@@ -453,3 +453,39 @@ got past reCAPTCHA and are sitting on a code prompt that the post-submit wait do
     enter it (`enterVerificationCode`), press the prompt's continue/verify button, then resume
     the confirmation wait. Timeout → `verification-timeout` (existing reason) with screenshot.
     Activity: `email-verification` with {source: 'code' | 'link'}. The code is never stored.
+
+## Found by the first confirmed application (2026-11-07, 20:28)
+
+Anthropic (Greenhouse) confirmed on the page in 3 s and by email at 20:29:06. OpenAI (Ashby) on
+real Chrome: the trace shows `POST jobs.ashbyhq.com/api/non-user-graphql` 3 s after the click
+(the first time a submit reached Ashby's server) while the page still showed the form; the
+confirmation wait then only re-checks the page after a code step, so a success screen that
+appears after the 10 s submit window is missed until the 600 s Gmail poll ends.
+
+41. The confirmation wait re-checks the page on every tick (page confirmation, thank-you text with
+    no controls, validation errors → `form-rejected`, code prompt → rule 40) before each Gmail
+    poll, for the whole 600 s. Page evidence wins over mail.
+42. The submit trace keeps the `op`/`operationName` query parameter for GraphQL endpoints
+    (`/graphql` in the path), since it names the action (`ApiSubmitMultipleFormsAction`) and
+    carries nothing personal; all other query strings stay dropped.
+
+43. Settle before the submit click. Ashby persists each field server-side as it is entered
+    (`POST /api/non-user-graphql?op=ApiSetFormValue` per field) and its submit button is a no-op
+    while those saves are in flight; the worker clicked right after filling 16-20 fields, so the
+    traces show only the saves and no reCAPTCHA or submit call (probe 2026-11-07 20:45: typing one
+    field, waiting 6 s, then the worker's own submit() reaches `ApiSubmitMultipleFormsAction` and
+    the vendor's validation reply). Before the click, the adapter waits until no POST request has
+    been in flight for 1.5 s (bounded at 10 s), then clicks. If within 5 s of the click no POST
+    went to a reCAPTCHA/hCaptcha host and no vendor POST whose op contains "Submit" appeared,
+    the button is clicked once more (this is a provably unacknowledged click, so it cannot
+    duplicate a submission); the trace records `clicks`.
+
+44. Phone-country selectors. A combobox inside an international phone widget (an ancestor with a
+    class containing `iti`, or options that all end in a dial code such as "+1") is the phone's
+    country selector, not a residence question. It resolves from the profile country (rule 39),
+    choosing the option whose text starts with the country name (then the shortest such option:
+    "United States+1" over "United States Minor Outlying Islands+1"), and verifies by the widget's
+    selected-country element (`.iti__selected-country` title or aria-label, or the dial code
+    shown) rather than the search input's value. When the phone number already carries the dial
+    code, the selector is left as the widget set it. Evidence: Anthropic Platform Distribution,
+    "Country*" required, parked `unmapped-field` with the flag already showing +1.

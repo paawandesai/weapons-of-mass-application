@@ -1,0 +1,18 @@
+graph LR
+    router["Router\nsrc/App.tsx"]
+    api-client["API client\nsrc/api.ts"]
+    layout["Layout and nav\nsrc/components/Layout.tsx"]
+    pages["Pages\nsrc/pages/"]
+    board-components["Board\nsrc/components/Board*.tsx"]
+    card-extras["Card extras\nsrc/components/card-extras/"]
+    landing["Landing field, three.js\nsrc/components/landing/"]
+
+    router -->|"mounts /signin and the Layout outlet"| layout
+    router -->|"routes to"| pages
+    layout -->|"renders active page"| pages
+    pages -->|"BoardPage, ApplicationPage"| board-components
+    board-components -->|"detail drawer sections"| card-extras
+    pages -->|"SignInPage hero"| landing
+    pages -->|"every data call"| api-client
+    board-components -->|"stage moves, search"| api-client
+    card-extras -->|"feedback, prep plan, negotiation"| api-client

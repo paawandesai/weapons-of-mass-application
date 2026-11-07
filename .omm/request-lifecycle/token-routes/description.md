@@ -1,0 +1,1 @@
+`confirm.ts`: GET shows the offered slot, POST books it (sends `book-interview` and `schedule-reminders`), second POST is 410. `captcha.ts`: serves the stored image and accepts the human answer the submission job is waiting on. Both are outside `requireSession` because the visitor only holds the token.

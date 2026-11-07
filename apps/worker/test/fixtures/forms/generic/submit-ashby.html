@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Submit that saves fields first</title>
+  </head>
+  <body>
+    <div id="page">
+      <form id="app">
+        <div class="entry"><label for="name">Full name</label><input id="name" type="text" /></div>
+        <button type="button" id="go">Submit application</button>
+      </form>
+    </div>
+    <script>
+      // ?mode=saves: every input starts a slow save and the button does nothing while one is pending.
+      // ?mode=swallow: the first click is ignored. Otherwise a click submits.
+      var mode = new URLSearchParams(location.search).get('mode');
+      var pending = 0;
+      var clicks = 0;
+      function post(op) {
+        return fetch('/api/non-user-graphql?op=' + op, { method: 'POST', body: '{}' });
+      }
+      document.getElementById('name').addEventListener('input', function () {
+        pending++;
+        post('ApiSetFormValue').then(function () {
+          pending--;
+        });
+      });
+      document.getElementById('go').addEventListener('click', function () {
+        clicks++;
+        if (mode === 'saves' && pending > 0) return;
+        if (mode === 'swallow' && clicks === 1) return;
+        post('ApiSetFormValue');
+        post('ApiSubmitMultipleFormsAction');
+      });
+    </script>
+  </body>
+</html>

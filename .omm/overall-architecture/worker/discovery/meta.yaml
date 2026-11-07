@@ -1,0 +1,15 @@
+created: 2026-11-07T20:03:40.513Z
+updated: 2026-11-07T20:03:40.565Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: discovery
+children:
+  - adapters
+  - applied-filter
+  - company-list
+  - handoff
+  - judge
+  - rank
+parentPath:
+  - worker

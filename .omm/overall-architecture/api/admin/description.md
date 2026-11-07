@@ -1,0 +1,1 @@
+`src/routes/admin.ts`: `GET /demo-mailbox` (the demo tenant's simulated inbox) and `POST /sync-now` (an immediate simulated-recruiter pass plus mail sync). `settings.ts` holds per-user run settings; `me.ts` returns the signed-in user and tenant flags.

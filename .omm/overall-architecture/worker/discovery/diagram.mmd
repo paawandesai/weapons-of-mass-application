@@ -1,0 +1,20 @@
+graph LR
+    adapters["Source adapters\nsrc/discovery/adapters/"]
+    company-list["Company list\nsrc/discovery/company-list.ts"]
+    applied-filter["Already-applied filter\nsrc/discovery/applied.ts"]
+    judge["Judge\nsrc/discovery/judge.ts prompts.ts"]
+    rank["Rank and select\nsrc/discovery/rank.ts"]
+    handoff["Handoff\nsrc/discovery/handoff.ts"]
+
+    company-list -->|"boards to sweep"| adapters
+    adapters -->|"Candidate rows"| applied-filter
+    applied-filter -->|"dedupeKey not in applications"| judge
+    judge -->|"Judgment: apply, fit, rationale, pay, deadline"| rank
+    rank -->|"top N, per-company cap"| handoff
+    handoff -->|"job + application PENDING, submit-application send"| submission-queue[("submit-application queue")]
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class submission-queue store

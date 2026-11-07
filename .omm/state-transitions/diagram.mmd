@@ -1,0 +1,29 @@
+graph LR
+    created(["run selects posting\napps/worker/src/discovery/handoff.ts"])
+    pending["pending\nbadge inside Applied"]
+    applied["applied"]
+    interviewing["interviewing"]
+    offer["offer"]
+    closed["closed\nsink"]
+
+    created -->|"jobs + applications row"| pending
+    pending -->|"submission confirmed on page or by email"| applied
+    pending -->|"stays with pending_reason: unmapped-field, captcha-timeout, unconfirmed, ..."| pending
+    applied -->|"mail classified interview; slots offered"| interviewing
+    applied -->|"mail classified offer"| offer
+    interviewing -->|"mail classified offer; negotiation row"| offer
+    pending -->|"mail classified rejection, closed_reason rejected"| closed
+    applied -->|"mail classified rejection"| closed
+    interviewing -->|"mail classified rejection"| closed
+    offer -->|"mail classified rejection"| closed
+    pending -->|"user drags card, closed_reason user"| closed
+    applied -->|"user drags card"| closed
+    interviewing -->|"user drags card"| closed
+    offer -->|"user drags card"| closed
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class created entry
+    class closed concern

@@ -1,0 +1,1 @@
+`deploy/Caddyfile`, built into the `web` image by `deploy/Dockerfile` (target `web`). Terminates TLS for `SITE_HOST` with an automatic certificate, gzips, and routes `/api/*`, `/auth/*`, `/confirm*`, `/captcha*` and `/health` to `api:3000`; every other path falls back to the built SPA's `index.html`. Those prefixes match the Vite dev proxy in local development.

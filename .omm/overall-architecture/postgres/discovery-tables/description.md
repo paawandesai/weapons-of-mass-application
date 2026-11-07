@@ -1,0 +1,1 @@
+`companies` (global cache of resolved boards, source `llm`, `user` or `hn`), `user_companies`, `runs` (unique per user and date, status, trigger, counts), `run_candidates` (every judged posting with its Judgment; purged after `RUN_RETENTION_DAYS` = 7), `jobs` (postings the run selected).

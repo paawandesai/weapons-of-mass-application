@@ -1,0 +1,1 @@
+Hand-drawn Mermaid for slides lives in `docs/ARCHITECTURE.md` (system diagram, daily-run and scheduling sequences). This `.omm/` tree is the code-level mirror and should be regenerated when module boundaries move.

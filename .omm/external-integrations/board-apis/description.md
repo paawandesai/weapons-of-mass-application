@@ -1,0 +1,1 @@
+`boards-api.greenhouse.io/v1/boards/<slug>/jobs?content=true`, `api.lever.co/v0/postings/<slug>?mode=json`, `api.ashbyhq.com/posting-api/job-board/<slug>?includeCompensation=true`, with EU hosts for Greenhouse and Lever.

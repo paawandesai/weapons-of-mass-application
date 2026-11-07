@@ -1,0 +1,1 @@
+`apps/api/src/auth/routes.ts`: Google OAuth start and callback (`connections.ts` seals the refresh token into the vault and records the Google source), `/auth/demo` (token sign-in for the demo persona, non-production only), `/auth/signout`. Sessions in `sessions.ts`.

@@ -1,0 +1,1 @@
+Where the agent acts on the user's behalf: `apps/worker/src/submission/adapters/` drive hosted Ashby, Greenhouse and Lever application forms with Playwright, including account creation when a board requires it. In demo mode the same adapters run against the fixture forms served by `apps/worker/src/demo/forms-server.ts`.

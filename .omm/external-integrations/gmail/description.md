@@ -1,0 +1,1 @@
+Read: `gmail-reader.ts` lists messages since the sync cursor and fetches bodies for linking and classification. Write: `send.ts` builds MIME and sends; every send has an `outgoing_messages` receipt and passes the money guard.

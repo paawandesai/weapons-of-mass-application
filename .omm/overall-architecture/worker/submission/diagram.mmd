@@ -1,0 +1,25 @@
+graph LR
+    tailor["Resume tailoring\nsrc/submission/tailor/ pdf.ts"]
+    answers["Form answers\nsrc/submission/answers/"]
+    form-adapters["Vendor adapters\nsrc/submission/adapters/"]
+    fill["Fill and submit\nsrc/submission/fill.ts browser.ts"]
+    accounts["ATS accounts\nsrc/submission/accounts/"]
+    captcha["CAPTCHA chain\nsrc/submission/captcha/"]
+    confirmation["Confirmation poll\nsrc/submission/confirmation.ts poll.ts gmail.ts"]
+    record["Outcome recording\nsrc/submission/record.ts failure.ts followup.ts"]
+
+    tailor -->|"PDF path, unmet requirements"| fill
+    form-adapters -->|"field scan, classify-form-field"| answers
+    answers -->|"standard, consent, relocation, free text"| fill
+    accounts -->|"create or sign in, vaulted password"| fill
+    fill -->|"widget detected"| captcha
+    captcha -->|"solve-captcha-a, -b, then human email"| fill
+    fill -->|"submitted"| confirmation
+    confirmation -->|"applied or pending unconfirmed"| record
+    record -->|"queue follow-up"| follow-up-queue[("follow-up queue")]
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class follow-up-queue store

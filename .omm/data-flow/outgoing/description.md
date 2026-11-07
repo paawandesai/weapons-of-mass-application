@@ -1,0 +1,1 @@
+`outgoing_messages`: kind (slot offer, recruiter reply, follow-up, digest, reminder, CAPTCHA request), state `pending` before the Gmail call, `sent` or `blocked` after. An uncertain send reconciles against this row instead of repeating.

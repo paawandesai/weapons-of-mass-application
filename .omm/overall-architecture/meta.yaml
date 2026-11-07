@@ -1,0 +1,23 @@
+created: 2026-11-07T20:03:38.731Z
+updated: 2026-11-07T20:03:39.053Z
+update_count: 7
+last_field: note
+git_commit: 011ef37
+git_branch: main
+children:
+  - anthropic
+  - api
+  - ats-forms
+  - ats-vendors
+  - caddy
+  - credential-vault
+  - file-store
+  - google-apis
+  - google-ports
+  - job-sources
+  - llm-gateway
+  - postgres
+  - task-queue
+  - user
+  - web
+  - worker

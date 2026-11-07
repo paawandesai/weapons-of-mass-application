@@ -1,0 +1,1 @@
+`src/guarded.ts` `guardedJob(name, handler)`. Calls `requireApprovedProfile` first; without an approved profile it writes one `profile_not_approved` activity entry and never runs the handler. Returns `{ran, result}` so callers can tell a skip from a result. Jobs that touch an application also check `isActionable` (`@wma/shared`) and log `skipped_not_actionable` for closed cards.

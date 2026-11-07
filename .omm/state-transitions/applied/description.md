@@ -1,0 +1,1 @@
+Set by the submission job on a page confirmation, or by mail sync when the vendor's confirmation email arrives (`confirmation_source = email`). Triggers the follow-up job and, for demo tenants, the simulated recruiter.

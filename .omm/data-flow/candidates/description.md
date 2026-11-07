@@ -1,0 +1,1 @@
+`run_candidates`: one per judged posting with the `Judgment` (apply, rationale up to 600 chars, fit, pay range, location mode, seniority, deadline). Capped by `JUDGE_CAP_PER_RUN` (default 120). Purged with the run after 7 days, after which the card shows a null rationale.

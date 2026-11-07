@@ -1,0 +1,30 @@
+graph LR
+    api["API\napps/api/"]
+    worker["Worker\napps/worker/"]
+    app-tables[("App tables\npackages/db/src/schema.ts")]
+    pgboss-schema[("pg-boss schema\npgboss.*")]
+    vault[("Credential vault\nvault_keys, secrets")]
+    outbox[("Outbox\npending_jobs")]
+    file-store[("File store\nFILE_STORE_DIR, compose volume files")]
+    demo-tables[("Demo mailbox and calendar\ndemo_mailbox_messages demo_calendar_events")]
+    migrations["Drizzle migrations\npackages/db/drizzle/ deploy migrate container"]
+
+    api -->|"TenantHandle repos"| app-tables
+    worker -->|"TenantHandle repos"| app-tables
+    api -->|"send only"| pgboss-schema
+    worker -->|"work, schedule, maintenance"| pgboss-schema
+    api -->|"seal Google refresh token"| vault
+    worker -->|"open tokens and ATS passwords"| vault
+    api -->|"prep-plan, negotiation rows"| outbox
+    worker -->|"book, offer, demo delivery rows; reconciler reads"| outbox
+    worker -->|"resume PDFs, CAPTCHA images"| file-store
+    api -->|"serve CAPTCHA image"| file-store
+    worker -->|"demo tenants only"| demo-tables
+    api -->|"GET /api/admin/demo-mailbox"| demo-tables
+    migrations -->|"runs before api and worker start"| app-tables
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class app-tables,pgboss-schema,vault,outbox,file-store,demo-tables store

@@ -1,0 +1,1 @@
+`src/App.tsx`. Declares the routes: `/signin` outside the layout; inside it `/` (dashboard), `/board`, `/runs`, `/applications/:id`, `/interviews/:id/feedback`, `/interviews/:id/prep`, `/demo/inbox`, `/connections`, `/survey`, `/profile/review`. Unknown paths redirect to `/`.

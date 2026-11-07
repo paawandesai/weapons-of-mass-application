@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Phone widget with a country combobox</title>
+  </head>
+  <body>
+    <form id="app" data-country="United Kingdom">
+      <div class="entry">
+        <label id="country-label" for="country">Country<span aria-hidden="true">*</span></label>
+        <div class="iti">
+          <button type="button" class="iti__selected-country" title="United Kingdom: +44">
+            <span class="iti__selected-dial-code">+44</span>
+          </button>
+          <input
+            id="country"
+            type="text"
+            role="combobox"
+            aria-expanded="false"
+            aria-labelledby="country-label"
+            aria-required="true"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+      <div class="entry">
+        <label for="phone">Phone</label>
+        <input id="phone" type="tel" />
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      (function () {
+        var rows = [
+          ['Afghanistan', '93'],
+          ['United Kingdom', '44'],
+          ['United States Minor Outlying Islands', '1'],
+          ['United States', '1'],
+        ];
+        var input = document.getElementById('country');
+        var flag = document.querySelector('.iti__selected-country');
+        var menu = null;
+        function close() {
+          if (menu) menu.remove();
+          menu = null;
+          input.setAttribute('aria-expanded', 'false');
+        }
+        input.addEventListener('click', function () {
+          close();
+          menu = document.createElement('ul');
+          menu.setAttribute('role', 'listbox');
+          rows.forEach(function (r, n) {
+            var o = document.createElement('li');
+            o.setAttribute('role', 'option');
+            o.id = 'country-option-' + n;
+            o.textContent = r[0] + '+' + r[1];
+            o.addEventListener('click', function () {
+              flag.title = r[0] + ': +' + r[1];
+              flag.querySelector('.iti__selected-dial-code').textContent = '+' + r[1];
+              document.getElementById('app').setAttribute('data-country', r[0]);
+              close();
+            });
+            menu.appendChild(o);
+          });
+          input.parentNode.appendChild(menu);
+          input.setAttribute('aria-expanded', 'true');
+        });
+        document.getElementById('app').addEventListener('submit', function (e) {
+          e.preventDefault();
+        });
+      })();
+    </script>
+  </body>
+</html>

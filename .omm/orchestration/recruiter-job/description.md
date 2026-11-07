@@ -1,0 +1,1 @@
+Polling, not event-driven: every 30 s one pass over the demo tenant's applied applications and recruiter replies, then an immediate outbox dispatch so the delivered message is synced. A no-op unless exactly one tenant is flagged demo.

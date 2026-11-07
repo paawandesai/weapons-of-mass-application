@@ -1,0 +1,3 @@
+- LinkedIn guest search is undocumented and best effort; it may break without notice.
+- Real vendor CAPTCHAs are iframe challenges the detector does not read; the chain goes to the human stage.
+- Google refresh tokens can be revoked; `invalid_grant` marks the connection and the user must reconnect.

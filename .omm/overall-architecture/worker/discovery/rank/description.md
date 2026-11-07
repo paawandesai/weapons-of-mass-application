@@ -1,0 +1,1 @@
+`src/discovery/rank.ts`. Orders approved candidates by fit, application deadline as tiebreaker, caps per company (`MAX_PER_COMPANY_PER_RUN`) and cuts to the user's top N (default 12). `fit` is never exposed by an API.

@@ -1,0 +1,1 @@
+`src/components/card-extras/`: FeedbackForm, PrepPanel and PrepPlanView, OfferPanel with `money.ts` formatting. Sections of the application drawer that appear once a card reaches Interviewing or Offer.

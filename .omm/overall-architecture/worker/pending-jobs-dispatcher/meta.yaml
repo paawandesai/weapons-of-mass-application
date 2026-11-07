@@ -1,0 +1,9 @@
+created: 2026-11-07T20:03:41.740Z
+updated: 2026-11-07T20:03:41.741Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: pending-jobs-dispatcher
+children: []
+parentPath:
+  - worker

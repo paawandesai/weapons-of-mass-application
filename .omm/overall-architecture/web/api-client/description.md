@@ -1,0 +1,1 @@
+`src/api.ts`. One `request(method, path, {json|form})` helper plus a typed object of calls (`me`, `signOut`, sources, profile build and approval, survey, board, runs, applications, interviews, demo mailbox). Carries the response types shared with the API.

@@ -1,0 +1,1 @@
+`insertPendingJob(handle, {kind, payload, dedupeKey})` inside the caller's transaction. Writers: `scheduling/book.ts` (prep-plan), `inbox/sync.ts` and `routes/applications.ts` and `services/prep.ts` (negotiation, prep-plan), `demo/recruiter.ts` and the seed (mail-sync).

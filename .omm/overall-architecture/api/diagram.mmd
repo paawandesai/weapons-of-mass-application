@@ -1,0 +1,33 @@
+graph LR
+    hono-app["Hono app\nsrc/app.ts"]
+    session-middleware["requireSession\nsrc/middleware/session.ts"]
+    auth["Google OAuth and demo sign-in\nsrc/auth/"]
+    profile-and-sources["Sources, profile, survey\nsrc/routes/sources.ts profile.ts survey.ts"]
+    runs-and-companies["Runs and companies\nsrc/routes/runs.ts companies.ts"]
+    board-and-applications["Board, applications, search\nsrc/routes/board.ts applications.ts search.ts"]
+    interviews["Interviews, feedback, prep, negotiation\nsrc/routes/interviews.ts"]
+    public-links["Token links: confirm, captcha\nsrc/routes/confirm.ts captcha.ts"]
+    admin["Admin and demo\nsrc/routes/admin.ts settings.ts me.ts"]
+    services["Services\nsrc/services/"]
+    build-queue["pg-boss producer\nsrc/services/queue.ts confirm.ts"]
+
+    hono-app -->|"/auth, no session needed"| auth
+    hono-app -->|"guards /api/*"| session-middleware
+    session-middleware -->|"sets user, tenant handle"| profile-and-sources
+    session-middleware -->|"sets user, tenant handle"| runs-and-companies
+    session-middleware -->|"sets user, tenant handle"| board-and-applications
+    session-middleware -->|"sets user, tenant handle"| interviews
+    session-middleware -->|"sets user, tenant handle"| admin
+    hono-app -->|"single-use token, outside session"| public-links
+    profile-and-sources -->|"fetchers, build, review gate"| services
+    runs-and-companies -->|"discovery queries"| services
+    board-and-applications -->|"board read model, stage moves"| services
+    interviews -->|"prep, feedback, negotiation"| services
+    public-links -->|"confirm slot, record CAPTCHA answer"| services
+    services -->|"profile.build, book-interview, schedule-reminders"| build-queue
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class hono-app,public-links entry

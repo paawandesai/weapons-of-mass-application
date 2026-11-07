@@ -1,0 +1,1 @@
+`POST /api/runs` starts a manual daily run (enqueued through the worker's queue contract), `GET /current` streams the running run's candidates with a cursor, `GET /latest`, `GET /:id`. `GET/POST/DELETE /api/companies` manage the user's company list used by discovery.

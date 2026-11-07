@@ -1,0 +1,1 @@
+`email_threads` (kind, linked application), `processed_messages` (`linked`, `unlinked`, `failed` per Gmail message id, the sync's idempotency), `outgoing_messages` (kind, state `pending`, `sent`, `blocked`: the delivery receipt written before Gmail is called), `mail_sync_state`, `digest_state`.

@@ -1,0 +1,1 @@
+`closed_reason` is `rejected` (mail) or `user` (board move). Terminal for the agent; `isActionable` is false so submission retries, follow-ups, slot offers, booking, prep plans and negotiation all skip it.

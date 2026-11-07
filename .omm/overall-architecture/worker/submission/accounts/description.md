@@ -1,0 +1,1 @@
+`accounts/index.ts`, `password.ts`, `verification.ts`. Some boards require an account: generate a password, store it in the vault as `ats_password`, create or sign in, and complete an email verification by polling Gmail (`verification-timeout`, `credential-rejected` on failure).

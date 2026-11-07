@@ -56,6 +56,8 @@ export interface Question {
   currentValue?: string;
   isResume: boolean;
   note?: 'unknown-control';
+  /** Rule 44: the combobox sits inside an international phone widget (its country selector). */
+  phoneWidget?: boolean;
   /** Set by option reading: more than LARGE_LIST options, so `options` is left out. */
   largeList?: boolean;
   /** Rule 22: the text that explains the question (help text, instructions), bounded to 1,000 chars. */
@@ -236,6 +238,16 @@ export function descriptorType(q: Question): FieldDescriptor['type'] {
   }
 }
 
+/** Rule 44: a phone widget's country selector (an `iti` ancestor, or options that all end in a dial code). */
+export function isPhoneCountry(q: Question): boolean {
+  if (q.kind !== 'combobox') return false;
+  if (q.phoneWidget) return true;
+  return !!q.options?.length && q.options.every((o) => /\+\d{1,4}\s*$/.test(o));
+}
+
+/** "United States: +1" and "United States+1" are both the country "united states". */
+const countryName = (s: string) => low(s).replace(/[\s:(-]*\+\d{1,4}\)?\s*$/, '');
+
 export function describe(q: Question): FieldDescriptor {
   const type = descriptorType(q);
   const d: FieldDescriptor = {
@@ -248,7 +260,8 @@ export function describe(q: Question): FieldDescriptor {
   };
   if (q.options?.length && !q.largeList) d.options = q.options;
   if (q.description) d.description = q.description;
-  if (q.largeList) d.hint = 'large-list';
+  if (isPhoneCountry(q)) d.hint = 'phone-country';
+  else if (q.largeList) d.hint = 'large-list';
   else if (q.note) d.hint = q.note;
   return d;
 }
@@ -491,8 +504,20 @@ async function pickOption(
   rows: OptionRow[],
   value: string,
   modes: Array<'equals' | 'starts' | 'contains'>,
+  shortest = false,
 ): Promise<string | null> {
   const v = low(value);
+  if (shortest) {
+    // Rule 44: "United States+1" over "United States Minor Outlying Islands+1".
+    const hit = rows
+      .filter((r) => low(r.text).startsWith(v))
+      .sort((a, b) => a.text.length - b.text.length)[0];
+    if (hit) {
+      await page.locator(`[data-wma-o="${hit.i}"]`).first().click({ timeout: ACTION_TIMEOUT_MS });
+      return hit.text;
+    }
+    return null;
+  }
   for (const mode of modes) {
     const hit = rows.find((r) => {
       const t = low(r.text);
@@ -513,7 +538,7 @@ async function fillCombobox(page: Page, q: Question, intent: Intent): Promise<vo
   await control.click({ timeout: ACTION_TIMEOUT_MS });
   let rows = await collectOptions(page, q, OPTIONS_WAIT_MS, OPTIONS_EARLY_MS);
   if (rows.length > 0) {
-    const first = await pickOption(page, rows, text, ['equals', 'starts']);
+    const first = await pickOption(page, rows, text, ['equals', 'starts'], isPhoneCountry(q));
     if (first !== null) {
       intent.chosen = first;
       return;
@@ -523,7 +548,13 @@ async function fillCombobox(page: Page, q: Question, intent: Intent): Promise<vo
     await control.press('Control+a').catch(() => undefined);
     await control.pressSequentially(text, { delay: 15 }).catch(() => undefined);
     rows = await waitForResults(page, q, text, before, RESULTS_WAIT_MS);
-    const second = await pickOption(page, rows, text, ['equals', 'starts', 'contains']);
+    const second = await pickOption(
+      page,
+      rows,
+      text,
+      ['equals', 'starts', 'contains'],
+      isPhoneCountry(q),
+    );
     if (second !== null) {
       intent.chosen = second;
       return;
@@ -747,6 +778,11 @@ export function stuck(q: Question, intent: Intent): boolean {
     case 'listbox':
       return low(curText) === low(intent.text);
     case 'combobox': {
+      if (isPhoneCountry(q)) {
+        // Rule 44: the widget's selected-country element, by country name.
+        const shown = countryName(curText);
+        return shown !== '' && shown === countryName(intent.chosen ?? intent.text);
+      }
       const t = low(curText);
       const w = low(intent.chosen ?? intent.text);
       // A clicked option may be shown with decoration around it; a typed value must be exact.
@@ -861,6 +897,13 @@ export async function fillPage(page: Page, values: FieldValues): Promise<FillFai
     return null;
   };
 
+  // Rule 44: a phone number that already carries its dial code leaves the selector as the widget set it.
+  const dialLed = (): boolean =>
+    initial.questions.some((q) => {
+      const v = values[q.id];
+      return q.kind === 'tel' && typeof v === 'string' && v.trim().startsWith('+');
+    });
+
   const attempt = async (scan: PageScan, planned: Question[]): Promise<void> => {
     let current = await withFreshScan(page, scan, async (live) => live);
     const steps = [
@@ -882,6 +925,7 @@ export async function fillPage(page: Page, values: FieldValues): Promise<FillFai
           q = findQuestion(current, p);
           if (!q) continue;
         }
+        if (isPhoneCountry(q) && dialLed()) continue;
         try {
           await fillQuestion(page, q, values[p.id]!, intents.get(p.id)!, countryOf);
         } catch {
@@ -896,6 +940,7 @@ export async function fillPage(page: Page, values: FieldValues): Promise<FillFai
   const check = (scan: PageScan, qs: Question[]): Question[] =>
     qs.filter((q) => {
       const now = findQuestion(scan, q);
+      if (now && isPhoneCountry(now) && dialLed()) return false;
       return !now || !stuck(now, intents.get(q.id)!);
     });
   let after = await scanPage(page);

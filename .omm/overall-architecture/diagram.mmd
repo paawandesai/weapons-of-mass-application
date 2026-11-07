@@ -1,0 +1,48 @@
+graph LR
+    user(["User\nbrowser"])
+    caddy["Caddy edge\ndeploy/Caddyfile"]
+    web["Web app, React SPA\napps/web/"]
+    api["API, Hono\napps/api/"]
+    worker["Worker, pg-boss consumers\napps/worker/"]
+    task-queue[("pg-boss queues\npgboss schema in Postgres")]
+    postgres[("Postgres, app tables\npackages/db/")]
+    file-store[("File store\npackages/db/src/files.ts")]
+    credential-vault[("Credential vault\npackages/db/src/vault/")]
+    llm-gateway["LLM gateway\npackages/llm/"]
+    google-ports["Google ports\npackages/google/"]
+    job-sources["Job sources\npackages/discovery/, apps/worker/src/discovery/adapters/"]
+    ats-forms["ATS form automation\napps/worker/src/submission/adapters/"]
+    anthropic["Anthropic Messages API"]
+    google-apis["Google Drive, Gmail, Calendar"]
+    ats-vendors["Ashby, Greenhouse, Lever, HN, LinkedIn"]
+
+    user -->|"HTTPS"| caddy
+    caddy -->|"serves the built SPA"| web
+    caddy -->|"/api /auth /confirm /captcha /health"| api
+    web -->|"JSON over session cookie"| api
+    api -->|"tenant-scoped reads and writes"| postgres
+    api -->|"sends profile.build, book-interview, schedule-reminders"| task-queue
+    api -->|"writes pending_jobs outbox rows"| postgres
+    worker -->|"consumes every queue, cron ticks"| task-queue
+    worker -->|"tenant-scoped reads and writes"| postgres
+    worker -->|"writes resume PDFs and CAPTCHA images"| file-store
+    api -->|"serves CAPTCHA images, resume refs"| file-store
+    api -->|"stores Google refresh token at sign-in"| credential-vault
+    worker -->|"reads tokens and ATS passwords"| credential-vault
+    worker -->|"structured prompts, 13 prompt families"| llm-gateway
+    llm-gateway -->|"streaming, adaptive thinking, JSON schema output"| anthropic
+    api -->|"OAuth sign-in, Drive folder list"| google-ports
+    worker -->|"Drive read, Gmail read and send, Calendar"| google-ports
+    google-ports -->|"googleapis with vaulted refresh token"| google-apis
+    worker -->|"board APIs, HN items, LinkedIn guest search"| job-sources
+    job-sources -->|"public JSON endpoints"| ats-vendors
+    worker -->|"Playwright fills and submits"| ats-forms
+    ats-forms -->|"hosted application forms"| ats-vendors
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class anthropic,google-apis,ats-vendors external
+    class caddy,api,worker entry
+    class task-queue,postgres,file-store,credential-vault store

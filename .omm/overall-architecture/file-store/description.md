@@ -1,0 +1,1 @@
+`packages/db/src/files.ts`. A directory (`FILE_STORE_DIR`, `/data/files` on the droplet, a compose volume shared by api and worker) with tenant-scoped subpaths. `resolveInStore` refuses any ref that escapes the root and every path segment is validated. Holds tailored resume PDFs and CAPTCHA images.

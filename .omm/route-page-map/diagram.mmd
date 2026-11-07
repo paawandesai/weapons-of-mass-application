@@ -1,0 +1,31 @@
+graph TD
+    signin["/signin\npages/SignInPage.tsx"]
+    layout["Layout outlet\ncomponents/Layout.tsx"]
+    dashboard["/\npages/DashboardPage.tsx"]
+    connections["/connections\npages/ConnectionsPage.tsx"]
+    survey["/survey\npages/SurveyPage.tsx"]
+    profile-review["/profile/review\npages/ProfileReviewPage.tsx"]
+    runs["/runs\npages/RunViewPage.tsx"]
+    board["/board\npages/BoardPage.tsx"]
+    application["/applications/:id\npages/ApplicationPage.tsx"]
+    feedback["/interviews/:id/feedback\npages/FeedbackPage.tsx"]
+    prep["/interviews/:id/prep\npages/PrepPlanPage.tsx"]
+    demo-inbox["/demo/inbox\npages/DemoInboxPage.tsx"]
+
+    signin -->|"Google OAuth or demo token"| layout
+    layout -->|"default route"| dashboard
+    dashboard -->|"onboarding: connect sources"| connections
+    connections -->|"then answer the survey"| survey
+    survey -->|"then build and approve"| profile-review
+    profile-review -->|"approved: runs unlock"| runs
+    dashboard -->|"kanban"| board
+    board -->|"open card, panic search result"| application
+    application -->|"interview actions"| feedback
+    application -->|"interview actions"| prep
+    layout -->|"demo tenants"| demo-inbox
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class signin entry

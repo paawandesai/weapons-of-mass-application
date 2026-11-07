@@ -1,0 +1,1 @@
+Google OAuth 2 (sign-in, refresh token), Drive v3 (read documents from chosen folders), Gmail v1 (read recruiter and vendor mail; send scheduling, follow-up, digest, reminder and CAPTCHA mail), Calendar v3 (availability, interview events). Demo tenants use local tables instead.

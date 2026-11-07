@@ -1,0 +1,9 @@
+created: 2026-11-07T20:03:39.837Z
+updated: 2026-11-07T20:03:39.837Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: auth
+children: []
+parentPath:
+  - api

@@ -1,0 +1,1 @@
+`dispatchPendingJobs` sends each row with per-kind options (`SEND_OPTIONS`: singleton key, retry limits) and stamps it; a null send for `mail-sync` leaves the row for the next pass because the running sync may predate the message. Runs at start and every `PENDING_JOBS_POLL_MS` (30 s) for every tenant, after `repairPendingPrepPlans`.

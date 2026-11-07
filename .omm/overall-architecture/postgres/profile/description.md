@@ -1,0 +1,1 @@
+`profiles` (versioned document plus `approved_version`, `approved_at`), `profile_builds` (`running`, `done`, `failed`), `activity_log` (every agent and user action with actor, action and detail; the audit trail the card detail pages read).

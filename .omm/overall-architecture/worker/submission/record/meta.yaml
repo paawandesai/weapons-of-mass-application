@@ -1,0 +1,10 @@
+created: 2026-11-07T20:03:41.342Z
+updated: 2026-11-07T20:03:41.342Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: record
+children: []
+parentPath:
+  - worker
+  - submission

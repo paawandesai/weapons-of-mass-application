@@ -1,0 +1,48 @@
+graph LR
+    cron["pg-boss cron, worker only\napps/worker/src/jobs/*.ts"]
+    api-producer["API producer\napps/api/src/services/queue.ts confirm.ts"]
+    outbox["pending_jobs outbox\npackages/db/src/repos/pending_jobs.ts"]
+    reconciler["Outbox reconciler, 30 s\napps/worker/src/jobs/pending-jobs.ts"]
+
+    profile-build-job["profile.build\napps/worker/src/jobs/profile-build.ts"]
+    daily-run-job["daily-run\napps/worker/src/jobs/daily-run.ts"]
+    submit-job["submit-application\napps/worker/src/jobs/submit-application.ts"]
+    follow-up-job["follow-up\napps/worker/src/jobs/follow-up.ts"]
+    mail-sync-job["mail-sync\napps/worker/src/jobs/mail-sync.ts"]
+    book-job["book-interview\napps/worker/src/jobs/book-interview.ts"]
+    reminders-job["schedule-reminders and reminder\napps/worker/src/jobs/reminders.ts"]
+    digest-job["digest\napps/worker/src/jobs/digest.ts"]
+    prep-plan-job["prep-plan\napps/worker/src/jobs/prep-plan.ts"]
+    negotiation-job["negotiation\napps/worker/src/jobs/negotiation.ts"]
+    recruiter-job["simulated-recruiter, demo only\napps/worker/src/jobs/simulated-recruiter.ts"]
+
+    api-producer -->|"POST /api/profile/build"| profile-build-job
+    api-producer -->|"POST /confirm/:token"| book-job
+    api-producer -->|"POST /confirm/:token"| reminders-job
+    api-producer -->|"POST /api/runs, manual"| daily-run-job
+    cron -->|"daily-run-tick hourly: users at their run hour"| daily-run-job
+    cron -->|"daily-run-cleanup 03:30: purge runs older than 7 days"| daily-run-job
+    cron -->|"mail-sync-tick hourly: one per approved user"| mail-sync-job
+    cron -->|"digest-tick hourly: users at their digest hour"| digest-job
+    cron -->|"follow-up-reconcile hourly"| follow-up-job
+    cron -->|"30 s timer when DEMO_FORMS_PORT set"| recruiter-job
+    daily-run-job -->|"one send per selected posting"| submit-job
+    submit-job -->|"on applied"| follow-up-job
+    mail-sync-job -->|"recruiter proposal: offer slots by email"| book-job
+    mail-sync-job -->|"offer classified"| outbox
+    book-job -->|"booked, same transaction"| outbox
+    api-producer -->|"POST prep-plan or negotiation"| outbox
+    recruiter-job -->|"delivered reply"| outbox
+    outbox -->|"undispatched rows"| reconciler
+    reconciler -->|"kind prep-plan"| prep-plan-job
+    reconciler -->|"kind negotiation"| negotiation-job
+    reconciler -->|"kind mail-sync"| mail-sync-job
+    reminders-job -->|"T-24h and T-1h"| reminders-job
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class cron,api-producer entry
+    class outbox store
+    class recruiter-job concern

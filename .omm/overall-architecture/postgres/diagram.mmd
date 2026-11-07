@@ -1,0 +1,28 @@
+graph LR
+    identity["Identity\ntenants users sessions source_connections"]
+    profile["Profile\nprofiles profile_builds activity_log"]
+    vault-tables["Vault\nvault_keys secrets"]
+    discovery-tables["Discovery\ncompanies user_companies runs run_candidates jobs"]
+    application-tables["Applications\napplications ats_credentials captcha_requests stage_overrides"]
+    inbox-tables["Inbox\nemail_threads processed_messages outgoing_messages mail_sync_state digest_state"]
+    scheduling-tables["Scheduling\ninterviews interview_slots"]
+    outbox["Outbox\npending_jobs"]
+    demo-tables["Demo\ndemo_mailbox_messages demo_calendar_events"]
+    pgboss["pg-boss\npgboss schema"]
+
+    identity -->|"user_id, tenant_id on every row"| profile
+    identity -->|"per-tenant data key"| vault-tables
+    profile -->|"approved version gates runs"| discovery-tables
+    discovery-tables -->|"run selects job, creates application"| application-tables
+    application-tables -->|"threads link to an application"| inbox-tables
+    inbox-tables -->|"interview proposal"| scheduling-tables
+    scheduling-tables -->|"booked interview writes prep-plan row"| outbox
+    inbox-tables -->|"offer writes negotiation row"| outbox
+    outbox -->|"reconciler sends to queue"| pgboss
+    demo-tables -->|"stand in for Gmail and Calendar"| inbox-tables
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class identity,profile,vault-tables,discovery-tables,application-tables,inbox-tables,scheduling-tables,outbox,demo-tables,pgboss store

@@ -1,0 +1,1 @@
+`BoardColumn.tsx`, `BoardCard.tsx`, `BoardDrawer.tsx`, `BoardDetail.tsx`, `ConfirmButton.tsx`. Four columns (Applied, Interviewing, Offer, Closed) read from `GET /api/board`; a card move posts `{from, to}` to `/api/applications/:id/stage` and shows the 409 when the server's status moved on.

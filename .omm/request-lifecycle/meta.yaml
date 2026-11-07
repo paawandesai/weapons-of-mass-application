@@ -1,0 +1,21 @@
+created: 2026-11-07T20:03:42.879Z
+updated: 2026-11-07T20:03:42.990Z
+update_count: 3
+last_field: context
+git_commit: 011ef37
+git_branch: main
+children:
+  - api-routes
+  - auth-routes
+  - browser
+  - caddy
+  - context-middleware
+  - error-handler
+  - health
+  - hono
+  - producer
+  - require-session
+  - services
+  - spa
+  - tenant-handle
+  - token-routes

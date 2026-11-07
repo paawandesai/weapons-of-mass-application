@@ -1,0 +1,1 @@
+`src/discovery/judge.ts`, `prompts.ts`, `profile-view.ts`, `text.ts`. Runs `apply-decision@v1` per candidate against a trimmed profile view and the survey preferences; output is the `Judgment` schema (apply, rationale, fit 1-5, pay range, location mode, seniority, deadline). Stored on `run_candidates` so the run view can show every decision.

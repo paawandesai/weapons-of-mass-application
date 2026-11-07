@@ -1,0 +1,1 @@
+`captcha/index.ts`, `email.ts`. When the detector finds a text-and-image widget: `solve-captcha-a`, then `solve-captcha-b`, then the human stage, which stores the image in the file store, writes a `captcha_requests` row and emails the user a single-use `/captcha/:token` link with a 15 minute hold. `captcha-timeout` parks the application.

@@ -1,0 +1,1 @@
+`applications` (status `pending`, `applied`, `interviewing`, `offer`, `closed`; `pending_reason`, `closed_reason`, `confirmation_source`, resume ref, form answers), `ats_credentials` (account per board with `credential_status`), `captcha_requests` (stage `agent1`, `agent2`, `human`, token, image ref), `stage_overrides` (user moves on the board).

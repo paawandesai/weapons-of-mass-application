@@ -1,0 +1,10 @@
+created: 2026-11-07T20:03:41.057Z
+updated: 2026-11-07T20:03:41.057Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: answers
+children: []
+parentPath:
+  - worker
+  - submission

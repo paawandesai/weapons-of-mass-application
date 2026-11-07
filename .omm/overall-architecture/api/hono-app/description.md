@@ -1,0 +1,1 @@
+`src/app.ts` `createApp()`. Injects the Db and a clock into context, exposes `/health`, mounts `/auth`, applies `requireSession` to `/api/*`, mounts the twelve `/api/...` groups, and mounts `/captcha` and `/confirm` publicly. JSON 404 for `/api/*`, text 404 otherwise; the error handler logs only the error name and answers a generic 500.

@@ -1,0 +1,1 @@
+`src/middleware/session.ts`. Reads the session cookie, loads the session row and user (`src/auth/sessions.ts`), rejects with 401 when missing or expired, and sets `user` and the tenant `handle` on the context so every route is tenant-scoped by construction.

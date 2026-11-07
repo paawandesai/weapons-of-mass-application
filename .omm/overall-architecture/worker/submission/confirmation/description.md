@@ -1,0 +1,1 @@
+`confirmation.ts`, `poll.ts`, `gmail.ts`. After submitting, polls the user's mailbox for the vendor's confirmation and links it to the application; `applied` on success, `pending` with `unconfirmed` otherwise. Mail sync can later promote a pending card when the confirmation arrives.

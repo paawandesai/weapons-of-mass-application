@@ -1,0 +1,1 @@
+`adapters/ashby.ts`, `greenhouse.ts`, `lever.ts`, `generic.ts`, `classify.ts`, `scan-script.ts`, `common.ts`. Playwright drivers per hosted ATS: scan the form into a field list, map answers to inputs, upload the resume, read the post-submit notice. `generic.ts` is the fallback; an unknown vendor parks with `unsupported-ats`.

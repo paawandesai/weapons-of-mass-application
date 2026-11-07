@@ -1,0 +1,1 @@
+`src/discovery/adapters/`: `board.ts` wraps the three public board APIs (`ashby.ts`, `greenhouse.ts`, `lever.ts` via `@wma/discovery` URLs), `hn.ts` reads the Who is Hiring thread from the Firebase HN API, `linkedin.ts` uses the guest job-search endpoints best effort, `seeded.ts` serves the demo fixture postings. `index.ts` `adaptersFor` picks the set per tenant.

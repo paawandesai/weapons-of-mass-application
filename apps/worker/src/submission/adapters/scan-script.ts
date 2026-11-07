@@ -730,6 +730,22 @@ export const SCAN_SCRIPT = String.raw`(opts) => {
       const inner = first.querySelector('input');
       if (inner) q.typeRef = stamp(inner);
     }
+    if (kind === 'combobox') {
+      // Rule 44: a combobox inside an international phone widget is the phone's country selector;
+      // the widget's selected-country element, not the search input, says what is chosen.
+      const holder = first.closest('.iti') || first.closest('[class*="iti__"]');
+      const widget = holder ? holder.closest('.iti') || holder : null;
+      if (widget) {
+        q.phoneWidget = true;
+        const flag = widget.querySelector('.iti__selected-country');
+        const dial = widget.querySelector('.iti__selected-dial-code');
+        q.current = flag
+          ? norm(attr(flag, 'title') || attr(flag, 'aria-label') || (dial ? dial.textContent : ''))
+          : dial
+            ? norm(dial.textContent)
+            : '';
+      }
+    }
     if (kind === 'unknown') q.note = 'unknown-control';
     questions.push(q);
     qFirst.push(first);

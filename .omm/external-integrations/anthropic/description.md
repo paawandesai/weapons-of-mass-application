@@ -1,0 +1,1 @@
+`createLlmClient()`: `claude-opus-5-5` by default, streaming with adaptive thinking, `output_config` JSON schema from zod, optional ephemeral cache on the system prompt, base64 images for CAPTCHA. Tests use `fake.ts` with recorded replies.

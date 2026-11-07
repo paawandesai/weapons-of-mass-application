@@ -1,0 +1,1 @@
+`src/services/queue.ts`: a producer-only `PgBoss` started on first use with `supervise: false, schedule: false`. `enqueueProfileBuild` uses the build id as the job id and singleton key so `GET /api/profile/build/status` can read the job state back. `services/confirm.ts` is the other producer, for `book-interview` and `schedule-reminders`.

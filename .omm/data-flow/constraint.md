@@ -1,0 +1,3 @@
+- `fit` from the judgment orders the day and is never returned by an API.
+- `nextStatus` is the only way mail moves a card: forward only, `closed` is a sink, `pending` moves only on a confirmation.
+- Money guard: no outgoing message may contain a dollar sign, "salary" or "compensation"; blocked messages are recorded, not sent.

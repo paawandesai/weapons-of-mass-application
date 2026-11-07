@@ -1,0 +1,1 @@
+The job seeker, in a browser. Signs in with Google (or the demo token sign-in on non-production hosts), connects sources, approves the built profile, watches runs and the board, and is the only actor who can confirm an interview slot or answer a CAPTCHA the agents could not solve. Receives email: digests, interview slot offers, reminders and CAPTCHA requests.

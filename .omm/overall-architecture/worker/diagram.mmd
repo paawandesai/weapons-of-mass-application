@@ -1,0 +1,40 @@
+graph TD
+    job-registry["Job registry\nsrc/register.ts src/jobs/"]
+    approval-guard["Approval gate\nsrc/guarded.ts"]
+    profile-build["Profile build\nsrc/profile/"]
+    discovery["Discovery and decision\nsrc/discovery/"]
+    submission["Submission\nsrc/submission/"]
+    inbox["Inbox\nsrc/inbox/"]
+    scheduling["Scheduling\nsrc/scheduling/"]
+    notifications["Notifications\nsrc/notifications/"]
+    prep["Prep plan\nsrc/prep/"]
+    negotiation["Negotiation data\nsrc/negotiation/"]
+    demo["Demo mode\nsrc/demo/"]
+    pending-jobs-dispatcher["Outbox reconciler\nsrc/jobs/pending-jobs.ts"]
+
+    job-registry -->|"profile.build, the only unguarded job"| profile-build
+    job-registry -->|"wraps every other handler"| approval-guard
+    approval-guard -->|"daily-run"| discovery
+    approval-guard -->|"submit-application, follow-up"| submission
+    approval-guard -->|"mail-sync"| inbox
+    approval-guard -->|"book-interview"| scheduling
+    approval-guard -->|"digest, reminders"| notifications
+    approval-guard -->|"prep-plan"| prep
+    approval-guard -->|"negotiation"| negotiation
+    approval-guard -->|"simulated-recruiter"| demo
+    discovery -->|"hands top N to submit queue"| submission
+    submission -->|"queues follow-up on applied"| notifications
+    inbox -->|"interview proposal: offer slots"| scheduling
+    inbox -->|"offer classified: negotiation outbox row"| pending-jobs-dispatcher
+    scheduling -->|"booked: prep-plan outbox row"| pending-jobs-dispatcher
+    demo -->|"delivered reply: mail-sync outbox row"| pending-jobs-dispatcher
+    pending-jobs-dispatcher -->|"sends rows to their queue every 30 s"| job-registry
+    demo -->|"swaps Gmail and Calendar for local tables"| inbox
+    demo -->|"swaps Gmail and Calendar for local tables"| scheduling
+
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef concern fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef store fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    class job-registry entry
+    class demo concern

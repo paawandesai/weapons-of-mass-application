@@ -26,9 +26,10 @@ export interface FieldDescriptor {
   description?: string;
   /**
    * Set when the page layer could not describe the control fully: `large-list` (a combobox with
-   * more than 60 options, `options` omitted) or `unknown-control` (read as `text`).
+   * more than 60 options, `options` omitted), `unknown-control` (read as `text`) or `phone-country`
+   * (the country selector of an international phone widget, rule 44).
    */
-  hint?: 'large-list' | 'unknown-control';
+  hint?: 'large-list' | 'unknown-control' | 'phone-country';
 }
 
 /** A resolved value for one field, by field id. Skipped fields are simply absent. */
@@ -69,8 +70,10 @@ export interface FormNotice {
 
 /** What a submit click did, as evidence only (design rule 36). */
 export interface SubmitTrace {
-  /** Every POST from the click to the end of the window: host and path, never query or body. */
-  posts: Array<{ host: string; path: string; status: number | null }>;
+  /** Every POST from the click to the end of the window: host and path, never query or body (only a GraphQL path keeps its `op`/`operationName`, rule 42). */
+  posts: Array<{ host: string; path: string; status: number | null; response?: string }>;
+  /** How many times the submit button was clicked (rule 43: 2 when the first was unacknowledged). */
+  clicks?: number;
   /** Console errors, sanitised, first 200 chars. */
   console: string[];
   /** A viewport screenshot taken 3 s after the click; null when it could not be taken. */
@@ -91,6 +94,8 @@ export interface FormAdapter {
   /** Clicks submit and waits out the window; returns what the page did meanwhile (rule 36). */
   submit(page: AdapterPage): Promise<SubmitTrace | void>;
   confirmed(page: AdapterPage): Promise<boolean>;
+  /** Visible validation error texts on the page now (rule 41); empty when there are none. */
+  validationErrors?(page: AdapterPage): Promise<string[]>;
   /** True when the page asks for an emailed one-time code (rule 40); marks the code input. */
   codePrompt?(page: AdapterPage): Promise<boolean>;
   /** Presses the prompt's own continue/verify button after the code is typed, when it has one. */

@@ -1,0 +1,1 @@
+Ashby, Greenhouse and Lever (public board APIs read-only; hosted application forms written), Hacker News (Who is Hiring, read-only), LinkedIn (guest job search, best effort, read-only; never logged-in applying), levels.fyi (public comparables page, read-only), GitHub (public repos at profile build).

@@ -1,0 +1,20 @@
+created: 2026-11-07T20:03:40.283Z
+updated: 2026-11-07T20:03:40.333Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: worker
+children:
+  - approval-guard
+  - demo
+  - discovery
+  - inbox
+  - job-registry
+  - negotiation
+  - notifications
+  - pending-jobs-dispatcher
+  - prep
+  - profile-build
+  - scheduling
+  - submission
+parentPath: []

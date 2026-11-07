@@ -1,0 +1,1 @@
+`interviews` (status, calendar event id, prep plan and its `prep_plan_status`, feedback, negotiation data) and `interview_slots` (offered slots with single-use tokens; `open`, `confirmed`, `expired`, `invalidated`).

@@ -1,0 +1,3 @@
+- `pnpm db:check` must agree with the schema before a commit; migrations are generated, not hand-written.
+- File refs are store-relative and validated segment by segment; a ref that escapes the root is rejected.
+- Vault secrets are bound to tenant, kind and ref through AEAD associated data.

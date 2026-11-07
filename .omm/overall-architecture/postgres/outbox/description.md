@@ -1,0 +1,1 @@
+`pending_jobs`: `kind` (queue name), `payload`, `dedupe_key`, `dispatched_at`. Written inside the parent transaction so follow-on work is never lost between a commit and an enqueue. Read by `apps/worker/src/jobs/pending-jobs.ts`.

@@ -1,0 +1,1 @@
+`src/routes/interviews.ts`: list for an application, detail, `POST`/`PUT /:id/feedback`, `POST /:id/prep-plan` (writes a `prep-plan` outbox row via `services/prep.ts`), `POST /for-application/:id/negotiation` (writes a `negotiation` outbox row). Negotiation output is data for the user only; the agent never sends a compensation message.

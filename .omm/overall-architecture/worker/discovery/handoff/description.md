@@ -1,0 +1,1 @@
+`src/discovery/handoff.ts`. For each selection writes the `jobs` row and a `pending` application, then `boss.send('submit-application')` with the application id as singleton key. Postings another concurrent run claimed first are un-flagged so stored selections and counts agree.

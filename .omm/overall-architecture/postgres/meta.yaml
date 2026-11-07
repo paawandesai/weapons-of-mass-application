@@ -1,0 +1,18 @@
+created: 2026-11-07T20:03:41.835Z
+updated: 2026-11-07T20:03:41.896Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: postgres
+children:
+  - application-tables
+  - demo-tables
+  - discovery-tables
+  - identity
+  - inbox-tables
+  - outbox
+  - pgboss
+  - profile
+  - scheduling-tables
+  - vault-tables
+parentPath: []

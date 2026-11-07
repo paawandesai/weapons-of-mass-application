@@ -1,0 +1,1 @@
+`fill.ts`, `browser.ts`, `structured.ts`, `domains.ts`. One shared Chromium per process, one context per application, navigation limited to the vendor's domains. Fills, submits and captures the result; browser errors park with `browser-error`.

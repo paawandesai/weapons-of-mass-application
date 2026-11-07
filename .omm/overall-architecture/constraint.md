@@ -1,0 +1,5 @@
+- Every table carries `tenant_id`; all repo access goes through a `TenantHandle` from `db.forTenant(tenantId)`.
+- Every worker job except `profile.build` is wrapped by `guardedJob`: it refuses to run for a user without an approved profile.
+- The agent never books an interview without a user-confirmed slot, never writes a message about compensation, never fills voluntary self-identification fields, never applies through logged-in LinkedIn or Indeed.
+- The API is a pg-boss producer only (`supervise: false, schedule: false`); the worker owns scheduling and maintenance.
+- Tests cannot reach the internet: a socket-level guard fails any test that tries.

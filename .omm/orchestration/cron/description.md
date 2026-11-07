@@ -1,0 +1,1 @@
+Schedules registered at worker start: `daily-run-tick` `0 * * * *`, `daily-run-cleanup` `30 3 * * *`, `mail-sync-tick` `7 * * * *`, `digest-tick` `0 * * * *`, `follow-up-reconcile` `17 * * * *`. The simulated recruiter uses a 30 s `setInterval` in demo mode rather than cron.

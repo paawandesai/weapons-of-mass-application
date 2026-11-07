@@ -1,0 +1,1 @@
+Shown inside the Applied column with a `pending` badge. `pending_reason` values: `tailoring-check-failed`, `unsupported-ats`, `unmapped-field`, `missing-profile-field`, `unanswerable-question`, `verification-timeout`, `credential-rejected`, `captcha-timeout`, `unconfirmed`, `browser-error`, `form-rejected`.

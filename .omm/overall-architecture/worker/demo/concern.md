@@ -1,0 +1,1 @@
+The demo tenant's behaviour is decided by one flag read on first use of the port factory. A misflagged tenant would route real mail into the local tables, so `apps/api/src/demo-check.ts` refuses to start with an inconsistent demo configuration.

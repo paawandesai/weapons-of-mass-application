@@ -53,7 +53,15 @@ done
 
 cd "$(dirname "$0")/.."
 mkdir -p "$LOG_DIR"
-if [[ -f .env ]]; then set -a; . ./.env; set +a; fi
+# .env fills in what the environment does not set: an exported DATABASE_URL or port wins.
+if [[ -f .env ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[[:space:]]*# || ! "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && continue
+    name="${line%%=*}"
+    [[ -n "${!name+x}" ]] && continue
+    export "$line"
+  done < .env
+fi
 # After the .env load, so a production setting in either place refuses before anything is touched.
 if [[ "${NODE_ENV:-}" == "production" ]]; then
   echo "refusing to run with NODE_ENV=production" >&2

@@ -222,29 +222,163 @@ async function codePromptOn(page: Page): Promise<boolean> {
 
 const TRACE_SHOT_DELAY_MS = 3_000;
 
+const SETTLE_QUIET_MS = 1_500;
+const SETTLE_MAX_MS = 10_000;
+const ACK_WAIT_MS = 5_000;
+const RESPONSE_KEYS = new Set(['errors', 'error', 'success', 'status', 'message']);
+const CAPTCHA_HOST = /(^|\.)(recaptcha\.net|hcaptcha\.com|google\.com|gstatic\.com)$/i;
+
+function queryOp(u: URL): string {
+  return u.searchParams.get('op') ?? u.searchParams.get('operationName') ?? '';
+}
+
+/** Rule 43: POSTs in flight on a page, tracked from load so saves made while filling are seen. */
+interface PostTracker {
+  inflight: number;
+  lastEvent: number;
+}
+const trackers = new WeakMap<Page, PostTracker>();
+function postTracker(page: Page): PostTracker {
+  const t = trackers.get(page);
+  if (t) return t;
+  const tracker: PostTracker = { inflight: 0, lastEvent: Date.now() };
+  trackers.set(page, tracker);
+  const done = (req: { method(): string }) => {
+    if (req.method() !== 'POST') return;
+    tracker.inflight = Math.max(0, tracker.inflight - 1);
+    tracker.lastEvent = Date.now();
+  };
+  page.on('request', (req) => {
+    if (req.method() !== 'POST') return;
+    tracker.inflight++;
+    tracker.lastEvent = Date.now();
+  });
+  page.on('requestfinished', done);
+  page.on('requestfailed', done);
+  return tracker;
+}
+
+/** Rule 43: waits until no POST has been in flight for 1.5 s, at most 10 s. */
+async function settlePosts(page: Page): Promise<void> {
+  const t = postTracker(page);
+  const started = Date.now();
+  while (Date.now() - started < SETTLE_MAX_MS) {
+    if (t.inflight === 0 && Date.now() - t.lastEvent >= SETTLE_QUIET_MS) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+/** What a response said, reduced to status, GraphQL error messages and result flags (rule 42). */
+export function summariseSubmitResponse(status: number, body: string): string {
+  const parts = [`HTTP ${status}`];
+  try {
+    const json = JSON.parse(body) as { errors?: unknown; data?: unknown };
+    if (Array.isArray(json.errors)) {
+      const msgs = json.errors
+        .map((e) => (e && typeof e === 'object' ? (e as { message?: unknown }).message : null))
+        .filter((m): m is string => typeof m === 'string');
+      if (msgs.length > 0) parts.push(`errors: ${msgs.join(' | ')}`);
+    }
+    const walk = (v: unknown, depth: number, path: string) => {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return;
+      for (const [k, val] of Object.entries(v)) {
+        if (RESPONSE_KEYS.has(k)) parts.push(`${path}${k}=${JSON.stringify(val)}`);
+        else if (depth < 3) walk(val, depth + 1, `${path}${k}.`);
+      }
+    };
+    walk(json.data, 1, 'data.');
+  } catch {
+    // not JSON: the status is all that is recorded
+  }
+  return redactResponse(parts.join('; ')).slice(0, 500);
+}
+
+/**
+ * sanitizeMessage cuts a message at the word "token", which would hide "bad token"; the response
+ * summary instead drops URLs, e-mail addresses, long token-like runs and `secret: value` pairs.
+ */
+function redactResponse(text: string): string {
+  return text
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, '[url]')
+    .replace(/[^\s@"]+@[^\s@"]+/g, '[email]')
+    .replace(
+      /(password|passwd|passcode|secret|token|bearer|authorization|api[_-]?key)(["']?\s*[:=]\s*["']?)[^\s,"'}\]]+/gi,
+      '$1$2[redacted]',
+    )
+    .replace(/[A-Za-z0-9_+/=-]{20,}/g, (m) => (/^[A-Za-z]+$/.test(m) ? m : '[redacted]'))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Rule 42: the path, plus the `op`/`operationName` query parameter for GraphQL endpoints (`graphql` in the path, e.g. Ashby's `/api/non-user-graphql`; it names
+ * the action and carries nothing personal); every other query string is dropped.
+ */
+export function tracePath(u: URL): string {
+  if (!u.pathname.includes('graphql')) return u.pathname;
+  for (const key of ['op', 'operationName']) {
+    const v = u.searchParams.get(key);
+    if (v && /^[A-Za-z0-9_.-]{1,80}$/.test(v)) return `${u.pathname}?${key}=${v}`;
+  }
+  return u.pathname;
+}
+
 /**
  * Rule 36: listens from just before the click for POST requests (host, path, status), console
  * errors and a viewport screenshot 3 s after the click. Evidence only; nothing here decides.
  */
-function startTrace(page: Page): { finish(): Promise<SubmitTrace>; stop(): void } {
+export function startTrace(page: Page): {
+  finish(): Promise<SubmitTrace>;
+  stop(): void;
+  /** True once a CAPTCHA provider was called or the vendor was sent a submit (rule 43). */
+  acknowledged(): boolean;
+  clicks: number;
+} {
   const posts: SubmitTrace['posts'] = [];
   const consoleErrors: string[] = [];
   const byRequest = new Map<unknown, SubmitTrace['posts'][number]>();
+  const submitOps = new Set<unknown>();
+  const reads: Array<Promise<void>> = [];
+  let acked = false;
   const onRequest = (req: { method(): string; url(): string }) => {
     if (req.method() !== 'POST') return;
     let entry: SubmitTrace['posts'][number];
+    let u: URL;
     try {
-      const u = new URL(req.url());
-      entry = { host: u.host, path: u.pathname, status: null };
+      u = new URL(req.url());
+      entry = { host: u.host, path: tracePath(u), status: null };
     } catch {
       return;
     }
     posts.push(entry);
     byRequest.set(req, entry);
+    const host = u.hostname;
+    if (CAPTCHA_HOST.test(host)) {
+      if (!host.endsWith('google.com') || u.pathname.includes('recaptcha')) acked = true;
+    } else if (u.pathname.includes('graphql')) {
+      if (/submit/i.test(queryOp(u))) {
+        acked = true;
+        submitOps.add(req);
+      }
+    } else {
+      // Not an Ashby-style save: a plain vendor POST may be the submission, so it is not repeated.
+      acked = true;
+    }
   };
   const onResponse = (res: { request(): unknown; status(): number }) => {
     const entry = byRequest.get(res.request());
     if (entry) entry.status = res.status();
+    if (entry && submitOps.has(res.request())) {
+      const r = res as unknown as { text(): Promise<string> };
+      reads.push(
+        r
+          .text()
+          .then((body) => {
+            entry.response = summariseSubmitResponse(res.status(), body);
+          })
+          .catch(() => {}),
+      );
+    }
   };
   const onConsole = (msg: { type(): string; text(): string }) => {
     if (msg.type() === 'error' && consoleErrors.length < 20) {
@@ -262,12 +396,15 @@ function startTrace(page: Page): { finish(): Promise<SubmitTrace>; stop(): void 
   const clicked = Date.now();
   return {
     stop,
+    acknowledged: () => acked,
+    clicks: 1,
     async finish() {
       const wait = clicked + TRACE_SHOT_DELAY_MS - Date.now();
       if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
       const screenshot = await page.screenshot({ fullPage: false }).catch(() => null);
+      await Promise.allSettled(reads);
       stop();
-      return { posts, console: consoleErrors, screenshot };
+      return { posts, console: consoleErrors, screenshot, clicks: this.clicks };
     },
   };
 }
@@ -334,6 +471,7 @@ export class VendorAdapter implements FormAdapter {
     } catch {
       // not a URL we can rewrite; navigate as given
     }
+    postTracker(page);
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: LOAD_TIMEOUT_MS });
     if (!(await this.waitForPage(page, LOAD_TIMEOUT_MS))) {
       throw new Error('the application form did not appear');
@@ -462,15 +600,41 @@ export class VendorAdapter implements FormAdapter {
     // submission, and an error already showing that is still there afterwards is a rejection.
     await recordBaseline(page);
     const before = new Set((await probePage(page).catch(() => null))?.errors ?? []);
+    // Rule 43: Ashby saves each field as it is entered and ignores the button while they are in flight.
+    await settlePosts(page);
     const tracer = startTrace(page);
     try {
       await button.click({ timeout: 5_000 });
+      if (!(await this.acknowledgedWithin(page, tracer))) {
+        await button.click({ timeout: 5_000 }).catch(() => {});
+        tracer.clicks = 2;
+      }
       await this.watchSubmitWindow(page, before);
     } catch (e) {
       tracer.stop();
       throw e;
     }
     return tracer.finish();
+  }
+
+  /**
+   * Rule 43: true when, within 5 s of the click, a CAPTCHA provider or a vendor submit was called,
+   * or the page already moved on (confirmation, code prompt). False means the click did nothing.
+   */
+  private async acknowledgedWithin(
+    page: Page,
+    tracer: { acknowledged(): boolean },
+  ): Promise<boolean> {
+    const started = Date.now();
+    while (Date.now() - started < ACK_WAIT_MS) {
+      if (tracer.acknowledged()) return true;
+      if (await this.confirmationShown(page)) return true;
+      if (await codePromptOn(page)) return true;
+      const probe = await probePage(page).catch(() => null);
+      if (probe && probe.thanks && !probe.controlsLeft) return true;
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    }
+    return tracer.acknowledged();
   }
 
   /** Rule 12, in order: confirmation, validation errors, a CAPTCHA; else leave it to the caller. */
@@ -507,6 +671,11 @@ export class VendorAdapter implements FormAdapter {
       if (Date.now() - started >= CONFIRM_TIMEOUT_MS) return false;
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
+  }
+
+  async validationErrors(page: Page): Promise<string[]> {
+    const probe = await probePage(page).catch(() => null);
+    return (probe?.errors ?? []).map((e) => sanitizeMessage(e));
   }
 
   codePrompt(page: Page): Promise<boolean> {

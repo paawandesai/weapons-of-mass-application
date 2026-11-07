@@ -1,0 +1,15 @@
+created: 2026-11-07T20:03:39.206Z
+updated: 2026-11-07T20:03:39.255Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: web
+children:
+  - api-client
+  - board-components
+  - card-extras
+  - landing
+  - layout
+  - pages
+  - router
+parentPath: []

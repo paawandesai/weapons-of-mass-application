@@ -1,0 +1,1 @@
+`demo_mailbox_messages` and `demo_calendar_events`: the demo tenant's local Gmail and Calendar, behind the same ports the real code uses. `GET /api/admin/demo-mailbox` and the web `/demo/inbox` page read them.

@@ -9,6 +9,7 @@ import { SubmissionFailure } from '../../src/submission/failure';
 import { ashbyAdapter, greenhouseAdapter, leverAdapter } from '../../src/submission/adapters';
 import { VendorAdapter, type VendorHints } from '../../src/submission/adapters/common';
 import {
+  fillPage,
   probePage,
   scanPage,
   stuck,
@@ -1033,6 +1034,121 @@ describe('rule 36: the submit trace', () => {
     } finally {
       server.close();
     }
+  }, 60_000);
+});
+
+describe('rules 42 and 43: an Ashby-style submit', () => {
+  async function withAshbyServer(
+    saveDelayMs: number,
+    run: (url: string, seen: { ops: string[] }) => Promise<void>,
+  ) {
+    const html = readFileSync(join(FORMS, 'generic', 'submit-ashby.html'));
+    const seen = { ops: [] as string[] };
+    const server: Server = createServer((req, res) => {
+      if (req.method !== 'POST') {
+        res.writeHead(200, { 'content-type': 'text/html' }).end(html);
+        return;
+      }
+      req.resume();
+      const op = new URL(req.url ?? '/', 'http://x').searchParams.get('op') ?? '';
+      seen.ops.push(op);
+      const reply = (body: string) =>
+        res.writeHead(200, { 'content-type': 'application/json' }).end(body);
+      if (op === 'ApiSetFormValue') {
+        setTimeout(() => reply('{"data":{"set":{"ok":true,"secretField":"zzz"}}}'), saveDelayMs);
+      } else {
+        reply('{"data":{"submit":{"success":false,"errors":["bad token"]},"viewer":{"id":"u-1"}}}');
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`, seen);
+    } finally {
+      server.close();
+    }
+  }
+
+  it('keeps the op in the path and summarises only the submit response', async () => {
+    await withAshbyServer(50, async (url) => {
+      await withPage(async (page) => {
+        await bare.load(page, url);
+        const [name] = await bare.fields(page);
+        await bare.fill(page, { [name!.id]: 'Mara Quill' });
+        const trace = await bare.submit(page);
+        const set = trace.posts.find((p) => p.path.endsWith('ApiSetFormValue'));
+        const submit = trace.posts.find((p) => p.path.endsWith('ApiSubmitMultipleFormsAction'));
+        expect(set?.path).toBe('/api/non-user-graphql?op=ApiSetFormValue');
+        expect(set?.response).toBeUndefined();
+        expect(submit?.path).toBe('/api/non-user-graphql?op=ApiSubmitMultipleFormsAction');
+        expect(submit?.response).toContain('bad token');
+        expect(submit?.response).toContain('HTTP 200');
+        expect(submit?.response).not.toContain('u-1');
+        expect(JSON.stringify(trace)).not.toContain('zzz');
+        expect(trace.clicks).toBe(1);
+      });
+    });
+  }, 60_000);
+
+  it('waits for the field saves to settle, then clicks once', async () => {
+    await withAshbyServer(2_000, async (url, seen) => {
+      await withPage(async (page) => {
+        await bare.load(page, `${url}?mode=saves`);
+        const [name] = await bare.fields(page);
+        await bare.fill(page, { [name!.id]: 'Mara Quill' });
+        const trace = await bare.submit(page);
+        expect(trace.clicks).toBe(1);
+        expect(seen.ops.filter((o) => o === 'ApiSubmitMultipleFormsAction')).toHaveLength(1);
+      });
+    });
+  }, 60_000);
+
+  it('clicks a second time when the first click was swallowed', async () => {
+    await withAshbyServer(50, async (url, seen) => {
+      await withPage(async (page) => {
+        await bare.load(page, `${url}?mode=swallow`);
+        const [name] = await bare.fields(page);
+        await bare.fill(page, { [name!.id]: 'Mara Quill' });
+        const trace = await bare.submit(page);
+        expect(trace.clicks).toBe(2);
+        expect(seen.ops.filter((o) => o === 'ApiSubmitMultipleFormsAction')).toHaveLength(1);
+      });
+    });
+  }, 60_000);
+});
+
+describe('rule 44: the phone widget country selector', () => {
+  it('is tagged phone-country, picks the shortest option starting with the country, and verifies by the flag', async () => {
+    await withPage(async (page) => {
+      await open(page, 'phone-country.html');
+      const fields = await bare.fields(page);
+      const country = byLabel(fields, 'Country');
+      expect(country.hint).toBe('phone-country');
+      const phone = byLabel(fields, 'Phone');
+      const failures = await fillPage(page, {
+        [country.id]: 'United States',
+        [phone.id]: '2025550100',
+      });
+      expect(failures).toEqual([]);
+      expect(await page.locator('.iti__selected-country').getAttribute('title')).toBe(
+        'United States: +1',
+      );
+      expect(await page.locator('#app').getAttribute('data-country')).toBe('United States');
+    });
+  }, 60_000);
+
+  it('leaves the selector as the widget set it when the number carries its dial code', async () => {
+    await withPage(async (page) => {
+      await open(page, 'phone-country.html');
+      const fields = await bare.fields(page);
+      const country = byLabel(fields, 'Country');
+      const phone = byLabel(fields, 'Phone');
+      const failures = await fillPage(page, {
+        [country.id]: 'United States',
+        [phone.id]: '+1 202 555 0100',
+      });
+      expect(failures).toEqual([]);
+      expect(await page.locator('#app').getAttribute('data-country')).toBe('United Kingdom');
+    });
   }, 60_000);
 });
 

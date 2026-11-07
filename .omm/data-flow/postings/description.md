@@ -1,0 +1,1 @@
+`Candidate` rows (`@wma/shared/jobs.ts`): source, title, company, url, ats and ats job id, description, location, posted date. `dedupeKey` collapses `/apply` and tracking variants of the same posting.

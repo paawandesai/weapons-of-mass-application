@@ -1,0 +1,1 @@
+`portFactory(handle, userId)` returns inbox, sender, sent lookup, mailbox and calendar ports; the `tenants.demo` flag decides real Google or the `demo_*` tables, resolved once on first use. The fixture forms server and simulated recruiter complete the closed loop.
