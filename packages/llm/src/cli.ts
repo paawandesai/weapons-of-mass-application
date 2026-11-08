@@ -7,23 +7,22 @@ import type { LlmUsage, StructuredLlm, StructuredRequest, StructuredResponse } f
 
 /**
  * Subscription backends: each drives a locally installed CLI that is already logged in
- * (`claude login`, `codex login`, `gemini`), so calls count against that plan, not API tokens.
+ * (`claude login`, `codex login`, `gemini`, `grok login`), so calls count against that plan, not API tokens.
  *
  * Personal use only: one person's own login, running on their own machine.
  */
-export type CliBackend = 'claude-code' | 'codex' | 'gemini';
-/** Every backend except `anthropic` and `grok` runs a CLI on a subscription login. */
-export type LlmBackend = 'anthropic' | 'grok' | CliBackend;
+export type CliBackend = 'claude-code' | 'codex' | 'gemini' | 'grok';
+/** Every backend except `anthropic` runs a CLI on a subscription login. */
+export type LlmBackend = 'anthropic' | CliBackend;
 
-const CLI_BACKENDS: readonly CliBackend[] = ['claude-code', 'codex', 'gemini'];
+const CLI_BACKENDS: readonly CliBackend[] = ['claude-code', 'codex', 'gemini', 'grok'];
 
 export function parseBackend(value: string | undefined): LlmBackend {
   const v = (value ?? '').trim().toLowerCase();
   if (v === '' || v === 'anthropic' || v === 'api') return 'anthropic';
-  if (v === 'grok' || v === 'xai') return 'grok';
   if ((CLI_BACKENDS as readonly string[]).includes(v)) return v as CliBackend;
   throw new Error(
-    `llm: unknown LLM_BACKEND "${value}" (use anthropic, grok, claude-code, codex, gemini)`,
+    `llm: unknown LLM_BACKEND "${value}" (use anthropic, claude-code, codex, gemini, grok)`,
   );
 }
 
@@ -112,6 +111,9 @@ interface PrepareCtx {
   dir: string;
   imageFiles: string[];
 }
+
+/** `grok -p` takes the prompt as an argument; the OS limits total argument size. */
+const MAX_ARG_PROMPT_CHARS = 200_000;
 
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 
@@ -247,6 +249,64 @@ const PROVIDERS: Record<
             }
           }
           return { text: await readFile(out, 'utf8'), usage };
+        },
+      };
+    },
+  },
+  grok: {
+    command: 'grok',
+    apiKeyVars: ['XAI_API_KEY', 'GROK_CODE_XAI_API_KEY'],
+    prepare(c) {
+      // Grok Build (`grok`) documents `-p` for one prompt (as an argument, not stdin), `--output-format
+      // json` for one JSON object at the end, `-m`, `--cwd` and `--no-auto-update`. It documents no
+      // flag for a system prompt, a JSON schema, tool-free runs or images, so the schema and system
+      // prompt go in the text and tools are never auto-approved (no `--always-approve`).
+      if (c.imageFiles.length) {
+        throw new Error('llm: the grok backend cannot take images (no documented flag for them)');
+      }
+      const prompt = inlineSchemaPrompt(c);
+      if (prompt.length > MAX_ARG_PROMPT_CHARS) {
+        throw new Error(
+          `llm: prompt is ${prompt.length} characters; grok takes it as an argument (limit ${MAX_ARG_PROMPT_CHARS})`,
+        );
+      }
+      const args = ['--no-auto-update', '--no-alt-screen', '--output-format', 'json'];
+      if (c.model) args.push('-m', c.model);
+      args.push('-p', prompt);
+      return {
+        args,
+        stdin: '',
+        async parse(res) {
+          // The json output's field names are not documented; accept the likely ones, and plain
+          // text if it is not JSON at all. Verified against a real `grok` run: not yet.
+          let j: Record<string, unknown> | null = null;
+          try {
+            const parsed: unknown = JSON.parse(res.stdout);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              j = parsed as Record<string, unknown>;
+            }
+          } catch {
+            /* plain text */
+          }
+          if (!j) return { text: res.stdout, usage: ZERO_USAGE };
+          if (j.is_error === true || (j.error && typeof j.error !== 'object')) {
+            throw new Error(`llm: grok failed: ${String(j.error ?? j.result ?? res.stderr)}`);
+          }
+          const text = ['text', 'result', 'response', 'output', 'content', 'message']
+            .map((k) => j[k])
+            .find((v): v is string => typeof v === 'string');
+          const u = (j.usage ?? {}) as Record<string, unknown>;
+          const cached = num(u.cached_input_tokens ?? u.cache_read_input_tokens);
+          return {
+            text: text ?? res.stdout,
+            usage: {
+              input_tokens: Math.max(0, num(u.input_tokens ?? u.prompt_tokens) - cached),
+              output_tokens: num(u.output_tokens ?? u.completion_tokens),
+              cache_creation_input_tokens: 0,
+              cache_read_input_tokens: cached,
+            },
+            stopReason: typeof j.stopReason === 'string' ? j.stopReason : null,
+          };
         },
       };
     },
