@@ -22,7 +22,6 @@ Set `LLM_BACKEND` in `.env` and the worker drives a logged-in CLI instead of the
 | `anthropic` (default) | Anthropic API, per token | `ANTHROPIC_API_KEY` |
 | `claude-code` | Claude subscription via `claude -p` | `claude login` |
 | `codex` | ChatGPT subscription via `codex exec` | `codex login` |
-| `gemini` | Google account via `gemini -p` | run `gemini` once |
 | `grok` | SuperGrok / X Premium+ via Grok Build `grok -p` | `grok login` |
 
 Run the worker on your own machine (not in the container). Keep `JUDGE_CAP_PER_RUN` low, since subscriptions have usage caps, and leave `LLM_CLI_CONCURRENCY` at 2 or less. Personal use only: it is your own login on your own machine. Implementation: `packages/llm/src/cli.ts`.

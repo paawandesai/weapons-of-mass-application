@@ -7,23 +7,21 @@ import type { LlmUsage, StructuredLlm, StructuredRequest, StructuredResponse } f
 
 /**
  * Subscription backends: each drives a locally installed CLI that is already logged in
- * (`claude login`, `codex login`, `gemini`, `grok login`), so calls count against that plan, not API tokens.
+ * (`claude login`, `codex login`, `grok login`), so calls count against that plan, not API tokens.
  *
  * Personal use only: one person's own login, running on their own machine.
  */
-export type CliBackend = 'claude-code' | 'codex' | 'gemini' | 'grok';
+export type CliBackend = 'claude-code' | 'codex' | 'grok';
 /** Every backend except `anthropic` runs a CLI on a subscription login. */
 export type LlmBackend = 'anthropic' | CliBackend;
 
-const CLI_BACKENDS: readonly CliBackend[] = ['claude-code', 'codex', 'gemini', 'grok'];
+const CLI_BACKENDS: readonly CliBackend[] = ['claude-code', 'codex', 'grok'];
 
 export function parseBackend(value: string | undefined): LlmBackend {
   const v = (value ?? '').trim().toLowerCase();
   if (v === '' || v === 'anthropic' || v === 'api') return 'anthropic';
   if ((CLI_BACKENDS as readonly string[]).includes(v)) return v as CliBackend;
-  throw new Error(
-    `llm: unknown LLM_BACKEND "${value}" (use anthropic, claude-code, codex, gemini, grok)`,
-  );
+  throw new Error(`llm: unknown LLM_BACKEND "${value}" (use anthropic, claude-code, codex, grok)`);
 }
 
 const ZERO_USAGE: LlmUsage = {
@@ -307,22 +305,6 @@ const PROVIDERS: Record<
             },
             stopReason: typeof j.stopReason === 'string' ? j.stopReason : null,
           };
-        },
-      };
-    },
-  },
-  gemini: {
-    command: 'gemini',
-    apiKeyVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
-    prepare(c) {
-      const args = ['-p', ''];
-      if (c.model) args.push('-m', c.model);
-      const refs = c.imageFiles.map((f) => `@${f}`).join(' ');
-      return {
-        args,
-        stdin: (refs ? refs + '\n' : '') + inlineSchemaPrompt({ ...c, imageFiles: [] }),
-        async parse(res) {
-          return { text: res.stdout, usage: ZERO_USAGE };
         },
       };
     },

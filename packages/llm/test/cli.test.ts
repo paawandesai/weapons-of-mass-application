@@ -90,9 +90,9 @@ describe('claude-code backend', () => {
   });
 });
 
-describe('gemini backend', () => {
+describe('plain-text replies (grok)', () => {
   it('parses JSON out of a fenced reply', async () => {
-    const llm = createCliLlm('gemini', {
+    const llm = createCliLlm('grok', {
       run: runner('```json\n{"a":2,"note":"x"}\n```'),
       env: {},
     });
@@ -100,7 +100,7 @@ describe('gemini backend', () => {
   });
 
   it('hands unparseable text on so the caller can retry', async () => {
-    const llm = createCliLlm('gemini', { run: runner('sorry'), env: {} });
+    const llm = createCliLlm('grok', { run: runner('sorry'), env: {} });
     expect((await llm.generateStructured(req)).output).toBe('sorry');
   });
 });
@@ -109,7 +109,7 @@ describe('concurrency', () => {
   it('never exceeds the limit', async () => {
     let active = 0;
     let peak = 0;
-    const llm = createCliLlm('gemini', {
+    const llm = createCliLlm('grok', {
       concurrency: 2,
       env: {},
       run: async () => {

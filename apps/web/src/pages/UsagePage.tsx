@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import { api, errorMessage, formatTime } from '../api';
 
 /** Backends that run a logged-in CLI on a subscription; the others bill per token. */
-const SUBSCRIPTION_BACKENDS = ['claude-code', 'codex', 'gemini', 'grok'];
+const SUBSCRIPTION_BACKENDS = ['claude-code', 'codex', 'grok'];
 
 const WINDOWS: Array<{ key: LlmUsageWindow; label: string }> = [
   { key: '7d', label: 'Last 7 days' },
