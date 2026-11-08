@@ -12,16 +12,18 @@ import type { LlmUsage, StructuredLlm, StructuredRequest, StructuredResponse } f
  * Personal use only: one person's own login, running on their own machine.
  */
 export type CliBackend = 'claude-code' | 'codex' | 'gemini';
-export type LlmBackend = 'anthropic' | CliBackend;
+/** Every backend except `anthropic` and `grok` runs a CLI on a subscription login. */
+export type LlmBackend = 'anthropic' | 'grok' | CliBackend;
 
 const CLI_BACKENDS: readonly CliBackend[] = ['claude-code', 'codex', 'gemini'];
 
 export function parseBackend(value: string | undefined): LlmBackend {
   const v = (value ?? '').trim().toLowerCase();
   if (v === '' || v === 'anthropic' || v === 'api') return 'anthropic';
+  if (v === 'grok' || v === 'xai') return 'grok';
   if ((CLI_BACKENDS as readonly string[]).includes(v)) return v as CliBackend;
   throw new Error(
-    `llm: unknown LLM_BACKEND "${value}" (use anthropic, claude-code, codex, gemini)`,
+    `llm: unknown LLM_BACKEND "${value}" (use anthropic, grok, claude-code, codex, gemini)`,
   );
 }
 

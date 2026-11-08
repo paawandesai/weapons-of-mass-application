@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { createGrokLlm } from './grok';
 import { createCliLlm, parseBackend, type LlmBackend } from './cli';
 import { outputFormatFor } from './schema';
 import type { StructuredLlm, StructuredRequest, StructuredResponse } from './types';
@@ -26,6 +27,9 @@ export interface LlmClientOptions {
 export function createLlmClient(options: LlmClientOptions = {}): LlmClient {
   const backend = options.backend ?? parseBackend(process.env.LLM_BACKEND);
   if (backend === 'anthropic') return createAnthropicClient(options);
+  if (backend === 'grok') {
+    return createGrokLlm({ apiKey: options.apiKey, model: options.model ?? process.env.LLM_MODEL });
+  }
   return createCliLlm(backend, { model: options.model ?? process.env.LLM_MODEL });
 }
 

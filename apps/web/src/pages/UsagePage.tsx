@@ -9,6 +9,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorMessage, formatTime } from '../api';
 
+/** Backends that run a logged-in CLI on a subscription; the others bill per token. */
+const SUBSCRIPTION_BACKENDS = ['claude-code', 'codex', 'gemini'];
+
 const WINDOWS: Array<{ key: LlmUsageWindow; label: string }> = [
   { key: '7d', label: 'Last 7 days' },
   { key: '30d', label: 'Last 30 days' },
@@ -85,7 +88,7 @@ export function UsagePage() {
         <Loading />
       ) : (
         <>
-          {data.backend !== 'anthropic' ? (
+          {SUBSCRIPTION_BACKENDS.includes(data.backend) ? (
             <div className="card usage-pace" aria-label="Subscription pace">
               <strong>Running on your {data.backend} subscription</strong>
               <span>
