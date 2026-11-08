@@ -1,12 +1,13 @@
 import type { ProfileFlag } from '@wma/shared';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { formatTime } from '../src/api';
 import { App } from '../src/App';
 import { ProfileReviewPage } from '../src/pages/ProfileReviewPage';
-import { conn, fixtureDocument, NOW, state } from './server';
+import { conn, fixtureDocument, NOW, server, state } from './server';
 
 function renderAt(path: string) {
   return render(
@@ -86,6 +87,7 @@ describe('connections', () => {
   it('rejects a PNG resume on the client with a message', async () => {
     const user = userEvent.setup({ applyAccept: false });
     renderAt('/connections');
+    await user.click(await screen.findByRole('button', { name: 'Replace' }));
     const input = await screen.findByLabelText('Resume file');
     await user.upload(input, new File(['x'], 'photo.png', { type: 'image/png' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/PDF or DOCX/);
@@ -95,9 +97,19 @@ describe('connections', () => {
   it('accepts a PDF resume', async () => {
     const user = userEvent.setup();
     renderAt('/connections');
+    await user.click(await screen.findByRole('button', { name: 'Replace' }));
     const input = await screen.findByLabelText('Resume file');
     await user.upload(input, new File(['%PDF'], 'cv.pdf', { type: 'application/pdf' }));
     expect(await screen.findByText('Resume uploaded.')).toBeInTheDocument();
+    expect(await screen.findByText(/upload\.pdf/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Resume file')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Replace' })).toBeInTheDocument();
+  });
+
+  it('shows the saved resume with a Replace button and no dropzone', async () => {
+    renderAt('/connections');
+    expect(await screen.findByText(/ada\.pdf/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Resume file')).toBeNull();
   });
 
   it('saves GitHub and LinkedIn, validating input', async () => {
@@ -107,6 +119,14 @@ describe('connections', () => {
     await user.type(screen.getByLabelText('GitHub username'), 'ada-l');
     await user.click(screen.getByRole('button', { name: 'Save GitHub' }));
     expect(await screen.findByText('GitHub saved.')).toBeInTheDocument();
+    // Saved: the form collapses to the value and a Change button.
+    const github = screen.getByLabelText('GitHub', { selector: 'div' });
+    expect(within(github).getByText('ada-l')).toBeInTheDocument();
+    expect(screen.queryByLabelText('GitHub username')).toBeNull();
+    await user.click(within(github).getByRole('button', { name: 'Change' }));
+    expect(screen.getByLabelText('GitHub username')).toBeInTheDocument();
+    await user.click(within(github).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText('GitHub username')).toBeNull();
 
     await user.type(screen.getByLabelText('Public profile URL'), 'not a url');
     await user.click(screen.getByRole('button', { name: 'Save LinkedIn' }));
@@ -122,7 +142,53 @@ describe('connections', () => {
     expect(await screen.findByText('Drive folders saved.')).toBeInTheDocument();
     expect(state.connections.find((c) => c.kind === 'drive')?.config).toEqual({
       folder_ids: ['f1'],
+      folders: [{ id: 'f1', name: 'Career' }],
     });
+    // The picker collapses to the saved names.
+    const card = screen.getByLabelText('Drive folders', { selector: 'div' });
+    expect(within(card).getByLabelText('Saved Drive folders')).toHaveTextContent('Career');
+    expect(screen.queryByRole('button', { name: 'Save folders' })).toBeNull();
+    await user.click(within(card).getByRole('button', { name: 'Change folders' }));
+    expect(await screen.findByLabelText('Writing')).toBeInTheDocument();
+    expect(screen.getByLabelText('Career')).toBeChecked();
+  });
+
+  it('disables the save button and says Saving… while a save is in flight', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.post('*/api/sources/github', async () => {
+        await gate;
+        return HttpResponse.json({ connection: conn('github', 'connected') }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderAt('/connections');
+    await user.type(await screen.findByLabelText('GitHub username'), 'ada-l');
+    await user.click(screen.getByRole('button', { name: 'Save GitHub' }));
+    expect(await screen.findByRole('button', { name: 'Saving…' })).toBeDisabled();
+    release();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Saving…' })).toBeNull());
+  });
+
+  it('keeps the disconnect confirmation visible and disabled until it finishes', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.delete('*/api/sources/:kind', async () => {
+        await gate;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderAt('/connections');
+    const card = (await screen.findByLabelText('Resume', { selector: 'div' })) as HTMLElement;
+    await user.click(within(card).getByRole('button', { name: 'Disconnect' }));
+    await user.click(within(card).getByRole('button', { name: 'Yes, disconnect' }));
+    expect(await within(card).findByRole('button', { name: 'Disconnecting…' })).toBeDisabled();
+    expect(within(card).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    release();
+    expect(await screen.findByText('resume disconnected.')).toBeInTheDocument();
   });
 
   it('asks for confirmation before disconnecting', async () => {

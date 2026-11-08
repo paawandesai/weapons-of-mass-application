@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading';
 import {
   LLM_PURPOSE_LABELS,
   type LlmUsageResponse,
@@ -81,7 +82,7 @@ export function UsagePage() {
       </div>
 
       {!data ? (
-        <p className="muted">Loading…</p>
+        <Loading />
       ) : (
         <>
           <div className="card usage-total" aria-label="Total">

@@ -1,3 +1,4 @@
+import { Loading } from './Loading';
 import { useEffect, useState } from 'react';
 import {
   api,
@@ -89,7 +90,7 @@ export function BoardDetail({ id }: { id: string }) {
         {error}
       </p>
     );
-  if (!detail) return <p className="muted">Loading…</p>;
+  if (!detail) return <Loading />;
 
   const job = detail.job;
   const pay = job ? formatPay(job.pay_min, job.pay_max, job.currency) : null;

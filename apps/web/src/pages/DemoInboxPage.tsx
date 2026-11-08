@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading';
 import { useCallback, useEffect, useState } from 'react';
 import type { DemoMailboxMessage } from '@wma/shared';
 import { api, errorMessage } from '../api';
@@ -51,7 +52,7 @@ export function DemoInboxPage() {
           {error}
         </p>
       ) : messages === null ? (
-        <p className="muted">Loading…</p>
+        <Loading />
       ) : messages.length === 0 ? (
         <p className="muted">No mail yet.</p>
       ) : (

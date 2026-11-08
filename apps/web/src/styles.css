@@ -1357,3 +1357,42 @@ button.chip.active {
 .usage-line {
   margin-top: 0.75rem;
 }
+
+/* Loading and busy states. */
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.spinner {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  border: 2px solid var(--line);
+  border-top-color: var(--action);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+.chips {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.chips li {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.15rem 0.5rem;
+}

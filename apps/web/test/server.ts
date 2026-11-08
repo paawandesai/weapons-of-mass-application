@@ -190,7 +190,11 @@ export const handlers = [
   }),
   http.post('*/api/sources/drive', async ({ request }) => {
     const { folder_ids } = (await request.json()) as { folder_ids: string[] };
-    return setConn(conn('drive', 'connected', { folder_ids }));
+    const folders = folder_ids.map((id) => ({
+      id,
+      name: state.folders.find((f) => f.id === id)?.name ?? id,
+    }));
+    return setConn(conn('drive', 'connected', { folder_ids, folders }));
   }),
   http.delete('*/api/sources/:kind', ({ params }) => {
     state.connections = state.connections.map((c) =>

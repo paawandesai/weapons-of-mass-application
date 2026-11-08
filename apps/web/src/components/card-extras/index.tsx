@@ -1,3 +1,4 @@
+import { Loading } from '../Loading';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { LlmUsageTotals } from '@wma/shared';
@@ -67,7 +68,7 @@ export function CardExtras({ application }: { application: CardExtrasApplication
         {error}
       </p>
     );
-  if (interviews === null) return <p className="muted">Loading…</p>;
+  if (interviews === null) return <Loading />;
 
   const showOffer = application.status === 'offer' || negotiation !== null;
   return (

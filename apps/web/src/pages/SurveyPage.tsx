@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading';
 import type { SurveyAnswers } from '@wma/shared';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -123,7 +124,7 @@ export function SurveyPage() {
     }
   }
 
-  if (!loaded) return <p className="muted">Loading…</p>;
+  if (!loaded) return <Loading />;
 
   const invalid = (k: keyof FormState) => (errors[k] ? true : undefined);
   const err = (k: keyof FormState) =>
