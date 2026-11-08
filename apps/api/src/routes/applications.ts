@@ -3,8 +3,10 @@ import { z } from 'zod';
 import {
   activity,
   changeStageByUser,
+  fileStoreDir,
   getApplication,
   getCurrentTenant,
+  getFile,
   getJob,
   listApplications,
   listCaptchaRequestsForApplication,
@@ -279,6 +281,46 @@ applicationsRoutes.get('/:id', async (c) => {
     feedback: [...interviews].reverse().find((i) => i.feedback)?.feedback ?? null,
     negotiation: row.negotiation ?? null,
     captcha: captcha.map(captchaSummary),
+  });
+});
+
+/** A download name from company and title: ASCII, no quotes or path characters, bounded. */
+function resumeFileName(company: string | null, title: string | null): string {
+  const clean = (s: string) =>
+    s
+      .normalize('NFKD')
+      .replace(/[^\x20-\x7e]/g, '')
+      .replace(/["\\/:*?<>|]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 60);
+  const parts = [company, title].map((p) => (p ? clean(p) : '')).filter(Boolean);
+  return `Resume - ${parts.join(' - ') || 'application'}.pdf`;
+}
+
+/** The tailored resume that was submitted, as a PDF download. */
+applicationsRoutes.get('/:id/resume', async (c) => {
+  const { handle, userId } = c.get('session');
+  const id = c.req.param('id');
+  const row = UUID_RE.test(id) ? await getApplication(handle, id) : null;
+  if (!row || row.userId !== userId || !row.resumePdfRef) {
+    return c.json({ code: 'not_found', message: 'No resume for this application' }, 404);
+  }
+  const bytes = await getFile(handle, row.resumePdfRef, fileStoreDir());
+  if (!bytes) {
+    return c.json({ code: 'not_found', message: 'The resume file is no longer available' }, 404);
+  }
+  const job = await getJob(handle, row.jobId);
+  const company = job?.companyId
+    ? (await listCompaniesByIds(handle, [job.companyId]))[0]
+    : undefined;
+  const name = resumeFileName(company?.name ?? null, job?.title ?? null);
+  return c.body(new Uint8Array(bytes), 200, {
+    'Content-Type': 'application/pdf',
+    'Content-Length': String(bytes.byteLength),
+    'Content-Disposition': `attachment; filename="${name}"`,
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
   });
 });
 

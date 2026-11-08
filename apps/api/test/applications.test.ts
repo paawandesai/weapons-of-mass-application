@@ -1,6 +1,11 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   activity,
+  applicationFileKey,
+  putFile,
   incrementCaptchaAttempt,
   insertApplication,
   insertCaptchaRequest,
@@ -37,6 +42,8 @@ afterAll(async () => {
 });
 
 const app = (t: TestTenant) => appFor(t, { '/applications': applicationsRoutes });
+// The resume download reads the file store at request time.
+process.env.FILE_STORE_DIR = mkdtempSync(join(tmpdir(), 'wma-api-applications-'));
 
 /** The demo flag has no application write path; the owner role flags the tenant for a test. */
 async function setDemo(t: TestTenant, demo: boolean) {
@@ -96,6 +103,37 @@ describe('GET /applications', () => {
     const both = await (await app(t).request('/applications?status=pending,applied')).json();
     expect(both.applications).toHaveLength(2);
     expect((await app(t).request('/applications?status=nope')).status).toBe(400);
+  });
+});
+
+describe('GET /applications/:id/resume', () => {
+  it('downloads the tailored resume as a PDF named after the company and role', async () => {
+    const t = await env.makeTenant();
+    const { application } = await seed(t, 'Staff Engineer');
+    const key = applicationFileKey(t.id, application.id, 'resume.pdf');
+    const pdf = Buffer.from('%PDF-1.4\n%fake\n');
+    await putFile(t.handle, key, pdf, process.env.FILE_STORE_DIR);
+    await updateApplication(t.handle, application.id, { status: 'applied', resumePdfRef: key });
+    const res = await app(t).request(`/applications/${application.id}/resume`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(res.headers.get('content-disposition')).toMatch(
+      /^attachment; filename="Resume - .+ - Staff Engineer\.pdf"$/,
+    );
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
+    expect(Buffer.from(await res.arrayBuffer()).equals(pdf)).toBe(true);
+  });
+
+  it('is 404 without a resume, when the file is gone, and for another user', async () => {
+    const t = await env.makeTenant();
+    const { application } = await seed(t, 'Staff Engineer');
+    expect((await app(t).request(`/applications/${application.id}/resume`)).status).toBe(404);
+    await updateApplication(t.handle, application.id, {
+      resumePdfRef: applicationFileKey(t.id, application.id, 'resume.pdf'),
+    });
+    expect((await app(t).request(`/applications/${application.id}/resume`)).status).toBe(404);
+    const other = await env.makeTenant();
+    expect((await app(other).request(`/applications/${application.id}/resume`)).status).toBe(404);
   });
 });
 

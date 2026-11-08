@@ -296,6 +296,10 @@ export interface ApplicationExtras {
   llm_usage?: LlmUsageTotals;
 }
 
+/** Where the tailored resume of an application downloads from (a plain link, same session cookie). */
+export const resumeUrl = (applicationId: string) =>
+  `/api/applications/${encodeURIComponent(applicationId)}/resume`;
+
 export const api = {
   me: () => request<MeResponse>('GET', '/api/me'),
   signOut: () => request<void>('POST', '/auth/signout'),

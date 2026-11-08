@@ -6,6 +6,7 @@ import {
   formatDate,
   formatPay,
   formatTime,
+  resumeUrl,
   type ApplicationDetail,
 } from '../api';
 import { CardExtras } from './card-extras';
@@ -133,7 +134,10 @@ export function BoardDetail({ id }: { id: string }) {
         <h2 id="d-resume">Resume</h2>
         {detail.resume ? (
           <p>
-            Tailored resume: <code>{basename(detail.resume.ref)}</code>
+            Tailored resume:{' '}
+            <a href={resumeUrl(detail.id)} download>
+              Download <code>{basename(detail.resume.ref)}</code>
+            </a>
           </p>
         ) : (
           <p className="muted">No tailored resume yet.</p>

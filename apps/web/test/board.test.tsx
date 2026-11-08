@@ -236,6 +236,10 @@ describe('card detail', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Acme Robotics' }));
     const dialog = await screen.findByRole('dialog', { name: 'Card detail' });
     expect(await within(dialog).findByText('resume.pdf')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Download resume.pdf' })).toHaveAttribute(
+      'href',
+      '/api/applications/a1/resume',
+    );
     expect(within(dialog).getByText('Mara Quill')).toBeInTheDocument();
     expect(within(dialog).getByText('Here are three times.')).toBeInTheDocument();
     expect(within(dialog).getByText('submitted')).toBeInTheDocument();
