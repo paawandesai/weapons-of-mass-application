@@ -1,4 +1,4 @@
-import { classifyFields, type ClassifiedField } from './classify';
+import { classifyFields, declineOption, type ClassifiedField } from './classify';
 import { resolveFreeText } from './freetext';
 import { resolveStandardFields } from './standard';
 import type { AnswerResolution, FieldDescriptor, FieldValues, SubmissionContext } from '../types';
@@ -6,6 +6,7 @@ import type { AnswerResolution, FieldDescriptor, FieldValues, SubmissionContext 
 export {
   classifyFields,
   classifyByRules,
+  declineOption,
   standardKeyFor,
   STANDARD_KEYS,
   type ClassifiedField,
@@ -25,7 +26,8 @@ export const RESUME_FILENAME = 'resume.pdf';
 
 /**
  * Resolves every field of a form, in order (rules 7 and 8):
- * self-identification is never filled and is recorded as skipped; the resume field is recorded as
+ * self-identification is recorded as skipped, unless the profile says to decline and the form has a
+ * decline option, which is then chosen; the resume field is recorded as
  * the stored resume file (attachResume uploads it); standard fields come from the profile;
  * everything else is answered by the model or left blank. The caller parks the application on the
  * first `missing-profile-field` or `unanswerable` and writes `toFormAnswers(...)` before submit.
@@ -43,9 +45,24 @@ export async function resolveAnswers(
   for (const f of classified) {
     const base = { fieldId: f.id, question: f.label };
     switch (f.classification) {
-      case 'self-identification':
-        out.push({ ...base, status: 'skipped', skipped: 'self-identification' });
+      case 'self-identification': {
+        // Only when the user chose to decline, and only a decline option the form itself offers.
+        const decline =
+          ctx.profile.standard_answers.self_identification_default === 'decline'
+            ? declineOption(f.options)
+            : null;
+        out.push(
+          decline === null
+            ? { ...base, status: 'skipped', skipped: 'self-identification' }
+            : {
+                ...base,
+                status: 'filled',
+                value: f.type === 'checkbox' ? [decline] : decline,
+                source: 'profile',
+              },
+        );
         break;
+      }
       case 'resume':
         out.push({ ...base, status: 'filled', value: RESUME_FILENAME, source: 'profile' });
         break;

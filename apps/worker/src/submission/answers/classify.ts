@@ -165,6 +165,20 @@ const SELF_ID =
 const DECLINE_OPTION =
   /(decline|prefer not|do(n't| not) wish|choose not|rather not)\b.*\b(self[- ]?identif\w*|identify)\b/;
 
+// Inside a field already known to be self-identification, any option that declines to answer.
+const DECLINE_CHOICE =
+  /\b(decline|prefer not|do(?:n't| not) (?:wish|want) to|choose not|rather not|not (?:wish|want) to (?:answer|say|disclose|identify))\b/;
+
+/**
+ * The option of a self-identification field that declines to answer, or null when the form has
+ * none (the field is then left alone, never guessed). Only meaningful for a field classified as
+ * self-identification: "Prefer not to answer" elsewhere can be an attestation, not a decline.
+ */
+export function declineOption(options: string[] | undefined): string | null {
+  if (!options) return null;
+  return options.find((o) => DECLINE_CHOICE.test(norm(o))) ?? null;
+}
+
 // Sponsorship wording, by polarity. "Do you require sponsorship?" is a different question from
 // "Can you work without sponsorship?" and from "Are you authorized to work without sponsorship?":
 // the first is answered Yes by someone who needs it, the others are answered Yes by someone who

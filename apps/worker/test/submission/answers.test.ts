@@ -16,6 +16,7 @@ import {
 import { planFill } from '../../src/submission/fill';
 import type { FieldClassification, FieldDescriptor } from '../../src/submission/types';
 import { callsTo, makeCtx, PROFILE, scripted } from '../fixtures/submission';
+import { declineOption } from '../../src/submission/answers';
 
 const field = (over: Partial<FieldDescriptor> & { label: string }): FieldDescriptor => ({
   id: over.id ?? over.label,
@@ -1561,5 +1562,117 @@ describe('rule 39: country from location', () => {
       profileField: 'identity.location',
     });
     expect(ask(null, { label: 'Country', required: false })).toMatchObject({ status: 'blank' });
+  });
+});
+
+describe('self-identification default: decline', () => {
+  const declining = () =>
+    makeCtx(scripted({}), {
+      profile: {
+        ...PROFILE,
+        standard_answers: { ...PROFILE.standard_answers, self_identification_default: 'decline' },
+      },
+    });
+  const gender = field({
+    id: 'gender',
+    label: 'Gender',
+    type: 'select',
+    options: ['Male', 'Female', 'Decline to self identify'],
+    classification: 'self-identification',
+  });
+
+  it('finds the decline option, and nothing when the form offers none', () => {
+    expect(declineOption(['Male', 'Female', 'Decline to self identify'])).toBe(
+      'Decline to self identify',
+    );
+    expect(declineOption(['Yes', 'No', "I don't wish to answer"])).toBe("I don't wish to answer");
+    expect(declineOption(['I prefer not to say'])).toBe('I prefer not to say');
+    expect(declineOption(['Yes', 'No'])).toBeNull();
+    expect(declineOption(['I am a protected veteran', 'I am not a protected veteran'])).toBeNull();
+    expect(declineOption(undefined)).toBeNull();
+  });
+
+  it('chooses the decline option the form itself offers', async () => {
+    const out = await resolveAnswers(declining(), [gender]);
+    expect(out[0]).toMatchObject({
+      status: 'filled',
+      value: 'Decline to self identify',
+      source: 'profile',
+    });
+    expect(toFieldValues(out, [gender])).toEqual({ gender: 'Decline to self identify' });
+    expect(toFormAnswers(out)).toEqual({ Gender: 'Decline to self identify' });
+  });
+
+  it('still skips a question that has no decline option, and never guesses', async () => {
+    const vet = field({
+      id: 'vet',
+      label: 'Veteran Status',
+      type: 'select',
+      options: ['Yes', 'No'],
+      classification: 'self-identification',
+    });
+    const out = await resolveAnswers(declining(), [vet]);
+    expect(out[0]).toMatchObject({ status: 'skipped', skipped: 'self-identification' });
+    expect(toFieldValues(out, [vet])).toEqual({});
+  });
+
+  it('without the setting the question is skipped even when a decline option exists', async () => {
+    const out = await resolveAnswers(makeCtx(scripted({})), [gender]);
+    expect(out[0]).toMatchObject({ status: 'skipped', skipped: 'self-identification' });
+  });
+
+  it('does not touch an attestation that merely offers "Prefer not to answer"', async () => {
+    const ctx = makeCtx(scripted({ 'answer-form-question/v1': [UNANSWERABLE] }), {
+      profile: {
+        ...PROFILE,
+        standard_answers: { ...PROFILE.standard_answers, self_identification_default: 'decline' },
+      },
+    });
+    const out = await resolveAnswers(ctx, [
+      field({
+        id: 'crim',
+        label: 'Have you ever been convicted of a crime?',
+        type: 'select',
+        options: ['Yes', 'No', 'Prefer not to answer'],
+        classification: 'free-text',
+      }),
+    ]);
+    expect(out[0]!.status).not.toBe('filled');
+    expect(out[0]).not.toMatchObject({ value: 'Prefer not to answer' });
+  });
+
+  it('the fill plan enters the decline option and records it', async () => {
+    const out = await resolveAnswers(declining(), [gender]);
+    const plan = planFill([gender], out);
+    expect(plan.values).toEqual({ gender: 'Decline to self identify' });
+    expect(plan.answers).toEqual({ Gender: 'Decline to self identify' });
+  });
+
+  it('the fill plan still skips a self-identification field the resolver skipped', async () => {
+    const out = await resolveAnswers(makeCtx(scripted({})), [gender]);
+    const plan = planFill([gender], out);
+    expect(plan.values).toEqual({});
+    expect(plan.answers).toEqual({ Gender: { skipped: 'self-identification' } });
+  });
+});
+
+describe('awards in answers', () => {
+  it('sends the awards list to the model without sources', async () => {
+    const llm = scripted({ 'answer-form-question/v1': [grounded("Dean's List 2018.")] });
+    const ctx = makeCtx(llm, {
+      profile: {
+        ...PROFILE,
+        awards: [
+          { name: "Dean's List", issuer: 'State University', date: '2018', sources: ['resume'] },
+        ],
+      },
+    });
+    await resolveFreeText(
+      ctx,
+      field({ id: 'h', label: 'Any honors or awards?', type: 'textarea' }),
+    );
+    const sent = callsTo(llm, 'answer-form-question/v1')[0]!.user;
+    expect(sent).toContain('Dean&#39;s List'.replace('&#39;', "'"));
+    expect(sent).not.toContain('"sources"');
   });
 });
