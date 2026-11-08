@@ -1,6 +1,13 @@
-import { and, asc, desc, eq, ilike } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, ilike, isNull, or, sql } from 'drizzle-orm';
 import type { TenantHandle } from '../client';
-import { applications, companies, jobs } from '../schema';
+import {
+  applications,
+  captchaRequests,
+  companies,
+  interviewSlots,
+  interviews,
+  jobs,
+} from '../schema';
 import type { ApplicationRow } from './applications';
 import type { JobRow } from './jobs';
 
@@ -45,4 +52,64 @@ export function searchApplicationsByCompany(
         .limit(limit),
     )
     .then((rows) => rows as CompanySearchRow[]);
+}
+
+export interface WaitingOnUser {
+  /** Applications with a CAPTCHA the agent could not solve and a still-valid link for the user. */
+  captcha: Set<string>;
+  /** Applications whose interview has slot links offered and none confirmed yet. */
+  pickTime: Set<string>;
+}
+
+/**
+ * Applications that cannot move until the user acts. Both queries are tenant- and user-scoped and
+ * count only requests still open: a resolved, expired or invalidated one is not waiting on anyone.
+ */
+export async function listWaitingOnUser(
+  handle: TenantHandle,
+  userId: string,
+): Promise<WaitingOnUser> {
+  const [captcha, pickTime] = await Promise.all([
+    handle.run((tx) =>
+      tx
+        .selectDistinct({ id: captchaRequests.applicationId })
+        .from(captchaRequests)
+        .where(
+          and(
+            eq(captchaRequests.tenantId, handle.tenantId),
+            eq(captchaRequests.userId, userId),
+            eq(captchaRequests.stage, 'human'),
+            isNull(captchaRequests.resolvedAt),
+            isNull(captchaRequests.expiredAt),
+            or(isNull(captchaRequests.expiresAt), gt(captchaRequests.expiresAt, sql`now()`)),
+          ),
+        ),
+    ),
+    handle.run((tx) =>
+      tx
+        .selectDistinct({ id: interviews.applicationId })
+        .from(interviews)
+        .innerJoin(
+          interviewSlots,
+          and(
+            eq(interviewSlots.tenantId, interviews.tenantId),
+            eq(interviewSlots.interviewId, interviews.id),
+          ),
+        )
+        .where(
+          and(
+            eq(interviews.tenantId, handle.tenantId),
+            eq(interviews.userId, userId),
+            isNull(interviews.confirmedSlotId),
+            isNull(interviewSlots.invalidatedAt),
+            isNull(interviewSlots.confirmedAt),
+            gt(interviewSlots.expiresAt, sql`now()`),
+          ),
+        ),
+    ),
+  ]);
+  return {
+    captcha: new Set(captcha.map((r) => r.id)),
+    pickTime: new Set(pickTime.map((r) => r.id)),
+  };
 }

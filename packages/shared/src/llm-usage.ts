@@ -95,7 +95,17 @@ export interface LlmUsageCall {
 export type LlmUsageWindow = 'all' | '7d' | '30d';
 
 /** `GET /api/usage` */
+export interface LlmUsagePace {
+  /** Model calls in the last 5 hours, the window subscription plans meter. */
+  last_5h: LlmUsageTotals;
+  /** Model calls since the start of the last 24 hours. */
+  last_24h: LlmUsageTotals;
+}
+
 export interface LlmUsageResponse {
+  /** Which backend serves the model calls (`LLM_BACKEND`): `anthropic` is billed per token, the rest use a subscription. */
+  backend: string;
+  pace: LlmUsagePace;
   /** Start of the window the totals cover (ISO), or null for all time. */
   since: string | null;
   total: LlmUsageTotals;

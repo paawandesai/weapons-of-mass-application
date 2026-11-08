@@ -94,7 +94,10 @@ export interface MockState {
   /** What approve answers for run_started. */
   runStarted?: boolean;
   signedOut: boolean;
-  usage: Pick<LlmUsageResponse, 'total' | 'by_purpose' | 'by_application' | 'recent'>;
+  usage: Pick<
+    LlmUsageResponse,
+    'total' | 'by_purpose' | 'by_application' | 'recent' | 'backend' | 'pace'
+  >;
 }
 
 const zeroTotals = {
@@ -130,7 +133,14 @@ function initial(): MockState {
     approveCalls: 0,
     approvedVersions: [],
     signedOut: false,
-    usage: { total: zeroTotals, by_purpose: [], by_application: [], recent: [] },
+    usage: {
+      total: zeroTotals,
+      by_purpose: [],
+      by_application: [],
+      recent: [],
+      backend: 'anthropic',
+      pace: { last_5h: zeroTotals, last_24h: zeroTotals },
+    },
   };
 }
 
@@ -278,6 +288,8 @@ export const handlers = [
       by_purpose: state.usage.by_purpose,
       by_application: state.usage.by_application,
       recent: state.usage.recent,
+      backend: state.usage.backend,
+      pace: state.usage.pace,
     }),
   ),
   http.put('*/api/survey', async ({ request }) => {

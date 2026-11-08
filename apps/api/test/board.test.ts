@@ -9,6 +9,11 @@ import {
   upsertCompany,
   upsertJob,
   getApplication,
+  insertCaptchaRequest,
+  insertInterview,
+  insertInterviewSlot,
+  updateCaptchaRequest,
+  upsertEmailThread,
   schema,
   type ApplicationStatus,
 } from '@wma/db';
@@ -213,5 +218,72 @@ describe('POST /applications/:id/stage', () => {
         )
       ).status,
     ).toBe(400);
+  });
+});
+
+describe('GET /board attention', () => {
+  const attentionOf = async (t: TestTenant, id: string) => {
+    const { columns } = await (await app(t).request('/board')).json();
+    const all = Object.values(columns).flat() as Array<{ id: string; attention: unknown }>;
+    return all.find((c) => c.id === id)!.attention;
+  };
+
+  it('flags an open human CAPTCHA and clears it once resolved', async () => {
+    const t = await env.makeTenant();
+    const a = await seed(t, 'Capco', 'pending');
+    expect(await attentionOf(t, a.id)).toBeNull();
+    const req = await insertCaptchaRequest(t.handle, {
+      userId: t.userId,
+      applicationId: a.id,
+      stage: 'human',
+    });
+    expect(await attentionOf(t, a.id)).toEqual({ kind: 'captcha', label: 'Solve a CAPTCHA' });
+    await updateCaptchaRequest(t.handle, req.id, { resolvedAt: new Date(), resolvedBy: 'human' });
+    expect(await attentionOf(t, a.id)).toBeNull();
+  });
+
+  it('flags an interview with open slot links and not one that is confirmed or expired', async () => {
+    const t = await env.makeTenant();
+    const a = await seed(t, 'Slotco', 'interviewing');
+    const thread = await upsertEmailThread(t.handle, {
+      userId: t.userId,
+      gmailThreadId: `g-${randomUUID()}`,
+      kind: 'interview',
+      applicationId: a.id,
+    });
+    const { interview } = await insertInterview(t.handle, {
+      userId: t.userId,
+      applicationId: a.id,
+      threadId: thread.id,
+    });
+    const startsAt = new Date('2026-12-01T17:00:00Z');
+    const endsAt = new Date('2026-12-01T17:30:00Z');
+    await insertInterviewSlot(t.handle, {
+      interviewId: interview.id,
+      startsAt,
+      endsAt,
+      tokenHash: randomUUID(),
+      ttlSeconds: -60,
+    });
+    expect(await attentionOf(t, a.id)).toBeNull();
+    await insertInterviewSlot(t.handle, {
+      interviewId: interview.id,
+      startsAt,
+      endsAt,
+      tokenHash: randomUUID(),
+    });
+    expect(await attentionOf(t, a.id)).toEqual({
+      kind: 'pick_time',
+      label: 'Pick an interview time',
+    });
+  });
+
+  it('flags a pending application on an unsupported ATS and never a closed one', async () => {
+    const t = await env.makeTenant();
+    const a = await seed(t, 'Handco', 'pending');
+    await updateApplication(t.handle, a.id, { pendingReason: 'unsupported-ats' });
+    expect(await attentionOf(t, a.id)).toEqual({ kind: 'apply_by_hand', label: 'Apply by hand' });
+    await updateApplication(t.handle, a.id, { status: 'closed', closedReason: 'withdrawn' });
+    expect(await attentionOf(t, a.id)).toBeNull();
   });
 });

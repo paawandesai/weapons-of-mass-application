@@ -35,6 +35,17 @@ export function BoardPage() {
   const dragged = useRef<string | null>(null);
   const { toasts, push, dismiss } = useToasts();
   const openId = params.get('card');
+  const waitingOnly = params.get('waiting') === '1';
+  const waitingCount = board
+    ? COLUMNS.reduce((n, { id }) => n + board.columns[id].filter((c) => c.attention).length, 0)
+    : 0;
+  const toggleWaiting = () =>
+    setParams((p) => {
+      const next = Object.fromEntries(p);
+      if (waitingOnly) delete next.waiting;
+      else next.waiting = '1';
+      return next;
+    });
 
   const load = useCallback(async () => {
     try {
@@ -129,6 +140,14 @@ export function BoardPage() {
     <section className="board-page">
       <div className="board-head">
         <h1>Board</h1>
+        <button
+          type="button"
+          className={waitingOnly ? 'chip active' : 'chip'}
+          aria-pressed={waitingOnly}
+          onClick={toggleWaiting}
+        >
+          Waiting on you <span className="muted small">{waitingCount}</span>
+        </button>
         <SearchBar onSelect={onSearchSelect} />
       </div>
       {loadError ? (
@@ -144,7 +163,7 @@ export function BoardPage() {
               key={id}
               id={id}
               label={label}
-              cards={board.columns[id]}
+              cards={waitingOnly ? board.columns[id].filter((c) => c.attention) : board.columns[id]}
               highlightId={highlightId}
               onOpen={(cardId) => {
                 setHighlightId(cardId);

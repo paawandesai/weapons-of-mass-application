@@ -41,17 +41,20 @@ describe('GET /usage', () => {
     const res = await app(t).request('/usage');
     expect(res.status).toBe(200);
     const body = await res.json();
+    const ZERO = {
+      calls: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      cost_usd: 0,
+      unpriced_calls: 0,
+    };
     expect(body).toEqual({
+      backend: 'anthropic',
+      pace: { last_5h: ZERO, last_24h: ZERO },
       since: null,
-      total: {
-        calls: 0,
-        input_tokens: 0,
-        output_tokens: 0,
-        cache_creation_input_tokens: 0,
-        cache_read_input_tokens: 0,
-        cost_usd: 0,
-        unpriced_calls: 0,
-      },
+      total: ZERO,
       by_purpose: [],
       by_application: [],
       recent: [],
@@ -137,5 +140,24 @@ describe('GET /usage', () => {
     await recordLlmUsage(a.handle, call({ userId: a.userId, costUsd: 9 }));
     const body = await (await app(b).request('/usage')).json();
     expect(body.total.calls).toBe(0);
+  });
+});
+
+describe('GET /usage pace and backend', () => {
+  it('reports recent calls and the configured backend', async () => {
+    const t = await env.makeTenant();
+    await recordLlmUsage(t.handle, call({ userId: t.userId }));
+    await recordLlmUsage(t.handle, call({ userId: t.userId }));
+    const saved = process.env.LLM_BACKEND;
+    process.env.LLM_BACKEND = 'Claude-Code';
+    try {
+      const body = await (await app(t).request('/usage')).json();
+      expect(body.backend).toBe('claude-code');
+      expect(body.pace.last_5h.calls).toBe(2);
+      expect(body.pace.last_24h.calls).toBe(2);
+    } finally {
+      if (saved === undefined) delete process.env.LLM_BACKEND;
+      else process.env.LLM_BACKEND = saved;
+    }
   });
 });

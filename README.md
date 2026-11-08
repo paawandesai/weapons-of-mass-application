@@ -13,6 +13,19 @@ Hackathon MVP of a multi-tenant SaaS.
 | [docs/llm-cost.md](docs/llm-cost.md) | LLM cost ledger: what each model call records, the purposes, how jobs are wired, how to read it. |
 | [openspec/](openspec/) | [OpenSpec](https://openspec.dev) specs and changes. Each change has a proposal, delta specs in SHALL / WHEN / THEN form, a design and a task list. |
 
+## Using a subscription instead of API tokens
+
+Set `LLM_BACKEND` in `.env` and the worker drives a logged-in CLI instead of the API:
+
+| `LLM_BACKEND` | Uses | One-time setup |
+|---|---|---|
+| `anthropic` (default) | Anthropic API, per token | `ANTHROPIC_API_KEY` |
+| `claude-code` | Claude subscription via `claude -p` | `claude login` |
+| `codex` | ChatGPT subscription via `codex exec` | `codex login` |
+| `gemini` | Google account via `gemini -p` | run `gemini` once |
+
+Run the worker on your own machine (not in the container). Keep `JUDGE_CAP_PER_RUN` low, since subscriptions have usage caps, and leave `LLM_CLI_CONCURRENCY` at 2 or less. Personal use only: it is your own login on your own machine. Implementation: `packages/llm/src/cli.ts`.
+
 ## OpenSpec
 
 Install the CLI once:

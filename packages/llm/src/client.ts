@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { createCliLlm, parseBackend, type LlmBackend } from './cli';
 import { outputFormatFor } from './schema';
 import type { StructuredLlm, StructuredRequest, StructuredResponse } from './types';
 
@@ -6,17 +7,30 @@ export const DEFAULT_MODEL = 'claude-opus-5-5';
 const DEFAULT_MAX_TOKENS = 32000;
 
 export interface LlmClient extends StructuredLlm {
-  readonly anthropic: Anthropic;
+  readonly anthropic?: Anthropic;
 }
 
 export interface LlmClientOptions {
   /** Defaults to process.env.ANTHROPIC_API_KEY. */
   apiKey?: string;
   model?: string;
+  /**
+   * Which backend serves the calls. Defaults to process.env.LLM_BACKEND, then `anthropic` (API
+   * key, billed per token). The others drive a locally installed, logged-in CLI, so the calls
+   * count against that subscription instead. See `cli.ts`.
+   */
+  backend?: LlmBackend;
 }
 
-/** Builds the Anthropic client wrapper. Makes no network calls. */
+/** Picks the backend (`LLM_BACKEND`) and builds it. Makes no network calls. */
 export function createLlmClient(options: LlmClientOptions = {}): LlmClient {
+  const backend = options.backend ?? parseBackend(process.env.LLM_BACKEND);
+  if (backend === 'anthropic') return createAnthropicClient(options);
+  return createCliLlm(backend, { model: options.model ?? process.env.LLM_MODEL });
+}
+
+/** Builds the Anthropic API client wrapper (pay per token). Makes no network calls. */
+export function createAnthropicClient(options: LlmClientOptions = {}): LlmClient {
   const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('llm: ANTHROPIC_API_KEY is not set');
   const model = options.model ?? DEFAULT_MODEL;
