@@ -869,8 +869,8 @@ function findQuestion(scan: PageScan, q: Question): Question | undefined {
 }
 
 /**
- * Fills the questions that have values, then rescans and compares (rule 9). Self-identification
- * and file questions are never touched. Returns the required questions whose value did not stick,
+ * Fills the questions that have values, then rescans and compares (rule 9). A self-identification
+ * question is filled only when it has a value (its decline option); file questions are never touched. Returns the required questions whose value did not stick,
  * and every required question still empty on the final scan (an answer can reveal a new one).
  */
 export async function fillPage(page: Page, values: FieldValues): Promise<FillFailure[]> {
@@ -878,10 +878,8 @@ export async function fillPage(page: Page, values: FieldValues): Promise<FillFai
   const isSelfId = (q: Question): boolean =>
     classifyField({ label: q.label, type: descriptorType(q), hint: q.context }) ===
     'self-identification';
-  const wanted = (q: Question): boolean => {
-    if (values[q.id] === undefined || q.kind === 'file') return false;
-    return !isSelfId(q);
-  };
+  // A self-identification question has a value only when the resolver chose its decline option.
+  const wanted = (q: Question): boolean => values[q.id] !== undefined && q.kind !== 'file';
   const plan = initial.questions.filter(wanted);
   const intents = new Map<string, Intent>();
   for (const q of plan) intents.set(q.id, intentOf(q, values[q.id]!));

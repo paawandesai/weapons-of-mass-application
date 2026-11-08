@@ -29,6 +29,8 @@ function profileForModel(p: ProfileDocument) {
     projects: p.projects.map(({ sources: _s, ...x }) => x),
     skills: p.skills,
     education: p.education.map(({ sources: _s, ...x }) => x),
+    // Honors and awards the profile states; a question about them is answered from this list only.
+    awards: (p.awards ?? []).map(({ sources: _s, ...x }) => x),
     preferences: p.preferences,
     // Never salary_floor or family_constraints.
     survey: {

@@ -12,7 +12,7 @@ export interface FillPlan {
 
 /**
  * Turns the resolver's output into what gets entered and what gets recorded. Self-identification
- * fields are never filled. The first field, in form order, that cannot be filled ends the plan
+ * fields are filled only with the form's decline option, when the profile says to decline. The first field, in form order, that cannot be filled ends the plan
  * with the pending reason that names it.
  */
 export function planFill(fields: FieldDescriptor[], resolutions: AnswerResolution[]): FillPlan {
@@ -23,7 +23,14 @@ export function planFill(fields: FieldDescriptor[], resolutions: AnswerResolutio
 
   for (const f of fields) {
     if (f.classification === 'self-identification') {
-      answers[f.label] = { skipped: 'self-identification' };
+      // Entered only when the resolver chose the form's decline option (the profile says to decline).
+      const chosen = byId.get(f.id);
+      if (chosen?.status === 'filled') {
+        values[f.id] = chosen.value;
+        answers[f.label] = chosen.value;
+      } else {
+        answers[f.label] = { skipped: 'self-identification' };
+      }
       continue;
     }
     if (f.classification === 'resume') {
