@@ -5,6 +5,7 @@ import { defaultGuards } from '@wma/shared';
 import { BOOK_INTERVIEW_JOB, BOOK_QUEUE_OPTIONS } from '../jobs/book-interview';
 import { createNotificationDeps } from '../notifications/deps';
 import { scheduleReminders } from '../notifications/reminders';
+import { recordConfirmedFromEmail } from '../scheduling/confirmed';
 import { recordOffer, resendPendingConfirmations, sendOfferEmail } from '../scheduling/offer';
 import { createSchedulingDeps } from '../scheduling/ports';
 import { requeueUnbookedInterviews } from '../scheduling/requeue';
@@ -43,6 +44,8 @@ export function createInboxDeps(boss: PgBoss): InboxDeps {
             : null,
       };
     },
+    recordConfirmedInterview: (handle, input) =>
+      recordConfirmedFromEmail(handle, input, scheduling(handle, input.userId)),
     sendOfferEmail: (handle, userId, offer) =>
       sendOfferEmail(
         handle,

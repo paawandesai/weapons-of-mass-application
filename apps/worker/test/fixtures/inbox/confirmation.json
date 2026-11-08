@@ -9,6 +9,7 @@
     "classification": "confirmation",
     "compensation_flag": false,
     "booking_link": null,
-    "proposed_slots": []
+    "proposed_slots": [],
+    "confirmed_slot": null
   }
 }

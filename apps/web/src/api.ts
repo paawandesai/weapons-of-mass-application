@@ -262,6 +262,7 @@ export interface InterviewView {
   starts_at: string | null;
   ends_at: string | null;
   confirmed: boolean;
+  booked_via: 'email' | 'manual' | null;
   prep_plan_status: PrepPlanStatus | null;
   prep_plan: PrepPlan | null;
   feedback: Feedback | null;
@@ -373,6 +374,12 @@ export const api = {
     request<{ status: 'queued'; enqueued: boolean }>(
       'POST',
       `/api/interviews/for-application/${encodeURIComponent(applicationId)}/negotiation`,
+    ),
+  recordInterview: (applicationId: string, input: { starts_at: string; ends_at: string | null }) =>
+    request<{ interview: InterviewView; enqueued: boolean }>(
+      'POST',
+      `/api/interviews/for-application/${encodeURIComponent(applicationId)}/record`,
+      { json: input },
     ),
   requestPrepPlan: (id: string) =>
     request<{ status: PrepPlanStatus; enqueued: boolean }>(

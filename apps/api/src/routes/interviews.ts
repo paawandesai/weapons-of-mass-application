@@ -21,6 +21,7 @@ import {
   type PrepQueue,
 } from '../services/prep';
 import { invalidJson, readJson, validationError } from '../services/http';
+import { recordInterview, RecordInterviewInput } from '../services/record-interview';
 import { isUuid } from '../services/uuid';
 
 export interface InterviewsDeps {
@@ -80,6 +81,40 @@ export function createInterviewsRoutes(deps: InterviewsDeps = {}): Hono<AppEnv> 
         return c.json({ code: 'not_offer', message: 'This application has no offer.' }, 409);
       default:
         return c.json({ status: 'queued', enqueued: r.enqueued }, 202);
+    }
+  });
+
+  // An interview booked outside the app (the employer's scheduling page, a phone call): the
+  // user records the time, the card moves to Interviewing and the prep plan is prepared.
+  app.post('/for-application/:applicationId/record', async (c) => {
+    const { handle, userId } = c.get('session');
+    const id = c.req.param('applicationId');
+    if (!isUuid(id)) return c.json({ code: 'not_found', message: 'Application not found.' }, 404);
+    const raw = await readJson(c);
+    if (raw === undefined) return invalidJson(c);
+    const parsed = RecordInterviewInput.safeParse(raw);
+    if (!parsed.success) return validationError(c, parsed.error);
+    const now = deps.now?.() ?? c.get('now')?.() ?? new Date();
+    const r = await recordInterview(
+      handle,
+      userId,
+      id,
+      parsed.data,
+      deps.queue ?? pgBossPrepQueue,
+      now,
+    );
+    switch (r.status) {
+      case 'not_found':
+        return c.json({ code: 'not_found', message: 'Application not found.' }, 404);
+      case 'closed':
+        return c.json(
+          { code: 'closed', message: 'This application is closed, so no interview is recorded.' },
+          409,
+        );
+      case 'invalid_time':
+        return c.json({ code: 'invalid_time', message: r.message }, 400);
+      default:
+        return c.json({ interview: toInterviewView(r.interview), enqueued: r.enqueued }, 201);
     }
   });
 

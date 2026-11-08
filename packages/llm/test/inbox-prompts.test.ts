@@ -2,18 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { loadPrompt } from '../src';
 
 describe('inbox prompts', () => {
-  it.each(['inbox-link', 'inbox-classify'])('%s/v1 loads with a frontmatter version', (name) => {
-    const text = loadPrompt(name, 'v1');
+  it.each([
+    ['inbox-link', 'v1'],
+    ['inbox-classify', 'v1'],
+    ['inbox-classify', 'v2'],
+  ])('%s/%s loads with a frontmatter version', (name, version) => {
+    const text = loadPrompt(name, version);
     expect(text.length).toBeGreaterThan(300);
-    expect(text).toMatch(new RegExp(`^---\\nname: ${name}\\nversion: v1\\n`));
+    expect(text).toMatch(new RegExp(`^---\\nname: ${name}\\nversion: ${version}\\n`));
   });
 
   it('the classify prompt covers every output field and treats the email as data', () => {
-    const text = loadPrompt('inbox-classify', 'v1');
+    const text = loadPrompt('inbox-classify', 'v2');
     for (const field of [
       'compensation_flag',
       'booking_link',
       'proposed_slots',
+      'confirmed_slot',
       'ambiguous',
       'tz_hint',
     ]) {

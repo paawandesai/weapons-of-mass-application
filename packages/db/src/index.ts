@@ -27,6 +27,7 @@ export * from './repos/discovery-queries';
 export * from './repos/email_threads';
 export * from './repos/processed_messages';
 export * from './repos/interviews';
+export * from './repos/confirmed-interviews';
 export * from './repos/interview_slots';
 export * from './repos/outgoing_messages';
 export * from './repos/mail_sync_state';

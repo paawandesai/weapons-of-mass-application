@@ -11,11 +11,11 @@ How the worker reads the user's Gmail, links replies to applications, moves card
 | `apps/worker/src/inbox/sync.ts` | `runMailSync`, `processMessage`. |
 | `apps/worker/src/inbox/gmail-reader.ts` | `InboxGmailPort` (history list, dated list, message, thread) over the user's Google connection; `parseGmailMessage`, `isAuthError`. |
 | `apps/worker/src/inbox/link.ts` | Deterministic linking, then `inbox-link@v1`. |
-| `apps/worker/src/inbox/classify.ts` | `inbox-classify@v1` with the shared `InboxClassification` schema. |
+| `apps/worker/src/inbox/classify.ts` | `inbox-classify@v2` with the shared `InboxClassification` schema (v2 added `confirmed_slot`, the one time an email states as already booked). |
 | `apps/worker/src/inbox/flags.ts` | `flagDigest`: writes `digest_flag` activity entries (`activity_on_closed`, `booking_link`, `compensation`, `no_free_slot`) that the digest reads. |
 | `apps/worker/src/inbox/follow-up.ts`, `templates/follow-up.ts` | `runFollowUp` and the plain template. |
 | `apps/worker/src/inbox/deps.ts`, `wiring.ts` | `InboxDeps` (Gmail, LLM, `mail`, `recordOffer`, `sendOfferEmail`, `flagDigest`, clock) and the production wiring. |
-| `packages/llm/prompts/inbox-link/v1.md`, `inbox-classify/v1.md` | Prompts. |
+| `packages/llm/prompts/inbox-link/v1.md`, `inbox-classify/v2.md` | Prompts (`inbox-classify/v1.md` is kept for threads classified under it). |
 
 ## Sync
 
@@ -24,7 +24,8 @@ How the worker reads the user's Gmail, links replies to applications, moves card
 3. Per message: ignore the user's own sent mail and mail from the user's own address; link; classify; then one transaction writes the processed marker, the thread row, the status change and its activity entry, and the digest flags. Linking and classification run before the transaction so no connection is held across model calls. A failure at any step records the message as `failed` with a `processing_failed` entry and moves on.
 4. After the batch, store the new history id and `last_synced_at` and clear `reauth_needed`. A Gmail error other than a rejected credential propagates and the queue retries with the mark unchanged; messages already committed are skipped on the retry.
 5. A message with proposed slots and no booking link on a non-closed application is handed to `deps.recordOffer` as the last step of its transaction (slots and token hashes only; nothing is sent). If the calendar cannot be read (`CalendarUnavailableError`) the message rolls back, is not marked processed, and its id is stored in `deferred_message_ids`; the mark moves on and the next hourly sync retries exactly those ids, so a dated fallback window cannot lose them. After the transaction commits, `deps.sendOfferEmail` sends the confirmation request; a failure other than authentication logs `offer_email_failed` and is repaired by `resendPendingConfirmations`. A rejected credential anywhere in message processing (including the send) is rethrown, never recorded as a per-message failure, so the revocation handler runs and the mark holds. Any other scheduling error fails that message only. The sync itself never sends mail to the recruiter.
-6. After the mark moves, `resendPendingConfirmations` and `requeueUnbookedInterviews` run for the user (the scheduling repair passes).
+6. A message whose classification carries a `confirmed_slot` (the email states one time as already booked: a self-schedule confirmation, a calendar invitation) on a non-closed application is handed to `deps.recordConfirmedInterview` inside its transaction instead. It normalizes the time like a proposed slot and writes the interview confirmed and booked in one step (`booked_via = email`, no slot, no recruiter reply, no Calendar event), moves the card to Interviewing, and records the `schedule-reminders` and `prep-plan` jobs in the outbox for the reconciler. A confirmed time wins over a reschedule link or stray options in the same message; an unusable time (ambiguous, past) stores nothing and logs `confirmed_time_unusable`, and the message falls through to the booking-link flag and the slot path. The same repo function backs `POST /api/interviews/for-application/:id/record` (`booked_via = manual`, no thread) for an interview the user booked by hand.
+7. After the mark moves, `resendPendingConfirmations` and `requeueUnbookedInterviews` run for the user (the scheduling repair passes).
 
 A rejected credential (401, `invalid_grant`, or no stored grant) calls `markRevoked`, logs `mailbox_reauth_needed`, sets `reauth_needed`, leaves the mark alone and returns without throwing. Further rejections while the flag is set do not log again.
 

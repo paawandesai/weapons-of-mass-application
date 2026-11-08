@@ -50,3 +50,6 @@ export const NEGOTIATION_QUEUE_OPTIONS = {
 /** Outbox dedupe keys for follow-on work: the same key means the same unit of work. */
 export const prepPlanKey = (interviewId: string) => `prep-plan:${interviewId}`;
 export const negotiationKey = (applicationId: string) => `negotiation:${applicationId}`;
+/** One reminder schedule per confirmed time of an interview (the generation changes with the time). */
+export const scheduleRemindersKey = (interviewId: string, generation: number) =>
+  `schedule-reminders:${interviewId}:${generation}`;

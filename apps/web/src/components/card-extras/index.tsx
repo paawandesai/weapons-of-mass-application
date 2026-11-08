@@ -6,11 +6,13 @@ import { formatUsd } from '../../pages/UsagePage';
 import { FeedbackForm } from './FeedbackForm';
 import { OfferPanel } from './OfferPanel';
 import { PrepPanel } from './PrepPanel';
+import { RecordInterviewForm } from './RecordInterviewForm';
 
 export { FeedbackForm } from './FeedbackForm';
 export { OfferPanel } from './OfferPanel';
 export { PrepPanel } from './PrepPanel';
 export { PrepPlanView } from './PrepPlanView';
+export { RecordInterviewForm } from './RecordInterviewForm';
 
 /**
  * What the card needs from the application. `interviews` and `negotiation` may be left out; the
@@ -34,6 +36,7 @@ export function CardExtras({ application }: { application: CardExtrasApplication
     llm_usage?: LlmUsageTotals;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
 
   const load = useCallback(() => {
     return api
@@ -70,18 +73,44 @@ export function CardExtras({ application }: { application: CardExtrasApplication
   if (interviews === null) return <p className="muted">Loading…</p>;
 
   const showOffer = application.status === 'offer' || negotiation !== null;
+  const closed = application.status === 'closed';
+  const recorded = () => {
+    setRecording(false);
+    void load();
+  };
   return (
     <div className="card-extras">
       {interviews.length === 0 ? (
-        <p className="muted">No interview is booked yet, so there is no prep plan.</p>
+        <>
+          <p className="muted">No interview is booked yet, so there is no prep plan.</p>
+          {!closed ? (
+            <RecordInterviewForm applicationId={application.id} onRecorded={recorded} />
+          ) : null}
+        </>
       ) : (
-        interviews.map((iv) => (
-          <div key={iv.id} className="interview">
-            <h3>Interview{iv.starts_at ? ` on ${formatTime(iv.starts_at)}` : ''}</h3>
-            <PrepPanel interview={iv} onChanged={() => void load()} />
-            {iv.confirmed ? <FeedbackForm interview={iv} onSaved={() => void load()} /> : null}
-          </div>
-        ))
+        <>
+          {interviews.map((iv) => (
+            <div key={iv.id} className="interview">
+              <h3>Interview{iv.starts_at ? ` on ${formatTime(iv.starts_at)}` : ''}</h3>
+              <PrepPanel interview={iv} onChanged={() => void load()} />
+              {iv.confirmed ? <FeedbackForm interview={iv} onSaved={() => void load()} /> : null}
+            </div>
+          ))}
+          {!closed && !recording ? (
+            <p>
+              <button type="button" className="link" onClick={() => setRecording(true)}>
+                Record another interview
+              </button>
+            </p>
+          ) : null}
+          {!closed && recording ? (
+            <RecordInterviewForm
+              applicationId={application.id}
+              onRecorded={recorded}
+              onCancel={() => setRecording(false)}
+            />
+          ) : null}
+        </>
       )}
       {showOffer ? (
         <OfferPanel

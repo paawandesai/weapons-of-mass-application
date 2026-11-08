@@ -26,7 +26,7 @@ A call that throws (transport or API error) returns no usage from the API and is
 | `onboarding` | `profile.build`, started by the survey save, a resume upload, or "Rebuild" on the profile page | `profile-build/v1` |
 | `discovery` | `daily-run` | `company-list/v1`, `apply-decision/v1` |
 | `application` | `submit-application` | `tailor-resume/v1`, `extract-resume-facts/v1`, `classify-form-field/v1`, `answer-form-question/v1`, `solve-captcha-a/v1`, `solve-captcha-b/v1` |
-| `inbox` | `mail-sync` | `inbox-link/v1`, `inbox-classify/v1` |
+| `inbox` | `mail-sync` | `inbox-link/v1`, `inbox-classify/v2` |
 | `interview_prep` | `prep-plan` | `prep-plan/v1` |
 | `negotiation` | `negotiation` | `comparables-extract/v1` |
 

@@ -102,6 +102,8 @@ export interface InterviewView {
   starts_at: string | null;
   ends_at: string | null;
   confirmed: boolean;
+  /** `email` or `manual` when the time was fixed outside the app's slot flow; null otherwise. */
+  booked_via: InterviewRow['bookedVia'];
   prep_plan_status: InterviewRow['prepPlanStatus'];
   prep_plan: PrepPlanView | null;
   feedback: FeedbackView | null;
@@ -114,6 +116,7 @@ export function toInterviewView(row: InterviewRow): InterviewView {
     starts_at: row.startsAt ? row.startsAt.toISOString() : null,
     ends_at: row.endsAt ? row.endsAt.toISOString() : null,
     confirmed: row.confirmedAt !== null,
+    booked_via: row.bookedVia,
     prep_plan_status: row.prepPlanStatus,
     prep_plan: row.prepPlanStatus === 'ready' ? parsePrepPlan(row.prepPlan) : null,
     feedback: feedbackView(row.feedback),

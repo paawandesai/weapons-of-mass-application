@@ -16,6 +16,16 @@ export interface OfferSlotsInput {
   compensationFlag: boolean;
 }
 
+export interface ConfirmedInterviewInput {
+  userId: string;
+  applicationId: string;
+  /** `email_threads.id` of the thread that confirmed the time. */
+  threadId: string;
+  /** Gmail id of the confirming message. */
+  messageId: string;
+  slot: ProposedSlot;
+}
+
 /** An offer whose slots are committed and whose confirmation email is still to be sent. */
 export interface OfferToSend {
   interviewId: string;
@@ -40,6 +50,16 @@ export interface InboxDeps {
    * calendar cannot be read.
    */
   recordOffer(handle: TenantHandle, input: OfferSlotsInput): Promise<{ send: OfferToSend | null }>;
+  /**
+   * Scheduling's `recordConfirmedInterview`: stores an interview whose time the email states as
+   * booked, inside the caller's transaction, and sends nothing (reminders and the prep plan go
+   * through the outbox). `interviewId` is null when the time was unusable (ambiguous, past) and
+   * nothing was stored.
+   */
+  recordConfirmedInterview(
+    handle: TenantHandle,
+    input: ConfirmedInterviewInput,
+  ): Promise<{ interviewId: string | null }>;
   /** Scheduling's `sendOfferEmail`: sends the confirmation request after the slots committed. */
   sendOfferEmail(handle: TenantHandle, userId: string, offer: OfferToSend): Promise<unknown>;
   /** Re-sends confirmation requests whose email never recorded as sent (scheduling). */

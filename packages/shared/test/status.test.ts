@@ -83,6 +83,7 @@ describe('InboxClassification', () => {
     proposed_slots: [
       { start: '2026-11-12T10:00:00-08:00', end: null, tz_hint: 'PT', ambiguous: false },
     ],
+    confirmed_slot: null,
   };
 
   it('accepts the rule 3 shape', () => {
@@ -99,10 +100,16 @@ describe('InboxClassification', () => {
     ).toBe(false);
   });
 
-  it('exports a JSON schema with the four top-level properties', () => {
+  it('exports a JSON schema with the five top-level properties', () => {
     const props = Object.keys((InboxClassificationJsonSchema as { properties: object }).properties);
     expect(props.sort()).toEqual(
-      ['booking_link', 'classification', 'compensation_flag', 'proposed_slots'].sort(),
+      [
+        'booking_link',
+        'classification',
+        'compensation_flag',
+        'confirmed_slot',
+        'proposed_slots',
+      ].sort(),
     );
   });
 });

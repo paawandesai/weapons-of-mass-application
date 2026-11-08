@@ -81,6 +81,108 @@ async function seedInterview(t: TestTenant, status: 'applied' | 'closed' | 'offe
   return { application, interview };
 }
 
+async function seedApplication(t: TestTenant, status: 'applied' | 'closed' = 'applied') {
+  n++;
+  const { job } = await upsertJob(t.handle, {
+    title: `Engineer ${n}`,
+    url: `https://jobs.example.test/api-interviews/${t.id}/${n}`,
+  });
+  const { application } = await insertApplication(t.handle, { userId: t.userId, jobId: job.id });
+  await updateApplication(t.handle, application.id, { status });
+  return application;
+}
+
+describe('record an interview booked outside the app', () => {
+  const starts_at = '2026-11-20T17:00:00.000Z';
+
+  it('stores it confirmed, moves the card to Interviewing, queues the prep plan and logs the user', async () => {
+    const t = await env.makeTenant();
+    const { app, prep } = setup(t);
+    const application = await seedApplication(t);
+    const res = await app.request(
+      `/interviews/for-application/${application.id}/record`,
+      json({ starts_at, ends_at: '2026-11-20T17:45:00.000Z' }),
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { interview: Record<string, unknown>; enqueued: boolean };
+    expect(body.interview).toMatchObject({
+      application_id: application.id,
+      starts_at,
+      ends_at: '2026-11-20T17:45:00.000Z',
+      confirmed: true,
+      booked_via: 'manual',
+    });
+    expect(body.enqueued).toBe(true);
+    expect(prep.map((p) => p.interviewId)).toEqual([body.interview.id]);
+    const row = (await getInterview(t.handle, body.interview.id as string))!;
+    expect(row.threadId).toBeNull();
+    expect(row.confirmedSlotId).toBeNull();
+    expect(row.bookedGeneration).toBe(row.confirmedGeneration);
+    expect((await getApplication(t.handle, application.id))?.status).toBe('interviewing');
+    const log = await activity.listByApplication(t.handle, application.id);
+    const recorded = log.find((e) => e.action === 'interview_recorded');
+    expect(recorded?.actor).toBe('user');
+    expect(recorded?.detail).toMatchObject({ booked_via: 'manual', starts_at });
+    // The prep plan was handed to the queue directly, so the outbox row is already dispatched.
+    const pending = await t.handle.run((tx) =>
+      tx.select().from(schema.pendingJobs).where(eq(schema.pendingJobs.tenantId, t.id)),
+    );
+    expect(pending.find((p) => p.kind === 'prep-plan')?.dispatchedAt).not.toBeNull();
+    expect(pending.find((p) => p.kind === 'schedule-reminders')?.dispatchedAt).toBeNull();
+  });
+
+  it('an end defaults to an hour after the start', async () => {
+    const t = await env.makeTenant();
+    const { app } = setup(t);
+    const application = await seedApplication(t);
+    const res = await app.request(
+      `/interviews/for-application/${application.id}/record`,
+      json({ starts_at }),
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { interview: { ends_at: string } };
+    expect(body.interview.ends_at).toBe('2026-11-20T18:00:00.000Z');
+  });
+
+  it('refuses a past time, an end before the start and unreadable input', async () => {
+    const t = await env.makeTenant();
+    const { app } = setup(t);
+    const application = await seedApplication(t);
+    const url = `/interviews/for-application/${application.id}/record`;
+    const past = await app.request(url, json({ starts_at: '2026-11-07T09:00:00.000Z' }));
+    expect(past.status).toBe(400);
+    expect(((await past.json()) as { code: string }).code).toBe('invalid_time');
+    const inverted = await app.request(
+      url,
+      json({ starts_at, ends_at: '2026-11-20T16:00:00.000Z' }),
+    );
+    expect(inverted.status).toBe(400);
+    const garbage = await app.request(url, json({ starts_at: 'next tuesday' }));
+    expect(garbage.status).toBe(400);
+    const missing = await app.request(url, json({}));
+    expect(missing.status).toBe(400);
+    expect(await getApplication(t.handle, application.id)).toMatchObject({ status: 'applied' });
+  });
+
+  it("a closed application takes no interview; another user's application is not found", async () => {
+    const t = await env.makeTenant();
+    const { app } = setup(t);
+    const closed = await seedApplication(t, 'closed');
+    const res = await app.request(
+      `/interviews/for-application/${closed.id}/record`,
+      json({ starts_at }),
+    );
+    expect(res.status).toBe(409);
+    const other = await env.makeTenant();
+    const theirs = await seedApplication(other);
+    const stranger = await app.request(
+      `/interviews/for-application/${theirs.id}/record`,
+      json({ starts_at }),
+    );
+    expect(stranger.status).toBe(404);
+  });
+});
+
 describe('feedback', () => {
   it('submits feedback, stamps it, writes a user-actor activity entry and shows it on the interview', async () => {
     const t = await env.makeTenant();

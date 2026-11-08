@@ -5,11 +5,15 @@ import {
   getEmailThreadByGmailId,
   getMailSyncState,
   isMessageProcessed,
+  listInterviewsForApplication,
   listOutgoingMessagesForUser,
+  listUndispatchedJobs,
+  recordConfirmedInterview,
   upsertMailSyncState,
   type ApplicationStatus,
 } from '@wma/db';
-import { InboxClassificationJsonSchema } from '@wma/shared';
+import { InboxClassificationJsonSchema, PREP_PLAN_JOB, SCHEDULE_REMINDERS_JOB } from '@wma/shared';
+import { recordConfirmedFromEmail } from '../../src/scheduling/confirmed';
 import { CalendarUnavailableError } from '../../src/scheduling/offer';
 import { INBOX_CLASSIFY_PROMPT } from '../../src/inbox/classify';
 import { processMessage, runMailSync } from '../../src/inbox/sync';
@@ -70,21 +74,23 @@ describe('rule 3: classification', () => {
   ])('fixture %s is stored as %s with the prompt version', async (name, kind) => {
     const r = await deliver(name);
     expect(r.thread).toMatchObject({ kind, promptVersion: INBOX_CLASSIFY_PROMPT });
-    expect(INBOX_CLASSIFY_PROMPT).toBe('inbox-classify@v1');
+    expect(INBOX_CLASSIFY_PROMPT).toBe('inbox-classify@v2');
   });
 
   it('sends the model the company, title and message, with the shared schema, and nothing about other applications', async () => {
     const r = await deliver('interview');
-    const call = r.llm.calls.find((c) => c.prompt === 'inbox-classify/v1')!;
+    const call = r.llm.calls.find((c) => c.prompt === 'inbox-classify/v2')!;
     expect(call.user).toContain(`Company: ${r.s.companyName}`);
     expect(call.user).toContain(`Job title: ${r.s.title}`);
     expect(call.user).toContain('Tuesday March 24, 2026');
     expect(call.system).toMatch(/proposed_slots/);
+    expect(call.system).toMatch(/confirmed_slot/);
     expect(Object.keys((InboxClassificationJsonSchema.properties ?? {}) as object)).toEqual([
       'classification',
       'compensation_flag',
       'booking_link',
       'proposed_slots',
+      'confirmed_slot',
     ]);
   });
 
@@ -112,6 +118,145 @@ describe('rule 3: classification', () => {
     }));
     expect(r.thread?.bookingLink).toBeNull();
     expect(r.flags.some((f) => f.kind === 'booking_link')).toBe(false);
+  });
+});
+
+describe('a confirmed time in the email (self-scheduled interviews)', () => {
+  it('is handed to scheduling inside the transaction; nothing is offered and the reschedule link is not flagged', async () => {
+    const r = await deliver('interview-confirmed', 'applied', (f) => f);
+    expect(r.app.status).toBe('interviewing');
+    expect(r.offerSlots).not.toHaveBeenCalled();
+    expect(r.sender.sent).toHaveLength(0);
+    expect(r.recordConfirmedInterview).toHaveBeenCalledTimes(1);
+    const [, input] = r.recordConfirmedInterview.mock.calls[0] as unknown as [
+      unknown,
+      { threadId: string; messageId: string; slot: { start: string } },
+    ];
+    expect(input.threadId).toBe(r.thread!.id);
+    expect(input.messageId).toBe(r.f.id);
+    expect(input.slot.start).toBe('2026-03-24T11:00:00-07:00');
+  });
+
+  it('falls back to the booking-link flag when scheduling could not use the time', async () => {
+    const t = await env.makeTenant();
+    await approve(t);
+    await upsertMailSyncState(t.handle, t.userId, { historyId: 'h-1' });
+    const s = await seed(t);
+    const f = fixture('interview-confirmed', s);
+    const gmail = new FakeInboxGmail();
+    gmail.add(message(f));
+    const d = makeDeps(gmail, inboxLlm({ classify: classifyAnswers(f) }));
+    d.recordConfirmedInterview.mockResolvedValueOnce({ interviewId: null });
+    await runMailSync(t.handle, t.userId, d.deps);
+    const flags = (await activity.listByUser(t.handle, t.userId))
+      .filter((e) => e.action === 'digest_flag')
+      .map((e) => e.detail as Record<string, unknown>);
+    expect(flags).toContainEqual(expect.objectContaining({ kind: 'booking_link' }));
+  });
+
+  async function deliverConfirmed(mutate?: (f: MessageFixture) => MessageFixture) {
+    const t = await env.makeTenant();
+    await approve(t);
+    await upsertMailSyncState(t.handle, t.userId, { historyId: 'h-1' });
+    const s = await seed(t);
+    const f = mutate
+      ? mutate(fixture('interview-confirmed', s))
+      : fixture('interview-confirmed', s);
+    const gmail = new FakeInboxGmail();
+    gmail.add(message(f));
+    const d = makeDeps(gmail, inboxLlm({ classify: classifyAnswers(f) }));
+    d.deps.recordConfirmedInterview = (h, input) =>
+      recordConfirmedFromEmail(h, input, { clock: d.deps.clock });
+    const out = await runMailSync(t.handle, t.userId, d.deps);
+    const interviews = await listInterviewsForApplication(t.handle, s.application.id);
+    const log = await activity.listByUser(t.handle, t.userId);
+    const jobs = await listUndispatchedJobs(t.handle);
+    return {
+      t,
+      s,
+      f,
+      out,
+      interviews,
+      log,
+      jobs,
+      thread: await getEmailThreadByGmailId(t.handle, f.threadId),
+    };
+  }
+
+  it('stores the interview confirmed and booked, with reminders and the prep plan in the outbox', async () => {
+    const r = await deliverConfirmed();
+    expect(r.out).toMatchObject({ status: 'ok', linked: 1, failed: 0 });
+    expect(r.interviews).toHaveLength(1);
+    const iv = r.interviews[0]!;
+    expect(iv.threadId).toBe(r.thread!.id);
+    expect(iv.startsAt?.toISOString()).toBe('2026-03-24T18:00:00.000Z');
+    expect(iv.endsAt?.toISOString()).toBe('2026-03-24T18:45:00.000Z');
+    expect(iv.confirmedAt).not.toBeNull();
+    expect(iv.confirmedSlotId).toBeNull();
+    expect(iv.bookedVia).toBe('email');
+    expect(iv.bookedGeneration).toBe(iv.confirmedGeneration);
+    expect(r.jobs.map((j) => j.kind).sort()).toEqual(
+      [PREP_PLAN_JOB, SCHEDULE_REMINDERS_JOB].sort(),
+    );
+    expect(r.jobs.find((j) => j.kind === PREP_PLAN_JOB)?.payload).toMatchObject({
+      interviewId: iv.id,
+      onlyIfMissing: true,
+    });
+    expect(r.log.map((e) => e.action)).toContain('interview_recorded');
+    expect(r.log.some((e) => e.action === 'digest_flag')).toBe(false);
+  });
+
+  it('a time without an end becomes an hour; one in the past stores nothing and is logged', async () => {
+    const hour = await deliverConfirmed((f) => ({
+      ...f,
+      classification: {
+        ...f.classification,
+        confirmed_slot: { ...f.classification.confirmed_slot!, end: null },
+      },
+    }));
+    expect(hour.interviews[0]?.endsAt?.toISOString()).toBe('2026-03-24T19:00:00.000Z');
+
+    const past = await deliverConfirmed((f) => ({
+      ...f,
+      classification: {
+        ...f.classification,
+        confirmed_slot: { ...f.classification.confirmed_slot!, start: '2026-03-01T11:00:00-08:00' },
+      },
+    }));
+    expect(past.interviews).toHaveLength(0);
+    expect(past.log.map((e) => e.action)).toContain('confirmed_time_unusable');
+    // The reschedule link is still worth a digest item when no interview was stored.
+    expect(past.log.some((e) => e.action === 'digest_flag')).toBe(true);
+    expect(past.jobs).toHaveLength(0);
+  });
+
+  it('a second confirmation on the thread reschedules in place; the same time changes nothing', async () => {
+    const r = await deliverConfirmed();
+    const iv = r.interviews[0]!;
+    const base = {
+      userId: r.t.userId,
+      applicationId: r.s.application.id,
+      threadId: r.thread!.id,
+      bookedVia: 'email' as const,
+    };
+    const same = await recordConfirmedInterview(r.t.handle, {
+      ...base,
+      startsAt: iv.startsAt!,
+      endsAt: iv.endsAt!,
+    });
+    expect(same.status).toBe('unchanged');
+    const moved = await recordConfirmedInterview(r.t.handle, {
+      ...base,
+      startsAt: new Date('2026-03-26T18:00:00Z'),
+      endsAt: new Date('2026-03-26T19:00:00Z'),
+    });
+    expect(moved.status).toBe('rescheduled');
+    expect(moved.interview.id).toBe(iv.id);
+    expect(moved.interview.confirmedGeneration).toBe(iv.confirmedGeneration + 1);
+    expect(moved.interview.bookedGeneration).toBe(moved.interview.confirmedGeneration);
+    expect(await listInterviewsForApplication(r.t.handle, r.s.application.id)).toHaveLength(1);
+    const keys = (await listUndispatchedJobs(r.t.handle)).map((j) => j.dedupeKey);
+    expect(keys).toContain(`schedule-reminders:${iv.id}:${moved.interview.confirmedGeneration}`);
   });
 });
 

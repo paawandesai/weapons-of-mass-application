@@ -91,7 +91,9 @@ export async function bookInterview(
   }
   const generation = interview.confirmedGeneration;
   const slot = await getInterviewSlot(handle, interview.confirmedSlotId);
-  const thread = await getEmailThread(handle, interview.threadId);
+  // An interview recorded from a confirmation email or by hand has no slot and may have no
+  // thread; neither reaches here (no confirmed slot), so a missing thread is simply not bookable.
+  const thread = interview.threadId ? await getEmailThread(handle, interview.threadId) : null;
   if (!slot || !thread) return { status: 'not_confirmed' };
   const ctx = await loadApplicationContext(handle, input.userId, interview.applicationId);
   const when = { start: interview.startsAt, end: interview.endsAt };

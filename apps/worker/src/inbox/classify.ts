@@ -3,7 +3,7 @@ import type { StructuredLlm } from '@wma/llm';
 import { loadVersionedPrompt } from '../discovery/prompts';
 import type { InboxMessage } from './gmail-reader';
 
-export const INBOX_CLASSIFY_PROMPT = 'inbox-classify@v1';
+export const INBOX_CLASSIFY_PROMPT = 'inbox-classify@v2';
 const MAX_BODY = 8000;
 
 export interface ClassifyContext {
@@ -46,7 +46,7 @@ export async function classifyMessage(
   msg: InboxMessage,
   ctx: ClassifyContext,
 ): Promise<Classified> {
-  const prompt = loadVersionedPrompt('inbox-classify', 'v1');
+  const prompt = loadVersionedPrompt('inbox-classify', 'v2');
   const user = [
     `Received: ${msg.receivedAt.toISOString()}`,
     `Company: ${ctx.companyName}`,
@@ -62,7 +62,7 @@ export async function classifyMessage(
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await llm.generateStructured({
-        prompt: 'inbox-classify/v1',
+        prompt: 'inbox-classify/v2',
         system: prompt.body,
         user,
         schema: InboxClassification,
@@ -78,6 +78,7 @@ export async function classifyMessage(
         ...parsed.data,
         booking_link: cleanLink(parsed.data.booking_link),
         proposed_slots: parsed.data.proposed_slots.map(cleanSlot),
+        confirmed_slot: parsed.data.confirmed_slot ? cleanSlot(parsed.data.confirmed_slot) : null,
         promptVersion: prompt.id,
       };
     } catch (e) {

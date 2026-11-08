@@ -9,6 +9,7 @@
     "classification": "interview",
     "compensation_flag": false,
     "booking_link": "https://cal.{{domain}}/dana/intro-call",
-    "proposed_slots": []
+    "proposed_slots": [],
+    "confirmed_slot": null
   }
 }

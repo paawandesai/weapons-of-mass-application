@@ -22,7 +22,13 @@
         "tz_hint": "America/Los_Angeles",
         "ambiguous": false
       },
-      { "start": "2026-03-26T09:00:00-07:00", "end": null, "tz_hint": null, "ambiguous": true }
-    ]
+      {
+        "start": "2026-03-26T09:00:00-07:00",
+        "end": null,
+        "tz_hint": null,
+        "ambiguous": true
+      }
+    ],
+    "confirmed_slot": null
   }
 }

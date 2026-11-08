@@ -52,7 +52,7 @@ describe('rule 2: linking', () => {
       gmailThreadId: f.threadId,
       userId: t.userId,
     });
-    expect(llm.calls.map((c) => c.prompt)).toEqual(['inbox-classify/v1']);
+    expect(llm.calls.map((c) => c.prompt)).toEqual(['inbox-classify/v2']);
     const linked = (await activity.listByUser(t.handle, t.userId)).find(
       (e) => e.action === 'thread_linked',
     );
@@ -126,7 +126,7 @@ describe('rule 2: linking', () => {
     const llm = inboxLlm({ link: () => s.application.id, classify: classifyAnswers(f) });
     const { deps } = makeDeps(gmail, llm);
     await runMailSync(t.handle, t.userId, deps);
-    expect(llm.calls.map((c) => c.prompt)).toEqual(['inbox-link/v1', 'inbox-classify/v1']);
+    expect(llm.calls.map((c) => c.prompt)).toEqual(['inbox-link/v1', 'inbox-classify/v2']);
     expect(await getEmailThreadByGmailId(t.handle, f.threadId)).toMatchObject({
       applicationId: s.application.id,
     });

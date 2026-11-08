@@ -185,7 +185,7 @@ describe('rule 1: mailbox sync', () => {
     const { deps } = makeDeps(gmail, llm);
     const real = llm.generateStructured.bind(llm);
     llm.generateStructured = async (req) =>
-      req.user.includes(bad.subject) && req.prompt === 'inbox-classify/v1'
+      req.user.includes(bad.subject) && req.prompt === 'inbox-classify/v2'
         ? {
             output: { classification: 'banana' },
             usage: {

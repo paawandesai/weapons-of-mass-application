@@ -21,5 +21,6 @@
       "tz_hint": "America/Los_Angeles",
       "ambiguous": false
     }
-  ]
+  ],
+  "confirmed_slot": null
 }

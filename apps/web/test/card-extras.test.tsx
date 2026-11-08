@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -21,6 +21,7 @@ const interview = (over: Partial<InterviewView> = {}): InterviewView => ({
   starts_at: '2030-03-12T22:00:00.000Z',
   ends_at: '2030-03-12T23:00:00.000Z',
   confirmed: true,
+  booked_via: null,
   prep_plan_status: null,
   prep_plan: null,
   feedback: null,
@@ -208,6 +209,51 @@ describe('card extras', () => {
     renderCard({ id: 'app-1', status: 'applied' });
     expect(await screen.findByText(/No interview is booked yet/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Offer' })).toBeNull();
+    expect(screen.getByRole('form', { name: 'Record an interview' })).toBeInTheDocument();
+  });
+
+  it('record form: posts the time and length, then shows the interview and its prep panel', async () => {
+    let recorded: { starts_at: string; ends_at: string | null } | null = null;
+    server.use(
+      http.get('*/api/interviews/for-application/app-1', () =>
+        HttpResponse.json({
+          interviews: recorded ? [interview({ booked_via: 'manual' })] : [],
+          negotiation: null,
+        }),
+      ),
+      http.post('*/api/interviews/for-application/app-1/record', async ({ request }) => {
+        recorded = (await request.json()) as { starts_at: string; ends_at: string | null };
+        return HttpResponse.json(
+          { interview: interview({ booked_via: 'manual' }), enqueued: true },
+          { status: 201 },
+        );
+      }),
+    );
+    renderCard({ id: 'app-1', status: 'applied' });
+    const form = await screen.findByRole('form', { name: 'Record an interview' });
+    fireEvent.change(within(form).getByLabelText('Date and time'), {
+      target: { value: '2030-03-12T15:00' },
+    });
+    await userEvent.selectOptions(within(form).getByLabelText('Length'), '45');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save interview' }));
+    await waitFor(() => expect(recorded).not.toBeNull());
+    const start = new Date('2030-03-12T15:00');
+    expect(recorded!.starts_at).toBe(start.toISOString());
+    expect(recorded!.ends_at).toBe(new Date(start.getTime() + 45 * 60_000).toISOString());
+    expect(await screen.findByRole('region', { name: 'Prep plan' })).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Record an interview' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Record another interview' })).toBeInTheDocument();
+  });
+
+  it('record form: a closed card offers no form', async () => {
+    server.use(
+      http.get('*/api/interviews/for-application/app-1', () =>
+        HttpResponse.json({ interviews: [], negotiation: null }),
+      ),
+    );
+    renderCard({ id: 'app-1', status: 'closed' });
+    expect(await screen.findByText(/No interview is booked yet/)).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Record an interview' })).toBeNull();
   });
 });
 

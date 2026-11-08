@@ -99,6 +99,7 @@ describe('inbox task 7.1: applied to booked, on the demo mailbox', () => {
                 compensation_flag: false,
                 booking_link: null,
                 proposed_slots: [],
+                confirmed_slot: null,
               },
     ]);
     const inbox = { ...createInboxDeps(boss), llm };

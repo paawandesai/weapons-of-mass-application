@@ -622,7 +622,8 @@ export const interviews = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').notNull(),
     applicationId: uuid('application_id').notNull(),
-    threadId: uuid('thread_id').notNull(),
+    /** The recruiter thread the interview came from; null for one the user recorded by hand. */
+    threadId: uuid('thread_id'),
     /** The slot the user confirmed (no foreign key: slots reference their interview). */
     confirmedSlotId: uuid('confirmed_slot_id'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
@@ -640,6 +641,12 @@ export const interviews = pgTable(
     calendarEventClientId: text('calendar_event_client_id'),
     /** The confirmed generation whose reply and Calendar write both completed; null until then. */
     bookedGeneration: integer('booked_generation'),
+    /**
+     * How the time was fixed outside the app's own slot flow: `email` when a confirmation email
+     * stated it, `manual` when the user typed it in. Null for an interview booked through a slot
+     * link (reply and Calendar event by the booking job).
+     */
+    bookedVia: text('booked_via'),
     createdAt: createdAt(),
   },
   (t) => [

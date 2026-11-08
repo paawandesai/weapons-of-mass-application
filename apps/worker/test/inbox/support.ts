@@ -262,6 +262,7 @@ export function inboxLlm(answers: Answers) {
           compensation_flag: false,
           booking_link: null,
           proposed_slots: [],
+          confirmed_slot: null,
         }
       );
     },
@@ -282,6 +283,9 @@ export function makeDeps(gmail: FakeInboxGmail, llm: FakeLlm, sender = new InMem
     } | null,
   }));
   const sendOfferEmail = vi.fn(async (..._args: unknown[]) => undefined);
+  const recordConfirmedInterview = vi.fn(async (..._args: unknown[]) => ({
+    interviewId: null as string | null,
+  }));
   const deps: InboxDeps = {
     gmail: () => gmail,
     llm,
@@ -292,11 +296,12 @@ export function makeDeps(gmail: FakeInboxGmail, llm: FakeLlm, sender = new InMem
       onBlocked: createBlockedLogger(handle, userId),
     }),
     recordOffer: offerSlots,
+    recordConfirmedInterview,
     sendOfferEmail,
     resendPendingConfirmations: vi.fn(async () => 0),
     requeueUnbookedInterviews: vi.fn(async () => 0),
     flagDigest,
     clock: { now: () => NOW },
   };
-  return { deps, offerSlots, sendOfferEmail, sender };
+  return { deps, offerSlots, recordConfirmedInterview, sendOfferEmail, sender };
 }

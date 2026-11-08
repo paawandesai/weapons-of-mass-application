@@ -220,6 +220,7 @@ export async function processMessage(
     });
 
     let offerToSend: OfferToSend | null = null;
+    let confirmedInterviewId: string | null = null;
     let movedToOffer = false;
     await handle.transaction(async (h) => {
       const app = await getApplication(h, link.applicationId);
@@ -312,7 +313,21 @@ export async function processMessage(
       if (result.compensation_flag) {
         await deps.flagDigest(h, { ...flagBase, kind: 'compensation', detail: ref });
       }
-      if (result.booking_link) {
+      // A time the email states as booked (the candidate picked it on the employer's page, say)
+      // is recorded as a confirmed interview; nothing is offered and no reply is owed, and the
+      // reminders and prep plan ride the outbox. It takes precedence over a reschedule link or
+      // stray options in the same message.
+      if (result.confirmed_slot && status !== 'closed') {
+        const recorded = await deps.recordConfirmedInterview(h, {
+          userId,
+          applicationId: app.id,
+          threadId: thread.id,
+          messageId: id,
+          slot: result.confirmed_slot,
+        });
+        confirmedInterviewId = recorded.interviewId;
+      }
+      if (result.booking_link && !confirmedInterviewId) {
         await deps.flagDigest(h, {
           ...flagBase,
           kind: 'booking_link',
@@ -321,7 +336,12 @@ export async function processMessage(
       }
 
       const slots: ProposedSlot[] = result.proposed_slots;
-      if (slots.length > 0 && !result.booking_link && status !== 'closed') {
+      if (
+        slots.length > 0 &&
+        !result.booking_link &&
+        !confirmedInterviewId &&
+        status !== 'closed'
+      ) {
         const input = {
           userId,
           applicationId: app.id,

@@ -353,6 +353,8 @@ export async function resendPendingConfirmations(
   const now = deps.clock.now();
   let sent = 0;
   for (const interview of await listInterviewsAwaitingConfirmationEmail(handle, userId)) {
+    // Only an interview that came from a recruiter thread ever owes a confirmation request.
+    if (!interview.threadId) continue;
     try {
       const open = (await listSlotsForInterview(handle, interview.id)).filter(
         (s) => !s.invalidatedAt && !s.confirmedAt && s.expiresAt > now && s.startsAt > now,
@@ -364,13 +366,12 @@ export async function resendPendingConfirmations(
         end: s.endsAt,
         tzHint: s.tzHint,
       }));
-      const { free, conflicts } = await filterConflicts(handle, ctx, slots, deps, {
-        threadId: interview.threadId,
-      });
+      const threadId = interview.threadId;
+      const { free, conflicts } = await filterConflicts(handle, ctx, slots, deps, { threadId });
       if (free.length === 0) {
         await invalidateOpenSlots(handle, interview.id);
         await flagNoFreeSlot(handle, ctx, {
-          thread_id: interview.threadId,
+          thread_id: threadId,
           reason: 'calendar_conflict',
           conflicts: conflicts.map(iso),
         });

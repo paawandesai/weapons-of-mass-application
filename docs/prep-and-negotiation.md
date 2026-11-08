@@ -20,7 +20,7 @@ Design rules 3, 7, 8, 9 and 10 of `docs/design/wave4-dashboard-demo.md` are impl
 
 ## Prep plan (rule 9)
 
-- Job `prep-plan` (`apps/worker/src/jobs/prep-plan.ts`, logic in `apps/worker/src/prep/`). Enqueued by the booking step (`bookInterview` calls `deps.enqueuePrepPlan` after the card moves to Interviewing; the hook is wired in `registerBookInterview`) and on demand by `POST /api/interviews/:id/prep-plan`.
+- Job `prep-plan` (`apps/worker/src/jobs/prep-plan.ts`, logic in `apps/worker/src/prep/`). Enqueued by the booking step (`bookInterview` records it in the outbox after the card moves to Interviewing), by `recordConfirmedInterview` for an interview whose time arrived already fixed (a confirmation email with a `confirmed_slot`, or the user's own entry through `POST /api/interviews/for-application/:id/record`), and on demand by `POST /api/interviews/:id/prep-plan`. An interview that exists only as a thread with a booking link, or as a card moved to Interviewing by hand, has no plan until one of those happens; the card offers a "Record an interview" form for that case.
 - Booking enqueues with `onlyIfMissing`, so a repeated booking never replaces an existing plan. On demand always regenerates.
 - On demand is idempotent while pending: the interview row is locked, the status set to `pending`, and a second request enqueues nothing. The queue also holds a singleton key per interview.
 - Research is the posting and the company's board page text (`@wma/discovery` http client), nothing else. An unreadable board page is not an error.
