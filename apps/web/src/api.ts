@@ -91,6 +91,7 @@ export interface BoardCardData {
   currency: string | null;
   applied_at: string | null;
   last_activity_at: string;
+  attention: { kind: 'captcha' | 'pick_time' | 'apply_by_hand'; label: string } | null;
 }
 
 export interface BoardData {

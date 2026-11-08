@@ -2,6 +2,7 @@ import {
   listApplications,
   listCompaniesByIds,
   listJobsByIds,
+  listWaitingOnUser,
   searchApplicationsByCompany,
   type ApplicationRow,
   type ApplicationStatus,
@@ -20,6 +21,15 @@ export function columnOf(status: ApplicationStatus): BoardColumn {
 export const SEARCH_MIN_CHARS = 2;
 export const SEARCH_MAX_RESULTS = 20;
 
+/** What a card is waiting for the user to do. Order here is the priority when several apply. */
+export type AttentionKind = 'captcha' | 'pick_time' | 'apply_by_hand';
+
+export const ATTENTION_LABELS: Record<AttentionKind, string> = {
+  captcha: 'Solve a CAPTCHA',
+  pick_time: 'Pick an interview time',
+  apply_by_hand: 'Apply by hand',
+};
+
 export interface BoardCard {
   id: string;
   status: ApplicationStatus;
@@ -32,6 +42,8 @@ export interface BoardCard {
   currency: string | null;
   applied_at: string | null;
   last_activity_at: string;
+  /** Set when the agent is blocked on the user; null otherwise. */
+  attention: { kind: AttentionKind; label: string } | null;
 }
 
 export type BoardResponse = { columns: Record<BoardColumn, BoardCard[]> };
@@ -58,7 +70,26 @@ async function loadJoined(handle: TenantHandle, userId: string): Promise<Joined[
   });
 }
 
-function toCard({ row, job, company }: Joined): BoardCard {
+/** The unsupported-ATS pending reason is never retried, so only the user can finish it. */
+const UNSUPPORTED_ATS = 'unsupported-ats';
+
+function attentionOf(
+  { row }: Joined,
+  waiting: Awaited<ReturnType<typeof listWaitingOnUser>>,
+): BoardCard['attention'] {
+  if (row.status === 'closed') return null;
+  const kind: AttentionKind | null = waiting.captcha.has(row.id)
+    ? 'captcha'
+    : waiting.pickTime.has(row.id)
+      ? 'pick_time'
+      : row.status === 'pending' && row.pendingReason === UNSUPPORTED_ATS
+        ? 'apply_by_hand'
+        : null;
+  return kind ? { kind, label: ATTENTION_LABELS[kind] } : null;
+}
+
+function toCard(j: Joined, waiting: Awaited<ReturnType<typeof listWaitingOnUser>>): BoardCard {
+  const { row, job, company } = j;
   return {
     id: row.id,
     status: row.status,
@@ -71,6 +102,7 @@ function toCard({ row, job, company }: Joined): BoardCard {
     currency: job?.currency ?? null,
     applied_at: row.appliedAt ? row.appliedAt.toISOString() : null,
     last_activity_at: row.lastActivityAt.toISOString(),
+    attention: attentionOf(j, waiting),
   };
 }
 
@@ -81,13 +113,16 @@ export async function buildBoard(handle: TenantHandle, userId: string): Promise<
     offer: [],
     closed: [],
   };
-  const joined = await loadJoined(handle, userId);
+  const [joined, waiting] = await Promise.all([
+    loadJoined(handle, userId),
+    listWaitingOnUser(handle, userId),
+  ]);
   joined.sort(
     (a, b) =>
       b.row.lastActivityAt.getTime() - a.row.lastActivityAt.getTime() ||
       a.row.id.localeCompare(b.row.id),
   );
-  for (const j of joined) columns[columnOf(j.row.status)].push(toCard(j));
+  for (const j of joined) columns[columnOf(j.row.status)].push(toCard(j, waiting));
   return { columns };
 }
 

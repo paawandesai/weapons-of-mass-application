@@ -85,6 +85,21 @@ export function UsagePage() {
         <Loading />
       ) : (
         <>
+          {data.backend !== 'anthropic' ? (
+            <div className="card usage-pace" aria-label="Subscription pace">
+              <strong>Running on your {data.backend} subscription</strong>
+              <span>
+                {data.pace.last_5h.calls} {data.pace.last_5h.calls === 1 ? 'call' : 'calls'} in the
+                last 5 hours · {data.pace.last_24h.calls} in the last 24 hours (
+                {tokens(data.pace.last_24h)})
+              </span>
+              <span className="muted">
+                Plans cap usage per 5-hour window and per week. If runs start failing, lower
+                JUDGE_CAP_PER_RUN. Dollar figures below are what the same calls would cost on the
+                API, not what you pay.
+              </span>
+            </div>
+          ) : null}
           <div className="card usage-total" aria-label="Total">
             <span className="usage-amount">{formatUsd(data.total.cost_usd)}</span>
             <span className="muted">

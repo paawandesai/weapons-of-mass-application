@@ -49,11 +49,13 @@ usageRoutes.get('/', async (c) => {
   const since = days === null ? undefined : new Date(now().getTime() - days * 86_400_000);
   const window = { since };
 
-  const [total, byPurpose, byApp, recent] = await Promise.all([
+  const [total, byPurpose, byApp, recent, last5h, last24h] = await Promise.all([
     totalLlmUsage(handle, userId, window),
     llmUsageByPurpose(handle, userId, window),
     llmUsageByApplication(handle, userId, window),
     listRecentLlmUsage(handle, userId, 50),
+    totalLlmUsage(handle, userId, { since: new Date(now().getTime() - 5 * 3_600_000) }),
+    totalLlmUsage(handle, userId, { since: new Date(now().getTime() - 24 * 3_600_000) }),
   ]);
 
   // Label each application with its company and title. Rows whose application was since deleted
@@ -67,6 +69,8 @@ usageRoutes.get('/', async (c) => {
   const companyById = new Map(companies.map((co) => [co.id, co]));
 
   const body: LlmUsageResponse = {
+    backend: (process.env.LLM_BACKEND ?? 'anthropic').trim().toLowerCase() || 'anthropic',
+    pace: { last_5h: last5h, last_24h: last24h },
     since: since ? since.toISOString() : null,
     total,
     by_purpose: byPurpose,

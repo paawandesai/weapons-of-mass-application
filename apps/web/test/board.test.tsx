@@ -21,6 +21,7 @@ function card(over: Partial<BoardCardData> & { id: string }): BoardCardData {
     currency: 'USD',
     applied_at: '2026-11-02T09:00:00.000Z',
     last_activity_at: NOW,
+    attention: null,
     ...over,
   };
 }
@@ -349,5 +350,47 @@ describe('panic search', () => {
     await new Promise((r) => setTimeout(r, 400));
     expect(called).toBe(0);
     expect(screen.queryByText(/nothing matched/i)).toBeNull();
+  });
+});
+
+describe('Waiting on you', () => {
+  it('flags blocked cards and filters the board to them', async () => {
+    server.use(
+      http.get('/api/board', () =>
+        HttpResponse.json(
+          boardOf({
+            applied: [
+              card({
+                id: 'w1',
+                company: 'Blocked Co',
+                attention: { kind: 'captcha', label: 'Solve a CAPTCHA' },
+              }),
+              card({ id: 'w2', company: 'Fine Co' }),
+            ],
+            interviewing: [
+              card({
+                id: 'w3',
+                company: 'Slots Co',
+                status: 'interviewing',
+                attention: { kind: 'pick_time', label: 'Pick an interview time' },
+              }),
+            ],
+          }),
+        ),
+      ),
+    );
+    render(
+      <MemoryRouter initialEntries={['/board']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/Waiting on you: Solve a CAPTCHA/)).toBeTruthy();
+    expect(screen.getByText(/Waiting on you: Pick an interview time/)).toBeTruthy();
+    expect(screen.getByText('Fine Co')).toBeTruthy();
+
+    await userEvent.click(screen.getByRole('button', { name: /^Waiting on you\s*2$/ }));
+    expect(screen.queryByText('Fine Co')).toBeNull();
+    expect(screen.getByText('Blocked Co')).toBeTruthy();
+    expect(screen.getByText('Slots Co')).toBeTruthy();
   });
 });

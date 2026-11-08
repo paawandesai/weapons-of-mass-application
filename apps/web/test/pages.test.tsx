@@ -684,6 +684,31 @@ describe('profile review', () => {
 });
 
 describe('usage', () => {
+  it('shows subscription pace when a CLI backend serves the calls', async () => {
+    const t = {
+      calls: 4,
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      cost_usd: 0.1,
+      unpriced_calls: 0,
+    };
+    state.usage = {
+      total: t,
+      by_purpose: [],
+      by_application: [],
+      recent: [],
+      backend: 'claude-code',
+      pace: { last_5h: t, last_24h: { ...t, calls: 9 } },
+    };
+    renderAt('/usage');
+    const card = await screen.findByLabelText('Subscription pace');
+    expect(card.textContent).toMatch(/claude-code subscription/);
+    expect(card.textContent).toMatch(/4 calls in the\s+last 5 hours/);
+    expect(card.textContent).toMatch(/9 in the last 24 hours/);
+  });
+
   it('shows the spend per activity and per application, and an empty state', async () => {
     const user = userEvent.setup();
     const totals = {
@@ -696,6 +721,8 @@ describe('usage', () => {
       unpriced_calls: 0,
     };
     state.usage = {
+      backend: 'anthropic',
+      pace: { last_5h: totals, last_24h: totals },
       total: totals,
       by_purpose: [
         { ...totals, calls: 2, cost_usd: 0.1, purpose: 'application' },

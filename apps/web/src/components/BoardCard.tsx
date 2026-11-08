@@ -44,6 +44,16 @@ export function BoardCard({
         </button>
         {card.badge === 'pending' ? <span className="badge partial">Pending</span> : null}
       </div>
+      {card.attention ? (
+        <button
+          type="button"
+          className="badge waiting"
+          data-attention={card.attention.kind}
+          onClick={() => onOpen(card.id)}
+        >
+          Waiting on you: {card.attention.label}
+        </button>
+      ) : null}
       <div>{card.title ?? 'Untitled role'}</div>
       <dl className="card-facts">
         <dt>Location</dt>
