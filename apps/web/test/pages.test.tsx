@@ -171,6 +171,36 @@ describe('connections', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Saving…' })).toBeNull());
   });
 
+  it('keeps Cancel disabled while a save of a connected source is in flight', async () => {
+    state.connections = state.connections.map((c) =>
+      c.kind === 'github' ? conn('github', 'connected', { username: 'ada' }) : c,
+    );
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.post('*/api/sources/github', async () => {
+        await gate;
+        return HttpResponse.json(
+          { connection: conn('github', 'connected', { username: 'ada-l' }) },
+          { status: 201 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderAt('/connections');
+    const github = (await screen.findByLabelText('GitHub', { selector: 'div' })) as HTMLElement;
+    await user.click(within(github).getByRole('button', { name: 'Change' }));
+    await user.type(within(github).getByLabelText('GitHub username'), 'ada-l');
+    await user.click(within(github).getByRole('button', { name: 'Save GitHub' }));
+    expect(await within(github).findByRole('button', { name: 'Saving…' })).toBeDisabled();
+    expect(within(github).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    release();
+    await waitFor(() =>
+      expect(within(github).queryByRole('button', { name: 'Cancel' })).toBeNull(),
+    );
+    expect(within(github).getByRole('button', { name: 'Change' })).toBeEnabled();
+  });
+
   it('keeps the disconnect confirmation visible and disabled until it finishes', async () => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>((r) => (release = r));

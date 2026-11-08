@@ -45,6 +45,8 @@ export function ConnectionsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [editing, setEditing] = useState<ReadonlySet<ConnectionKind>>(new Set());
+  /** Sources with a save in flight; their editor cannot be closed or reopened until it settles. */
+  const [pending, setPending] = useState<ReadonlySet<ConnectionKind>>(new Set());
 
   const reload = useCallback(async () => {
     try {
@@ -94,19 +96,32 @@ export function ConnectionsPage() {
     }
   }
 
-  /** A save that hides the editor for `kind` once it has gone through. */
-  const save = (kind: ConnectionKind, okText: string, fn: () => Promise<unknown>) =>
-    run(okText, fn).then((ok) => {
-      if (ok) setEdit(kind, false);
+  const setPendingFor = (kind: ConnectionKind, on: boolean) =>
+    setPending((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(kind);
+      else next.delete(kind);
+      return next;
     });
 
+  /** A save that hides the editor for `kind` once it has gone through; one at a time per source. */
+  const save = async (kind: ConnectionKind, okText: string, fn: () => Promise<unknown>) => {
+    if (pending.has(kind)) return;
+    setPendingFor(kind, true);
+    try {
+      if (await run(okText, fn)) setEdit(kind, false);
+    } finally {
+      setPendingFor(kind, false);
+    }
+  };
+
   const changeButton = (kind: ConnectionKind, label: string) => (
-    <button type="button" onClick={() => setEdit(kind, true)}>
+    <button type="button" disabled={pending.has(kind)} onClick={() => setEdit(kind, true)}>
       {label}
     </button>
   );
   const cancelButton = (kind: ConnectionKind) => (
-    <button type="button" onClick={() => setEdit(kind, false)}>
+    <button type="button" disabled={pending.has(kind)} onClick={() => setEdit(kind, false)}>
       Cancel
     </button>
   );
