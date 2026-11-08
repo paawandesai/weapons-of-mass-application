@@ -374,10 +374,14 @@ describe('profile review', () => {
         <ProfileReviewPage pollMs={200} />
       </MemoryRouter>,
     );
-    const banner = await screen.findByRole('status');
-    expect(banner).toHaveTextContent('Building your profile from your connected sources…');
-    expect(within(banner).getByRole('progressbar')).toHaveAttribute('value', '1');
-    expect(within(banner).getByText('Extracting your profile')).toBeInTheDocument();
+    const banner = (
+      await screen.findByText('Building your profile from your connected sources…', {
+        exact: false,
+      })
+    ).closest('[role="status"]')!;
+    expect(banner).not.toBeNull();
+    expect(within(banner as HTMLElement).getByRole('progressbar')).toHaveAttribute('value', '1');
+    expect(within(banner as HTMLElement).getByText('Extracting your profile')).toBeInTheDocument();
   });
 
   it('Go to field focuses a control inside the flagged entry', async () => {
@@ -605,9 +609,11 @@ describe('profile review', () => {
         <ProfileReviewPage pollMs={10} />
       </MemoryRouter>,
     );
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Building your profile from your connected sources…',
-    );
+    expect(
+      await screen.findByText('Building your profile from your connected sources…', {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText('Full name')).toBeNull();
     expect(await screen.findByLabelText('Full name')).toBeInTheDocument();
     expect(screen.queryByText('Building your profile from your connected sources…')).toBeNull();

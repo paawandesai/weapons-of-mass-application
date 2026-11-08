@@ -8,6 +8,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError, api, errorMessage, formatTime } from '../api';
+import { Loading } from '../components/Loading';
 import { getAt, sameValue, setAt } from '../profilePaths';
 
 type Kind = 'text' | 'area' | 'month' | 'lines' | 'tri' | 'date' | 'list';
@@ -404,7 +405,7 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
         </div>
       </section>
     );
-  if (state === 'loading') return <p className="muted">Loading…</p>;
+  if (state === 'loading') return <Loading />;
   if (state === 'error')
     return (
       <p role="alert" className="banner error">
