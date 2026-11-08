@@ -255,10 +255,12 @@ const PROVIDERS: Record<
     command: 'grok',
     apiKeyVars: ['XAI_API_KEY', 'GROK_CODE_XAI_API_KEY'],
     prepare(c) {
-      // Grok Build (`grok`) documents `-p` for one prompt (as an argument, not stdin), `--output-format
-      // json` for one JSON object at the end, `-m`, `--cwd` and `--no-auto-update`. It documents no
-      // flag for a system prompt, a JSON schema, tool-free runs or images, so the schema and system
-      // prompt go in the text and tools are never auto-approved (no `--always-approve`).
+      // Grok Build (`grok`) takes `-p` for one prompt (as an argument, not stdin), `--output-format
+      // json` for one JSON object at the end, `-m`, `--cwd` and `--no-auto-update`. Newer versions
+      // (1.0.77) also have `--json-schema`, `--system-prompt-override`, `--tools` and `--max-turns`,
+      // but we still put the schema and system prompt in the text and never auto-approve tools (no
+      // `--always-approve`). Reasoning effort is pinned low: at default effort Grok spent ~5.6
+      // minutes and ~21,600 reasoning tokens on the profile prompt, past the 5-minute timeout.
       if (c.imageFiles.length) {
         throw new Error('llm: the grok backend cannot take images (no documented flag for them)');
       }
@@ -268,7 +270,14 @@ const PROVIDERS: Record<
           `llm: prompt is ${prompt.length} characters; grok takes it as an argument (limit ${MAX_ARG_PROMPT_CHARS})`,
         );
       }
-      const args = ['--no-auto-update', '--no-alt-screen', '--output-format', 'json'];
+      const args = [
+        '--no-auto-update',
+        '--no-alt-screen',
+        '--output-format',
+        'json',
+        '--reasoning-effort',
+        'low',
+      ];
       if (c.model) args.push('-m', c.model);
       args.push('-p', prompt);
       return {

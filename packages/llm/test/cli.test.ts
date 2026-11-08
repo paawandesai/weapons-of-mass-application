@@ -143,6 +143,7 @@ describe('grok backend (Grok Build CLI)', () => {
     expect(call.command).toBe('grok');
     expect(call.args).toContain('--output-format');
     expect(call.args[call.args.indexOf('-m') + 1]).toBe('grok-4');
+    expect(call.args[call.args.indexOf('--reasoning-effort') + 1]).toBe('low');
     expect(call.args[call.args.indexOf('-p') + 1]).toMatch(/SYS[\s\S]*USER[\s\S]*JSON Schema/);
     expect(call.args).not.toContain('--always-approve');
     expect(call.env.XAI_API_KEY).toBeUndefined();
