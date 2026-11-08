@@ -96,6 +96,26 @@ export async function finishProfileBuild(
   return rows[0] ?? null;
 }
 
+/** Records the phase of a build; applies only while the row is still running. */
+export async function setProfileBuildStep(
+  handle: TenantHandle,
+  id: string,
+  step: string,
+): Promise<void> {
+  await handle.run((tx) =>
+    tx
+      .update(profileBuilds)
+      .set({ step })
+      .where(
+        and(
+          eq(profileBuilds.tenantId, handle.tenantId),
+          eq(profileBuilds.id, id),
+          eq(profileBuilds.state, 'running'),
+        ),
+      ),
+  );
+}
+
 /** Locks the build row if it is still running; false when it finished, failed or does not exist. */
 export async function lockRunningBuild(handle: TenantHandle, id: string): Promise<boolean> {
   const rows = await handle.run((tx) =>

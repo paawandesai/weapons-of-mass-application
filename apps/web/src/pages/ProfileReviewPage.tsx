@@ -1,5 +1,6 @@
 import {
   profileDocumentSchema,
+  type BuildStatus,
   unresolvedBlockingFlags,
   type ProfileDocument,
   type ProfileFlag,
@@ -86,6 +87,37 @@ function cleanDocument(doc: ProfileDocument): ProfileDocument {
     d.standard_answers.previous_interviews = cleanLines(d.standard_answers.previous_interviews);
   }
   return d;
+}
+
+const STEP_LABELS = {
+  gathering: 'Reading your sources',
+  extracting: 'Extracting your profile',
+  checking: 'Checking it against your sources',
+} as const;
+const STEP_VALUES = { gathering: 0, extracting: 1, checking: 2 } as const;
+
+/** Determinate progress for a running build; a missing step reads as the first phase. */
+function BuildProgress({ status }: { status: BuildStatus | null }) {
+  const step = status?.step ?? 'gathering';
+  return (
+    <div className="build-progress">
+      <progress max={3} value={STEP_VALUES[step]} aria-label="Profile build progress" />
+      <span className="muted"> {STEP_LABELS[step]}</span>
+    </div>
+  );
+}
+
+/** Moves to the field a flag points at: the exact id, else the first field inside that entry. */
+function goToField(path: string) {
+  const target =
+    document.getElementById(`f-${path}`) ??
+    document.querySelector(`[id^="f-${CSS.escape(path)}."]`);
+  if (!target) return;
+  target.scrollIntoView?.({ block: 'center' });
+  const control = target.matches('input, select, textarea')
+    ? target
+    : target.querySelector<HTMLElement>('input, select, textarea');
+  (control as HTMLElement | null)?.focus();
 }
 
 interface FieldProps {
@@ -202,7 +234,7 @@ function EntryList(props: {
   return (
     <>
       {items.map((item, i) => (
-        <fieldset className="card" key={i}>
+        <fieldset className="card" key={i} id={`f-${props.listKey}.${i}`}>
           <legend>{(item[props.titleKey] as string) || `Entry ${i + 1}`}</legend>
           {props.specs.map((s) => (
             <Field
@@ -232,11 +264,17 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
   const [approvedVersion, setApprovedVersion] = useState<number | null>(null);
   const [approvedAt, setApprovedAt] = useState<string | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading');
-  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    kind: 'ok' | 'error';
+    text: string;
+    runsLink?: boolean;
+  } | null>(null);
   const [busy, setBusy] = useState<null | 'save' | 'approve'>(null);
   const [building, setBuilding] = useState(false);
   /** A build that was already running when the page opened (the first one, started by the survey). */
   const [initialBuild, setInitialBuild] = useState(false);
+  /** The latest status seen while a build runs, for the progress bar. */
+  const [buildStatus, setBuildStatus] = useState<BuildStatus | null>(null);
   const [builtFrom, setBuiltFrom] = useState<string[]>([]);
   const alive = useRef(true);
 
@@ -269,6 +307,7 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
         await new Promise((r) => setTimeout(r, pollMs));
         if (!alive.current) return false;
         const s = await api.buildStatus();
+        if (alive.current) setBuildStatus(s);
         if (s.state === 'done') {
           await load();
           if (!alive.current) return false;
@@ -295,7 +334,9 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
     void (async () => {
       let running = false;
       try {
-        running = (await api.buildStatus()).state === 'running';
+        const first = await api.buildStatus();
+        running = first.state === 'running';
+        if (running && alive.current) setBuildStatus(first);
       } catch {
         // Status is only a hint here; the profile load below reports real failures.
       }
@@ -321,6 +362,7 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
 
   const rebuild = useCallback(async () => {
     setMessage(null);
+    setBuildStatus(null);
     setBuilding(true);
     try {
       await api.startBuild();
@@ -356,9 +398,10 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
     return (
       <section>
         <h1>Profile review</h1>
-        <p role="status" className="banner">
-          Building your profile from your connected sources…
-        </p>
+        <div role="status" className="banner">
+          <p>Building your profile from your connected sources…</p>
+          <BuildProgress status={buildStatus} />
+        </div>
       </section>
     );
   if (state === 'loading') return <p className="muted">Loading…</p>;
@@ -413,6 +456,11 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
       )
     );
   };
+  const entryTitle = (doc: ProfileDocument, path: string): string | null => {
+    const e = getAt(doc, path) as Record<string, unknown> | undefined;
+    const t = e?.employer ?? e?.name ?? e?.institution;
+    return typeof t === 'string' && t !== '' ? t : null;
+  };
   const resolve = (id: string) =>
     setDraft((d) => (d ? { ...d, flags: d.flags.filter((f) => f.id !== id) } : d));
 
@@ -463,7 +511,11 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
       const r = await api.approve(reviewed);
       setApprovedVersion(r.approved_version);
       setApprovedAt(r.approved_at);
-      setMessage({ kind: 'ok', text: 'Profile approved.' });
+      setMessage(
+        r.run_started
+          ? { kind: 'ok', text: 'Profile approved. Your first run has started.', runsLink: true }
+          : { kind: 'ok', text: 'Profile approved.' },
+      );
     } catch (e) {
       if (e instanceof ApiError && e.code === 'unresolved_flags') {
         setMessage({ kind: 'error', text: 'Resolve the flagged items before approving.' });
@@ -496,8 +548,16 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
           className={`banner ${message.kind}`}
         >
           {message.text}
+          {message.runsLink && (
+            <>
+              {' '}
+              <Link to="/runs">See your runs</Link>
+            </>
+          )}
         </p>
       )}
+
+      {building && <BuildProgress status={buildStatus} />}
 
       {isApproved ? (
         <p className="banner ok" aria-label="Approval status">
@@ -523,14 +583,18 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
                   {f.message}
                   {f.sources.length > 0 && <span className="muted"> · {f.sources.join(', ')}</span>}
                 </span>
-                {f.path && (
+                {flagPaths(f).map((p, n, all) => (
                   <a
-                    href={`#f-${f.path}`}
-                    onClick={() => document.getElementById(`f-${f.path}`)?.focus()}
+                    key={p}
+                    href={`#f-${p}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      goToField(p);
+                    }}
                   >
-                    Go to field
+                    {all.length > 1 ? (entryTitle(draft, p) ?? 'Go to field') : 'Go to field'}
                   </a>
-                )}
+                ))}
                 <button
                   type="button"
                   disabled={!canResolve(f)}

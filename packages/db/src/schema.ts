@@ -155,6 +155,8 @@ export const profileBuilds = pgTable(
     state: buildState('state').notNull().default('running'),
     version: integer('version'),
     reason: text('reason'),
+    /** Phase of a running build: gathering, extracting or checking. Null reads as gathering. */
+    step: text('step'),
     createdAt: createdAt(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
   },

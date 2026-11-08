@@ -7,12 +7,14 @@ import {
   getUserById,
   insertProfileVersion,
   requireApprovedProfile,
+  setProfileBuildStep,
   startProfileBuild,
   upsertConnection,
 } from '@wma/db';
 import { profileDocumentSchema, type ProfileDocument, type ProfileFlag } from '@wma/shared';
 import fixture from '../../../packages/shared/test/fixtures/profile.full.json';
 import { createProfileRoutes } from '../src/routes/profile';
+import type { DailyRunRequest, RunQueue } from '../src/services/discovery';
 import type { BuildQueue, JobState, ProfileBuildJobData } from '../src/services/queue';
 import { BUILD_STALE_MS, getBuildStatus, requestProfileBuild } from '../src/services/builds';
 import { appFor, json, setupEnv, type TestEnv, type TestTenant } from './support';
@@ -48,9 +50,31 @@ function fakeQueue(sent: ProfileBuildJobData[] = [], states: Record<string, JobS
   return queue;
 }
 
-function setup(t: TestTenant) {
+/** `outcome` scripts the run queue: accept, decline (pg-boss returned null) or throw. */
+function fakeRunQueue(outcome: Array<'accept' | 'decline' | 'throw'> = []) {
+  const runs: DailyRunRequest[] = [];
+  const script = [...outcome];
+  const runQueue: RunQueue = {
+    enqueueDailyRun: async (d) => {
+      runs.push(d);
+      const next = script.shift() ?? 'accept';
+      if (next === 'throw') throw new Error('queue down');
+      return next === 'accept';
+    },
+  };
+  return { runQueue, runs };
+}
+
+function setup(t: TestTenant, outcome: Array<'accept' | 'decline' | 'throw'> = []) {
   const sent: ProfileBuildJobData[] = [];
-  return { app: appFor(t, { '/profile': createProfileRoutes({ queue: fakeQueue(sent) }) }), sent };
+  const { runQueue, runs } = fakeRunQueue(outcome);
+  return {
+    app: appFor(t, {
+      '/profile': createProfileRoutes({ queue: fakeQueue(sent), runQueue }),
+    }),
+    sent,
+    runs,
+  };
 }
 
 const approve = (app: ReturnType<typeof setup>['app'], version: number) =>
@@ -89,7 +113,20 @@ describe('POST /profile/build and GET /profile/build/status', () => {
     expect(res.status).toBe(202);
     const { job_id } = await res.json();
     expect(sent).toEqual([{ tenantId: t.id, userId: t.userId, buildId: job_id }]);
-    expect(await (await app.request('/profile/build/status')).json()).toEqual({ state: 'running' });
+    const running = await (await app.request('/profile/build/status')).json();
+    expect(running).toEqual({
+      state: 'running',
+      step: 'gathering',
+      started_at: expect.any(String),
+    });
+    expect(new Date(running.started_at).getTime()).toBeGreaterThan(Date.now() - 60_000);
+    await setProfileBuildStep(t.handle, job_id, 'extracting');
+    expect((await (await app.request('/profile/build/status')).json()).step).toBe('extracting');
+    await setProfileBuildStep(t.handle, job_id, 'checking');
+    expect((await (await app.request('/profile/build/status')).json()).step).toBe('checking');
+    await finishProfileBuild(t.handle, job_id, { state: 'done', version: 1 });
+    await setProfileBuildStep(t.handle, job_id, 'gathering'); // a finished build keeps its row
+    expect((await getLatestProfileBuild(t.handle, t.userId))?.step).toBe('checking');
   });
 
   it('a second request while one is running reuses the job', async () => {
@@ -131,7 +168,9 @@ describe('POST /profile/build and GET /profile/build/status', () => {
     const first = await requestProfileBuild(t.handle, t.userId, queue);
     const later = new Date(Date.now() + BUILD_STALE_MS + 1000);
     // Past the stale window, but the queue says the job is still queued or running.
-    expect(await getBuildStatus(t.handle, t.userId, queue, later)).toEqual({ state: 'running' });
+    expect(await getBuildStatus(t.handle, t.userId, queue, later)).toMatchObject({
+      state: 'running',
+    });
     expect(await requestProfileBuild(t.handle, t.userId, queue, later)).toBe(first);
     expect(sent).toHaveLength(1);
     const active = fakeQueue(sent, { [first]: 'active' });
@@ -155,7 +194,7 @@ describe('POST /profile/build and GET /profile/build/status', () => {
       const second = await requestProfileBuild(t.handle, t.userId, dead, later);
       expect(second).not.toBe(first);
       expect(sent.map((d) => d.buildId)).toEqual([first, second]);
-      expect(await getBuildStatus(t.handle, t.userId, dead)).toEqual({ state: 'running' });
+      expect(await getBuildStatus(t.handle, t.userId, dead)).toMatchObject({ state: 'running' });
     },
   );
 
@@ -369,6 +408,42 @@ describe('POST /profile/approve', () => {
     expect(log).toMatchObject({ actor: 'user', detail: { version: 2 } });
   });
 
+  it("the first approval requests today's run; approving again or a later version does not", async () => {
+    const t = await env.makeTenant();
+    const { app, runs } = setup(t);
+    await insertProfileVersion(t.handle, { userId: t.userId, document: baseDoc() });
+    const first = await approve(app, 1);
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({ approved_version: 1, run_started: true });
+    expect(runs).toEqual([
+      {
+        tenantId: t.id,
+        userId: t.userId,
+        date: new Date().toISOString().slice(0, 10),
+        trigger: 'manual',
+      },
+    ]);
+
+    const again = await approve(app, 1);
+    expect((await again.json()).run_started).toBe(false);
+    await insertProfileVersion(t.handle, { userId: t.userId, document: baseDoc() });
+    const later = await approve(app, 2);
+    expect(later.status).toBe(200);
+    expect((await later.json()).run_started).toBe(false);
+    expect(runs).toHaveLength(1);
+  });
+
+  it('a run queue failure still approves the profile', async () => {
+    const t = await env.makeTenant();
+    const { app, runs } = setup(t, ['throw', 'throw', 'throw']);
+    await insertProfileVersion(t.handle, { userId: t.userId, document: baseDoc() });
+    const res = await approve(app, 1);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ approved_version: 1, run_started: false });
+    expect(runs.length).toBeGreaterThan(0);
+    expect((await getUserById(t.handle, t.userId)).approvedProfileVersion).toBe(1);
+  });
+
   it('setting resolved: true on a blocking flag does not unblock approval', async () => {
     const t = await env.makeTenant();
     const { app } = setup(t);
@@ -409,7 +484,7 @@ describe('POST /profile/approve', () => {
     await insertProfileVersion(t.handle, { userId: t.userId, document: baseDoc() });
     const first = await (await approve(app, 1)).json();
     const second = await (await approve(app, 1)).json();
-    expect(second).toEqual(first);
+    expect(second).toEqual({ ...first, run_started: false });
   });
 
   it('a rebuild after approval is pending review while the approved version stays in use', async () => {

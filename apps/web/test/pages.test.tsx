@@ -327,6 +327,102 @@ describe('profile review', () => {
     expect(state.approvedVersions).toEqual([1, 2]);
   });
 
+  it('shows the first run link when approving starts a run', async () => {
+    const user = userEvent.setup();
+    seedProfile();
+    state.runStarted = true;
+    renderAt('/profile/review');
+    await user.click(await screen.findByRole('button', { name: 'Approve' }));
+    const note = await screen.findByText(/Your first run has started/);
+    expect(note).toHaveTextContent('Profile approved. Your first run has started.');
+    expect(within(note).getByRole('link')).toHaveAttribute('href', '/runs');
+  });
+
+  it('draws build progress from the step while a rebuild runs', async () => {
+    const user = userEvent.setup();
+    seedProfile();
+    state.buildStatuses = [
+      { state: 'idle' },
+      { state: 'running', step: 'gathering', started_at: NOW },
+      { state: 'running', step: 'extracting', started_at: NOW },
+      { state: 'running', step: 'checking', started_at: NOW },
+      { state: 'done', version: 2 },
+    ];
+    render(
+      <MemoryRouter>
+        <ProfileReviewPage pollMs={150} />
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Rebuild from sources' }));
+    const bar = await screen.findByRole('progressbar');
+    expect(bar).toHaveAttribute('max', '3');
+    expect(await screen.findByText('Extracting your profile')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('value', '1');
+    expect(await screen.findByText('Checking it against your sources')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('value', '2');
+    expect(await screen.findByText(/profile was rebuilt/)).toBeInTheDocument();
+  });
+
+  it('shows the first-build banner with progress', async () => {
+    seedProfile();
+    state.buildStatuses = [
+      { state: 'running', step: 'extracting', started_at: NOW },
+      { state: 'done', version: 2 },
+    ];
+    render(
+      <MemoryRouter>
+        <ProfileReviewPage pollMs={200} />
+      </MemoryRouter>,
+    );
+    const banner = await screen.findByRole('status');
+    expect(banner).toHaveTextContent('Building your profile from your connected sources…');
+    expect(within(banner).getByRole('progressbar')).toHaveAttribute('value', '1');
+    expect(within(banner).getByText('Extracting your profile')).toBeInTheDocument();
+  });
+
+  it('Go to field focuses a control inside the flagged entry', async () => {
+    const user = userEvent.setup();
+    seedProfile([
+      {
+        id: 'e1',
+        kind: 'unsupported_entry',
+        path: 'work_history.1',
+        message: 'Not in your sources',
+        sources: ['resume'],
+        resolved: false,
+      },
+    ]);
+    const doc = state.profile!.document;
+    doc.work_history.push({ ...doc.work_history[0]!, employer: 'Globex', sources: ['resume'] });
+    renderAt('/profile/review');
+    await user.click(await screen.findByRole('link', { name: 'Go to field' }));
+    const entry = document.getElementById('f-work_history.1')!;
+    expect(entry.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.id).toBe('f-work_history.1.employer');
+  });
+
+  it('a date conflict gets one link per entry, labelled by employer', async () => {
+    const user = userEvent.setup();
+    seedProfile([
+      {
+        id: 'dc2',
+        kind: 'date_conflict',
+        path: 'work_history.0',
+        paths: ['work_history.0', 'work_history.1'],
+        message: 'Overlap',
+        sources: ['resume'],
+        resolved: false,
+      },
+    ]);
+    const doc = state.profile!.document;
+    doc.work_history.push({ ...doc.work_history[0]!, employer: 'Globex', sources: ['resume'] });
+    renderAt('/profile/review');
+    const second = await screen.findByRole('link', { name: 'Globex' });
+    expect(screen.getByRole('link', { name: doc.work_history[0]!.employer })).toBeInTheDocument();
+    await user.click(second);
+    expect(document.activeElement?.id).toBe('f-work_history.1.employer');
+  });
+
   it('keeps Approve disabled while a rebuild is running', async () => {
     const user = userEvent.setup();
     seedProfile();

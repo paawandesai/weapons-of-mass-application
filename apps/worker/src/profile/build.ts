@@ -7,6 +7,7 @@ import {
   lockRunningBuild,
   lockUserForProfileWrite,
   NotFoundError,
+  setProfileBuildStep,
   type TenantHandle,
 } from '@wma/db';
 import {
@@ -173,11 +174,17 @@ export async function runProfileBuild(
   deps: BuildDeps,
   opts: RunOptions = {},
 ): Promise<BuildResult> {
+  const step = async (name: string) => {
+    if (opts.buildId) await setProfileBuildStep(handle, opts.buildId, name);
+  };
+  await step('gathering');
   const bundle = await gatherBundle(handle, userId, { drive: deps.drive });
   const resume = bundle.sources.find((s) => s.kind === 'resume');
   if (!resume || resume.text.trim() === '') throw new BuildError('profile_build_no_resume');
 
+  await step('extracting');
   const model = await callModel(meterLlm(handle, userId, 'onboarding', deps.llm), bundle);
+  await step('checking');
   const { output, flags } = postValidate(model, bundle);
   const sources = bundle.sources.filter((s) => s.text.trim() !== '').map((s) => s.id);
 
