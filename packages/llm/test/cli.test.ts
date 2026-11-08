@@ -16,6 +16,7 @@ describe('parseBackend', () => {
   it('defaults to anthropic and rejects unknown names', () => {
     expect(parseBackend(undefined)).toBe('anthropic');
     expect(parseBackend('Claude-Code')).toBe('claude-code');
+    expect(parseBackend('grok')).toBe('grok');
     expect(() => parseBackend('bard')).toThrow(/LLM_BACKEND/);
   });
 });
@@ -121,5 +122,38 @@ describe('concurrency', () => {
     });
     await Promise.all(Array.from({ length: 6 }, () => llm.generateStructured(req)));
     expect(peak).toBe(2);
+  });
+});
+
+describe('grok backend (Grok Build CLI)', () => {
+  it('passes the prompt as -p, strips API keys and parses a json result', async () => {
+    const seen: CliRunInput[] = [];
+    const llm = createCliLlm('grok', {
+      run: runner(
+        JSON.stringify({ text: '{"a":3}', usage: { input_tokens: 10, output_tokens: 2 } }),
+        seen,
+      ),
+      env: { PATH: '/bin', XAI_API_KEY: 'k', GROK_CODE_XAI_API_KEY: 'k' },
+      model: 'grok-4',
+    });
+    const res = await llm.generateStructured(req);
+    expect(res.output).toEqual({ a: 3, note: null });
+    expect(res.usage).toMatchObject({ input_tokens: 10, output_tokens: 2 });
+    const call = seen[0]!;
+    expect(call.command).toBe('grok');
+    expect(call.args).toContain('--output-format');
+    expect(call.args[call.args.indexOf('-m') + 1]).toBe('grok-4');
+    expect(call.args[call.args.indexOf('-p') + 1]).toMatch(/SYS[\s\S]*USER[\s\S]*JSON Schema/);
+    expect(call.args).not.toContain('--always-approve');
+    expect(call.env.XAI_API_KEY).toBeUndefined();
+    expect(call.env.GROK_CODE_XAI_API_KEY).toBeUndefined();
+  });
+
+  it('accepts plain text output and refuses images', async () => {
+    const llm = createCliLlm('grok', { run: runner('{"a":4,"note":"x"}'), env: {} });
+    expect((await llm.generateStructured(req)).output).toEqual({ a: 4, note: 'x' });
+    await expect(
+      llm.generateStructured({ ...req, images: [{ mediaType: 'image/png', data: 'AAAA' }] }),
+    ).rejects.toThrow(/cannot take images/);
   });
 });
