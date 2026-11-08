@@ -19,6 +19,8 @@ export const LLM_PURPOSES = [
   'interview_prep',
   /** Offer comparables extraction. */
   'negotiation',
+  /** Drafting recruiter outreach emails (never sent without the user's approval). */
+  'outreach',
 ] as const;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
@@ -29,6 +31,7 @@ export const LLM_PURPOSE_LABELS: Record<LlmPurpose, string> = {
   inbox: 'Inbox',
   interview_prep: 'Interview prep',
   negotiation: 'Offer negotiation',
+  outreach: 'Recruiter outreach',
 };
 
 /** Token counts as the API reports them. Cache fields are 0 when the call used no cache. */

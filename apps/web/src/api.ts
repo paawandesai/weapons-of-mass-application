@@ -7,6 +7,8 @@ import type {
   LlmUsageTotals,
   LlmUsageWindow,
   MeResponse,
+  OutreachDraftView,
+  OutreachListResponse,
   DemoMailboxResponse,
   ProfileDocument,
   ProfileResponse,
@@ -301,7 +303,49 @@ export interface ApplicationExtras {
 export const resumeUrl = (applicationId: string) =>
   `/api/applications/${encodeURIComponent(applicationId)}/resume`;
 
+export interface OutreachContactInput {
+  name: string;
+  title: string | null;
+  profile_url: string | null;
+  email: string;
+}
+
+export interface OutreachEditInput {
+  to_address?: string;
+  subject?: string;
+  body_text?: string;
+  linkedin_note?: string | null;
+}
+
 export const api = {
+  outreach: (applicationId: string) =>
+    request<OutreachListResponse>(
+      'GET',
+      `/api/outreach?application_id=${encodeURIComponent(applicationId)}`,
+    ),
+  requestOutreachDraft: (applicationId: string, contact: OutreachContactInput) =>
+    request<{ queued: true }>('POST', '/api/outreach/drafts', {
+      json: { application_id: applicationId, contact },
+    }),
+  editOutreach: (id: string, edit: OutreachEditInput) =>
+    request<{ draft: OutreachDraftView }>('PATCH', `/api/outreach/${encodeURIComponent(id)}`, {
+      json: edit,
+    }),
+  /** Approves exactly the text the user saw (`contentHash`); the server queues the send. */
+  approveOutreach: (id: string, contentHash: string) =>
+    request<{ draft: OutreachDraftView }>(
+      'POST',
+      `/api/outreach/${encodeURIComponent(id)}/approve`,
+      { json: { content_hash: contentHash } },
+    ),
+  rejectOutreach: (id: string) =>
+    request<{ draft: OutreachDraftView }>(
+      'POST',
+      `/api/outreach/${encodeURIComponent(id)}/reject`,
+      {
+        json: {},
+      },
+    ),
   me: () => request<MeResponse>('GET', '/api/me'),
   signOut: () => request<void>('POST', '/auth/signout'),
   demoMailbox: () => request<DemoMailboxResponse>('GET', '/api/admin/demo-mailbox'),

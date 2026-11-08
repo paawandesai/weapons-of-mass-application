@@ -1,5 +1,6 @@
 import {
   unresolvedBlockingFlags,
+  type OutreachDraftView,
   type BuildStatus,
   type Connection,
   type LlmUsageResponse,
@@ -94,6 +95,8 @@ export interface MockState {
   /** What approve answers for run_started. */
   runStarted?: boolean;
   signedOut: boolean;
+  outreach: OutreachDraftView[];
+  outreachCalls: { approved: string[]; rejected: string[]; requested: unknown[] };
   usage: Pick<
     LlmUsageResponse,
     'total' | 'by_purpose' | 'by_application' | 'recent' | 'backend' | 'pace'
@@ -133,6 +136,8 @@ function initial(): MockState {
     approveCalls: 0,
     approvedVersions: [],
     signedOut: false,
+    outreach: [],
+    outreachCalls: { approved: [], rejected: [], requested: [] },
     usage: {
       total: zeroTotals,
       by_purpose: [],
@@ -280,6 +285,32 @@ export const handlers = [
     });
   }),
 
+  http.get('*/api/outreach', () =>
+    HttpResponse.json({ drafts: state.outreach, sent_today: 1, daily_cap: 5 }),
+  ),
+  http.post('*/api/outreach/drafts', async ({ request }) => {
+    state.outreachCalls.requested.push(await request.json());
+    return HttpResponse.json({ queued: true }, { status: 202 });
+  }),
+  http.post('*/api/outreach/:id/approve', async ({ params, request }) => {
+    const { content_hash } = (await request.json()) as { content_hash: string };
+    const d = state.outreach.find((x) => x.id === params.id);
+    if (!d) return HttpResponse.json({ code: 'not_found', message: 'gone' }, { status: 404 });
+    if (d.content_hash !== content_hash)
+      return HttpResponse.json(
+        { code: 'stale', message: 'The draft changed since you opened it.' },
+        { status: 409 },
+      );
+    state.outreachCalls.approved.push(d.id);
+    d.state = 'approved';
+    return HttpResponse.json({ draft: d });
+  }),
+  http.post('*/api/outreach/:id/reject', ({ params }) => {
+    const d = state.outreach.find((x) => x.id === params.id);
+    if (d) d.state = 'rejected';
+    state.outreachCalls.rejected.push(String(params.id));
+    return HttpResponse.json({ draft: d });
+  }),
   http.get('*/api/survey', () => HttpResponse.json({ answers: state.survey })),
   http.get('*/api/usage', ({ request }) =>
     HttpResponse.json({

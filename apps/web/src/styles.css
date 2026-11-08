@@ -1410,3 +1410,19 @@ button.chip.active {
   border-radius: var(--radius-sm);
   padding: 0.15rem 0.5rem;
 }
+
+.outreach-draft {
+  border-top: 1px solid var(--border, #ddd);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+}
+.outreach-draft input,
+.outreach-draft textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.outreach-body {
+  white-space: pre-wrap;
+  font: inherit;
+  margin: 0 0 0.5rem;
+}

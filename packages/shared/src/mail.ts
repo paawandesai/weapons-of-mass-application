@@ -13,6 +13,7 @@ export type OutgoingKind =
   | 'reminder'
   | 'digest'
   | 'captcha_request'
+  | 'outreach'
   | 'other';
 
 export interface OutgoingEmail {
