@@ -73,6 +73,28 @@ describe('profile build', () => {
     expect(llm.calls[0]!.user).toContain('<source id="linkedin"');
   });
 
+  it('records the build phase in order: gathering, extracting (during the model call), checking', async () => {
+    const t = await tenantWith();
+    const build = await startProfileBuild(t.handle, t.userId);
+    expect(build.step).toBeNull();
+    const seen: Array<string | null | undefined> = [];
+    class StepSpyLlm extends FakeLlm {
+      override async generateStructured(
+        ...args: Parameters<FakeLlm['generateStructured']>
+      ): ReturnType<FakeLlm['generateStructured']> {
+        seen.push((await getLatestProfileBuild(t.handle, t.userId))?.step);
+        return super.generateStructured(...args);
+      }
+    }
+    const llm = new StepSpyLlm([clean]);
+    await runProfileBuild(t.handle, t.userId, { llm }, { buildId: build.id });
+    expect(seen).toEqual(['extracting']);
+    expect(await getLatestProfileBuild(t.handle, t.userId)).toMatchObject({
+      state: 'done',
+      step: 'checking',
+    });
+  });
+
   it('job wrapper logs profile_built with {version, sources, flag_count} and marks the build done', async () => {
     const t = await tenantWith(['resume', 'linkedin', 'github']);
     const build = await startProfileBuild(t.handle, t.userId);

@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading';
 import type { Connection, ConnectionKind, MeResponse } from '@wma/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage, formatTime, type DriveFolder } from '../api';
@@ -43,6 +44,9 @@ export function ConnectionsPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [editing, setEditing] = useState<ReadonlySet<ConnectionKind>>(new Set());
+  /** Sources with a save in flight; their editor cannot be closed or reopened until it settles. */
+  const [pending, setPending] = useState<ReadonlySet<ConnectionKind>>(new Set());
 
   const reload = useCallback(async () => {
     try {
@@ -62,7 +66,7 @@ export function ConnectionsPage() {
         {loadError}
       </p>
     );
-  if (!me) return <p className="muted">Loading…</p>;
+  if (!me) return <Loading />;
 
   const get = (k: ConnectionKind) => me.connections.find((c) => c.kind === k);
   const googleMissing = GOOGLE.some((g) => {
@@ -70,23 +74,67 @@ export function ConnectionsPage() {
     return !c || c.status === 'disconnected';
   });
 
-  async function run(okText: string, fn: () => Promise<unknown>) {
+  const setEdit = (kind: ConnectionKind, on: boolean) =>
+    setEditing((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(kind);
+      else next.delete(kind);
+      return next;
+    });
+
+  /** Runs a save; resolves true when it succeeded. */
+  async function run(okText: string, fn: () => Promise<unknown>): Promise<boolean> {
     setNotice(null);
     try {
       await fn();
       setNotice({ kind: 'ok', text: okText });
       await reload();
+      return true;
     } catch (e) {
       setNotice({ kind: 'error', text: errorMessage(e) });
+      return false;
     }
   }
+
+  const setPendingFor = (kind: ConnectionKind, on: boolean) =>
+    setPending((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(kind);
+      else next.delete(kind);
+      return next;
+    });
+
+  /** A save that hides the editor for `kind` once it has gone through; one at a time per source. */
+  const save = async (kind: ConnectionKind, okText: string, fn: () => Promise<unknown>) => {
+    if (pending.has(kind)) return;
+    setPendingFor(kind, true);
+    try {
+      if (await run(okText, fn)) setEdit(kind, false);
+    } finally {
+      setPendingFor(kind, false);
+    }
+  };
+
+  const changeButton = (kind: ConnectionKind, label: string) => (
+    <button type="button" disabled={pending.has(kind)} onClick={() => setEdit(kind, true)}>
+      {label}
+    </button>
+  );
+  const cancelButton = (kind: ConnectionKind) => (
+    <button type="button" disabled={pending.has(kind)} onClick={() => setEdit(kind, false)}>
+      Cancel
+    </button>
+  );
 
   const disconnect = (kind: ConnectionKind, label: string) => (
     <ConfirmButton
       label="Disconnect"
       question={`Disconnect ${label}?`}
       confirmLabel="Yes, disconnect"
-      onConfirm={() => run(`${label} disconnected.`, () => api.disconnect(kind))}
+      busyLabel="Disconnecting…"
+      onConfirm={async () => {
+        await run(`${label} disconnected.`, () => api.disconnect(kind));
+      }}
     />
   );
 
@@ -95,6 +143,11 @@ export function ConnectionsPage() {
   const github = get('github');
   const drive = get('drive');
   const driveAvailable = !!drive && drive.status !== 'disconnected';
+  const isOn = (c: Connection | undefined) => !!c && c.status !== 'disconnected';
+  const driveFolders = (Array.isArray(drive?.config?.folders) ? drive.config.folders : []).filter(
+    (f): f is { id: string; name: string } =>
+      !!f && typeof f.id === 'string' && typeof f.name === 'string',
+  );
 
   return (
     <section>
@@ -141,7 +194,16 @@ export function ConnectionsPage() {
           <span className="grow" />
           {resume && resume.status !== 'disconnected' && disconnect('resume', 'resume')}
         </div>
-        <ResumeUpload onUpload={(f) => run('Resume uploaded.', () => api.uploadResume(f))} />
+        {isOn(resume) && !editing.has('resume') ? (
+          <p>{changeButton('resume', 'Replace')}</p>
+        ) : (
+          <>
+            <ResumeUpload
+              onUpload={(f) => save('resume', 'Resume uploaded.', () => api.uploadResume(f))}
+            />
+            {isOn(resume) && <p>{cancelButton('resume')}</p>}
+          </>
+        )}
       </div>
 
       <div className="card" aria-label="LinkedIn">
@@ -154,22 +216,29 @@ export function ConnectionsPage() {
           <span className="grow" />
           {linkedin && linkedin.status !== 'disconnected' && disconnect('linkedin', 'LinkedIn')}
         </div>
-        <SingleValueForm
-          label="Public profile URL"
-          placeholder="https://www.linkedin.com/in/your-name"
-          button="Save LinkedIn"
-          validate={(v) => {
-            try {
-              const u = new URL(v);
-              return u.protocol === 'https:' || u.protocol === 'http:'
-                ? null
-                : 'Enter a full profile URL.';
-            } catch {
-              return 'Enter a full profile URL, starting with https://';
-            }
-          }}
-          onSubmit={(v) => run('LinkedIn saved.', () => api.setLinkedIn(v))}
-        />
+        {isOn(linkedin) && !editing.has('linkedin') ? (
+          <p>{changeButton('linkedin', 'Change')}</p>
+        ) : (
+          <>
+            <SingleValueForm
+              label="Public profile URL"
+              placeholder="https://www.linkedin.com/in/your-name"
+              button="Save LinkedIn"
+              validate={(v) => {
+                try {
+                  const u = new URL(v);
+                  return u.protocol === 'https:' || u.protocol === 'http:'
+                    ? null
+                    : 'Enter a full profile URL.';
+                } catch {
+                  return 'Enter a full profile URL, starting with https://';
+                }
+              }}
+              onSubmit={(v) => save('linkedin', 'LinkedIn saved.', () => api.setLinkedIn(v))}
+            />
+            {isOn(linkedin) && <p>{cancelButton('linkedin')}</p>}
+          </>
+        )}
       </div>
 
       <div className="card" aria-label="GitHub">
@@ -182,15 +251,24 @@ export function ConnectionsPage() {
           <span className="grow" />
           {github && github.status !== 'disconnected' && disconnect('github', 'GitHub')}
         </div>
-        <SingleValueForm
-          label="GitHub username"
-          placeholder="your-username"
-          button="Save GitHub"
-          validate={(v) =>
-            /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(v) ? null : 'Enter a valid GitHub username.'
-          }
-          onSubmit={(v) => run('GitHub saved.', () => api.setGitHub(v))}
-        />
+        {isOn(github) && !editing.has('github') ? (
+          <p>{changeButton('github', 'Change')}</p>
+        ) : (
+          <>
+            <SingleValueForm
+              label="GitHub username"
+              placeholder="your-username"
+              button="Save GitHub"
+              validate={(v) =>
+                /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(v)
+                  ? null
+                  : 'Enter a valid GitHub username.'
+              }
+              onSubmit={(v) => save('github', 'GitHub saved.', () => api.setGitHub(v))}
+            />
+            {isOn(github) && <p>{cancelButton('github')}</p>}
+          </>
+        )}
       </div>
 
       <div className="card" aria-label="Drive folders">
@@ -200,13 +278,30 @@ export function ConnectionsPage() {
           <span className="grow" />
           {drive && drive.status !== 'disconnected' && disconnect('drive', 'Drive folders')}
         </div>
-        {driveAvailable ? (
-          <DrivePicker
-            initial={
-              Array.isArray(drive?.config?.folder_ids) ? (drive.config.folder_ids as string[]) : []
-            }
-            onSave={(ids) => run('Drive folders saved.', () => api.setDriveFolders(ids))}
-          />
+        {driveAvailable && driveFolders.length > 0 && !editing.has('drive') ? (
+          <>
+            <ul className="chips" aria-label="Saved Drive folders">
+              {driveFolders.map((f) => (
+                <li key={f.id}>{f.name}</li>
+              ))}
+            </ul>
+            <p>{changeButton('drive', 'Change folders')}</p>
+          </>
+        ) : driveAvailable ? (
+          <>
+            <DrivePicker
+              initial={
+                Array.isArray(drive?.config?.folder_ids)
+                  ? (drive.config.folder_ids as string[])
+                  : []
+              }
+              autoLoad={editing.has('drive')}
+              onSave={(ids) =>
+                save('drive', 'Drive folders saved.', () => api.setDriveFolders(ids))
+              }
+            />
+            {driveFolders.length > 0 && <p>{cancelButton('drive')}</p>}
+          </>
         ) : (
           <p className="muted">
             Drive access is missing. Reconnect with Google and allow Drive to choose folders.
@@ -221,19 +316,26 @@ function ResumeUpload({ onUpload }: { onUpload: (f: File) => Promise<void> }) {
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [over, setOver] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   async function handle(file: File | undefined) {
-    if (!file) return;
+    if (!file || busy) return;
     const problem = resumeProblem(file);
     setError(problem);
     if (problem) return;
-    await onUpload(file);
+    setBusy(true);
+    try {
+      await onUpload(file);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <div>
       <div
         className={`drop${over ? ' over' : ''}`}
+        aria-busy={busy}
         onDragOver={(e) => {
           e.preventDefault();
           setOver(true);
@@ -245,12 +347,13 @@ function ResumeUpload({ onUpload }: { onUpload: (f: File) => Promise<void> }) {
           void handle(e.dataTransfer.files[0]);
         }}
       >
-        <span>Drop a PDF or DOCX here, or</span>
-        <label className="button">
+        <span>{busy ? 'Uploading…' : 'Drop a PDF or DOCX here, or'}</span>
+        <label className="button" aria-disabled={busy}>
           Choose file
           <input
             ref={input}
             type="file"
+            disabled={busy}
             aria-label="Resume file"
             accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             hidden
@@ -282,6 +385,7 @@ interface SingleProps {
 function SingleValueForm({ label, placeholder, button, validate, onSubmit }: SingleProps) {
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   return (
     <form
       className="inline-form"
@@ -291,15 +395,27 @@ function SingleValueForm({ label, placeholder, button, validate, onSubmit }: Sin
         const problem = v ? validate(v) : 'This field is required.';
         setError(problem);
         if (problem) return;
-        await onSubmit(v);
-        setValue('');
+        setBusy(true);
+        try {
+          await onSubmit(v);
+          setValue('');
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <label>
         {label}
-        <input value={value} placeholder={placeholder} onChange={(e) => setValue(e.target.value)} />
+        <input
+          value={value}
+          disabled={busy}
+          placeholder={placeholder}
+          onChange={(e) => setValue(e.target.value)}
+        />
       </label>
-      <button type="submit">{button}</button>
+      <button type="submit" disabled={busy}>
+        {busy ? 'Saving…' : button}
+      </button>
       {error && (
         <span role="alert" className="field-error">
           {error}
@@ -311,15 +427,18 @@ function SingleValueForm({ label, placeholder, button, validate, onSubmit }: Sin
 
 function DrivePicker({
   initial,
+  autoLoad,
   onSave,
 }: {
   initial: string[];
+  autoLoad?: boolean;
   onSave: (ids: string[]) => Promise<void>;
 }) {
   const [folders, setFolders] = useState<DriveFolder[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set(initial));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -332,6 +451,10 @@ function DrivePicker({
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (autoLoad) void load();
+  }, [autoLoad]);
 
   if (!folders) {
     return (
@@ -352,7 +475,12 @@ function DrivePicker({
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        await onSave([...selected]);
+        setSaving(true);
+        try {
+          await onSave([...selected]);
+        } finally {
+          setSaving(false);
+        }
       }}
     >
       {folders.length === 0 ? (
@@ -378,8 +506,8 @@ function DrivePicker({
           ))}
         </ul>
       )}
-      <button type="submit" className="primary" disabled={selected.size === 0}>
-        Save folders
+      <button type="submit" className="primary" disabled={selected.size === 0 || saving}>
+        {saving ? 'Saving…' : 'Save folders'}
       </button>
     </form>
   );

@@ -1,5 +1,5 @@
 {
-  "id": "a66a6efd-1e15-44a9-b9dc-d9ca3582ea1b",
+  "id": "77f648f6-2c3f-469f-9eaf-1f89e9945791",
   "prevId": "a649e4be-9bfa-4fb6-a08f-525db8be9d34",
   "version": "7",
   "dialect": "postgresql",
@@ -1661,7 +1661,7 @@
           "name": "thread_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "confirmed_slot_id": {
           "name": "confirmed_slot_id",
@@ -1743,12 +1743,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "booked_via": {
-          "name": "booked_via",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1758,6 +1752,33 @@
         }
       },
       "indexes": {
+        "interviews_tenant_thread_created_idx": {
+          "name": "interviews_tenant_thread_created_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "thread_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "interviews_tenant_application_idx": {
           "name": "interviews_tenant_application_idx",
           "columns": [
@@ -1875,14 +1896,6 @@
           "columns": [
             "tenant_id",
             "id"
-          ]
-        },
-        "interviews_tenant_thread_key": {
-          "name": "interviews_tenant_thread_key",
-          "nullsNotDistinct": false,
-          "columns": [
-            "tenant_id",
-            "thread_id"
           ]
         }
       },

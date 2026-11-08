@@ -1,3 +1,4 @@
+import { Loading } from './Loading';
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../api';
@@ -36,7 +37,7 @@ export function Layout() {
         We could not load your account. Reload the page to try again.
       </p>
     );
-  if (email === null) return <p className="muted pad">Loading…</p>;
+  if (email === null) return <Loading pad />;
 
   async function signOut() {
     try {

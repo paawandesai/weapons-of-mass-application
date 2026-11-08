@@ -181,6 +181,7 @@ describe('reschedule (rule 11, task 5.6)', () => {
           proposed('2037-11-18T09:00:00-08:00'),
         ]),
         messageId: 'gmail-msg-2',
+        reschedule: true,
       },
       h.deps,
     );

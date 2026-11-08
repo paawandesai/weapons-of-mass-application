@@ -17,6 +17,13 @@ export interface Classified extends InboxClassification {
   promptVersion: string;
 }
 
+/**
+ * Rule 53: wording that moves or re-proposes a time already agreed. It sets `reschedule` whatever
+ * the model said, so a missed flag cannot turn a move into a second interview.
+ */
+export const RESCHEDULE_WORDS =
+  /\b(?:re-?schedul\w*|move (?:our|the|this) (?:call|interview|conversation|meeting)|no longer works?|something (?:has )?came up|push(?:ed)? (?:it |the call |the interview )?back|(?:change|changing) (?:the|our) time|(?:a )?different time)\b/i;
+
 const safe = (s: string) => s.replace(/<\/?email>/gi, '');
 
 /** A booking link must be a plain http(s) URL; anything else is treated as absent. */

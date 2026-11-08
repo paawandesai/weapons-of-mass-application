@@ -326,9 +326,11 @@ export const api = {
     request<{ version: number }>('PUT', '/api/profile', { json: { document } }),
   /** Approves the version the user reviewed; the server refuses if a newer one exists. */
   approve: (version: number) =>
-    request<{ approved_version: number; approved_at: string }>('POST', '/api/profile/approve', {
-      json: { version },
-    }),
+    request<{ approved_version: number; approved_at: string; run_started: boolean }>(
+      'POST',
+      '/api/profile/approve',
+      { json: { version } },
+    ),
 
   board: () => request<BoardData>('GET', '/api/board'),
   searchCompanies: (q: string) =>

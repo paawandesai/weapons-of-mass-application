@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading';
 import { useEffect, useRef, useState } from 'react';
 import { errorMessage, formatTime, type RunCandidateView, type RunSummary } from '../api';
 import { api } from '../api';
@@ -109,7 +110,7 @@ export function RunViewPage() {
     }
   };
 
-  if (!loaded) return <p className="muted">Loading…</p>;
+  if (!loaded) return <Loading />;
 
   return (
     <section>
@@ -121,7 +122,7 @@ export function RunViewPage() {
           onClick={() => void startRun()}
           disabled={running || starting}
         >
-          {running ? 'Running…' : 'Run today'}
+          {starting ? 'Starting…' : running ? 'Running…' : 'Run today'}
         </button>
       </div>
       {notice ? <p className="muted">{notice}</p> : null}
@@ -167,7 +168,16 @@ export function RunViewPage() {
               {candidates.map((c, i) => (
                 <li key={`${c.url}-${i}`}>
                   <div className="grow">
-                    <strong>{c.title}</strong> <span className="muted">at {c.company}</span>
+                    <strong>
+                      {c.url ? (
+                        <a href={c.url} target="_blank" rel="noopener noreferrer">
+                          {c.title}
+                        </a>
+                      ) : (
+                        c.title
+                      )}
+                    </strong>{' '}
+                    <span className="muted">at {c.company}</span>
                     <div>
                       <span>{verdict(c)}</span>
                       {!c.selected && c.exclusion_reason ? (

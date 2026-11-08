@@ -5,11 +5,13 @@ import { profileDocumentSchema } from '@wma/shared';
 import type { AppEnv } from '../middleware/session';
 import { getBuildStatus, hasResume, requestProfileBuild } from '../services/builds';
 import { invalidJson, readJson, validationError } from '../services/http';
+import { pgBossRunQueue, requestRun, type RunQueue } from '../services/discovery';
 import { pgBossQueue, type BuildQueue } from '../services/queue';
 import { approveProfileVersion, getProfileResponse, saveProfileDocument } from '../services/review';
 
 export interface ProfileDeps {
   queue?: BuildQueue;
+  runQueue?: RunQueue;
 }
 
 export function createProfileRoutes(deps: ProfileDeps = {}): Hono<AppEnv> {
@@ -62,7 +64,24 @@ export function createProfileRoutes(deps: ProfileDeps = {}): Hono<AppEnv> {
     const parsed = z.object({ version: z.number().int().positive() }).safeParse(raw);
     if (!parsed.success) return validationError(c, parsed.error);
     const r = await approveProfileVersion(handle, userId, parsed.data.version);
-    if (r.ok) return c.json({ approved_version: r.approved_version, approved_at: r.approved_at });
+    if (r.ok) {
+      // The approval is saved; starting the first run is best effort and never fails it.
+      let runStarted = false;
+      if (r.first_approval) {
+        try {
+          const now = c.get('now')?.() ?? new Date();
+          const result = await requestRun(handle, userId, deps.runQueue ?? pgBossRunQueue, now);
+          runStarted = result.queued;
+        } catch (e) {
+          console.error('profile: could not start the first run', e);
+        }
+      }
+      return c.json({
+        approved_version: r.approved_version,
+        approved_at: r.approved_at,
+        run_started: runStarted,
+      });
+    }
     if (r.reason === 'no_profile')
       return c.json({ code: 'no_profile', message: 'No profile yet.' }, 404);
     if (r.reason === 'version_mismatch')

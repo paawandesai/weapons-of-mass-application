@@ -268,4 +268,48 @@ describe('run view', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Run today' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Try again in a moment.');
   });
+
+  it('links each title to its posting in a new tab and leaves a missing url as text', async () => {
+    server.use(
+      http.get('*/api/runs/current', () =>
+        HttpResponse.json(
+          page({ candidates: [cand('Alpha'), cand('Beta', { rank: 2, url: '' })] }),
+        ),
+      ),
+    );
+    render(<RunViewPage />);
+    const link = await screen.findByRole('link', { name: 'Alpha' });
+    expect(link).toHaveAttribute('href', 'https://jobs.example.test/Alpha');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Beta' })).toBeNull();
+  });
+
+  it('shows Starting… and disables the button while the start request is in flight', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.get('*/api/runs/current', () => HttpResponse.json(page({ run: null }))),
+      http.post('*/api/runs', async () => {
+        await gate;
+        return HttpResponse.json(
+          { run: run({ step: 'queued', counts: {} }), candidates: [] },
+          { status: 202 },
+        );
+      }),
+    );
+    render(<RunViewPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Run today' }));
+    expect(await screen.findByRole('button', { name: 'Starting…' })).toBeDisabled();
+    release();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Starting…' })).toBeNull());
+  });
+
+  it('shows a loading status before the first answer', async () => {
+    server.use(http.get('*/api/runs/current', () => HttpResponse.json(page({ run: null }))));
+    render(<RunViewPage />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading…');
+    await screen.findByText('No run has happened yet.');
+  });
 });

@@ -12,6 +12,8 @@ export interface ConfirmedFromEmailInput {
   /** Gmail id of the confirming message (recorded in the activity log). */
   messageId: string;
   slot: ProposedSlot;
+  /** The message moves a time already agreed (rule 53). */
+  reschedule?: boolean;
 }
 
 /**
@@ -53,6 +55,7 @@ export async function recordConfirmedFromEmail(
     startsAt: slot.start,
     endsAt: slot.end,
     bookedVia: 'email',
+    reschedule: input.reschedule === true,
     detail: { gmail_message_id: input.messageId, tz_hint: slot.tzHint },
   });
   return { interviewId: result.interview.id };

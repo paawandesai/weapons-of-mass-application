@@ -28,6 +28,11 @@ export interface ConfirmedInterviewInput {
   startsAt: Date;
   endsAt: Date;
   bookedVia: BookedVia;
+  /**
+   * The message moves a time already agreed (rule 53). A confirmed interview on the thread is
+   * then moved in place; without it a different confirmed time is a new round (rule 55).
+   */
+  reschedule?: boolean;
   /** Extra fields for the `interview_recorded` activity entry (the Gmail message id, say). */
   detail?: Record<string, unknown>;
 }
@@ -48,10 +53,12 @@ export interface ConfirmedInterviewResult {
  * transaction commits. Also moves the card to Interviewing and records the prep plan in the
  * outbox (`onlyIfMissing`), all in the caller's transaction.
  *
- * A thread that already has an interview is updated in place: a different time replaces it (open
- * slots invalidated, generation bumped so a booking in flight for the old time turns into a
- * no-op), the same time changes nothing. A Calendar event from an earlier in-app booking is kept
- * as it is and the activity entry says so.
+ * On a thread with an interview: the newest one is confirmed in place when it is still awaiting
+ * a slot pick (the user chose on the employer's page instead of through our link; open slots are
+ * invalidated and the generation bumped so a booking in flight turns into a no-op). A confirmed
+ * interview is moved in place only when the message is a reschedule and the same time changes
+ * nothing; any other confirmed time is a new round and gets its own row. A Calendar event from an
+ * earlier in-app booking is kept as it is and the activity entry says so.
  *
  * Reminders and the prep plan are recorded in the outbox with the row, so the worker's reconciler
  * schedules both even if the process dies right after the commit.
@@ -61,19 +68,20 @@ export function recordConfirmedInterview(
   input: ConfirmedInterviewInput,
 ): Promise<ConfirmedInterviewResult> {
   return handle.transaction(async (h) => {
-    const existing = input.threadId ? await getInterviewByThread(h, input.threadId) : null;
+    const newest = input.threadId ? await getInterviewByThread(h, input.threadId) : null;
+    const locked = newest ? ((await lockInterview(h, newest.id)) ?? newest) : null;
+    if (locked?.confirmedAt && locked.startsAt?.getTime() === input.startsAt.getTime()) {
+      return {
+        status: 'unchanged',
+        interview: locked,
+        statusChange: { changed: false, reason: 'no_change', from: null },
+      };
+    }
+    const inPlace = locked !== null && (!locked.confirmedAt || input.reschedule === true);
     let interview: InterviewRow;
     let status: ConfirmedInterviewResult['status'];
     let eventKept = false;
-    if (existing) {
-      const locked = (await lockInterview(h, existing.id)) ?? existing;
-      if (locked.confirmedAt && locked.startsAt?.getTime() === input.startsAt.getTime()) {
-        return {
-          status: 'unchanged',
-          interview: locked,
-          statusChange: { changed: false, reason: 'no_change', from: null },
-        };
-      }
+    if (locked && inPlace) {
       status = locked.confirmedAt ? 'rescheduled' : 'recorded';
       eventKept = locked.calendarEventId !== null;
       await invalidateOpenSlots(h, locked.id);

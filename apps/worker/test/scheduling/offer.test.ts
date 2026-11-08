@@ -1,11 +1,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { activity, getInterview, getInterviewByThread, listSlotsForInterview } from '@wma/db';
+import {
+  activity,
+  countInterviewsForThread,
+  getInterview,
+  getInterviewByThread,
+  listSlotsForInterview,
+  updateInterview,
+} from '@wma/db';
 import {
   CalendarUnavailableError,
   offerSlots,
   resendPendingConfirmations,
 } from '../../src/scheduling';
 import {
+  confirmToken,
   makeHarness,
   NOW,
   offerInput,
@@ -236,5 +244,103 @@ describe('resendPendingConfirmations (crash gap)', () => {
 
     expect(await resendPendingConfirmations(s.t.handle, s.t.userId, h.deps)).toBe(0);
     expect(h.sender.sent).toHaveLength(1);
+  });
+});
+
+describe('interview rounds (rule 55)', () => {
+  const later = () => [
+    proposed('2037-11-17T09:00:00-08:00'),
+    proposed('2037-11-18T09:00:00-08:00'),
+  ];
+  async function confirmed() {
+    const s = await seedThread(env);
+    const h = makeHarness();
+    const first = await offerSlots(s.t.handle, offerInput(s, threeSlots()), h.deps);
+    const request = h.sender.sent.at(-1)!;
+    expect((await confirmToken(s.t.handle, tokensIn(request)[0]!)).ok).toBe(true);
+    return { s, h, id: first.interviewId! };
+  }
+
+  it('confirmed + reschedule + future start: the same row is cleared and re-offered', async () => {
+    const { s, h, id } = await confirmed();
+    const out = await offerSlots(
+      s.t.handle,
+      { ...offerInput(s, later()), messageId: 'm2', reschedule: true },
+      h.deps,
+    );
+    expect(out).toMatchObject({ status: 'offered', reschedule: true, interviewId: id });
+    expect((await getInterview(s.t.handle, id))?.confirmedSlotId).toBeNull();
+    expect(await countInterviewsForThread(s.t.handle, s.thread.id)).toBe(1);
+  });
+
+  it('confirmed + no flag: a second row; the first keeps its confirmation; round 2 is logged', async () => {
+    const { s, h, id } = await confirmed();
+    const before = (await getInterview(s.t.handle, id))!;
+    expect(before.confirmedSlotId).not.toBeNull();
+    const out = await offerSlots(
+      s.t.handle,
+      { ...offerInput(s, later()), messageId: 'm2' },
+      h.deps,
+    );
+    expect(out).toMatchObject({ status: 'offered', reschedule: false });
+    expect(out.interviewId).not.toBe(id);
+    const after = (await getInterview(s.t.handle, id))!;
+    expect(after.confirmedSlotId).toBe(before.confirmedSlotId);
+    expect(after.calendarEventId).toBe(before.calendarEventId);
+    expect(after.confirmedGeneration).toBe(before.confirmedGeneration);
+    expect((await getInterviewByThread(s.t.handle, s.thread.id))?.id).toBe(out.interviewId);
+    const log = (await activity.listByUser(s.t.handle, s.t.userId)).filter(
+      (e) => e.action === 'slots_offered',
+    );
+    expect(log.map((e) => (e.detail as { round: number }).round).sort()).toEqual([1, 2]);
+    expect(log.some((e) => (e.detail as { reschedule: boolean }).reschedule)).toBe(false);
+  });
+
+  it('confirmed + the booked time repeated (an acknowledgement): nothing happens, no flag (rule 57)', async () => {
+    const { s, h, id } = await confirmed();
+    const before = await countInterviewsForThread(s.t.handle, s.thread.id);
+    const out = await offerSlots(
+      s.t.handle,
+      { ...offerInput(s, [proposed('2037-11-12T10:00:00-08:00')]), messageId: 'm2' },
+      h.deps,
+    );
+    expect(out).toMatchObject({ status: 'already_booked', interviewId: id, offered: 0 });
+    expect(await countInterviewsForThread(s.t.handle, s.thread.id)).toBe(before);
+    const log = await activity.listByUser(s.t.handle, s.t.userId);
+    expect(log.some((e) => e.action === 'digest_flag')).toBe(false);
+    // The booked time among new ones is dropped; the rest open a new round.
+    const mixed = await offerSlots(
+      s.t.handle,
+      { ...offerInput(s, [proposed('2037-11-12T10:00:00-08:00'), ...later()]), messageId: 'm3' },
+      h.deps,
+    );
+    expect(mixed).toMatchObject({ status: 'offered', offered: 2 });
+    expect(mixed.interviewId).not.toBe(id);
+  });
+
+  it('confirmed + reschedule + start in the past: a second row', async () => {
+    const { s, h, id } = await confirmed();
+    await updateInterview(s.t.handle, id, { startsAt: new Date(NOW.getTime() - 3_600_000) });
+    const out = await offerSlots(
+      s.t.handle,
+      { ...offerInput(s, later()), messageId: 'm2', reschedule: true },
+      h.deps,
+    );
+    expect(out).toMatchObject({ status: 'offered', reschedule: false });
+    expect(out.interviewId).not.toBe(id);
+    expect(await countInterviewsForThread(s.t.handle, s.thread.id)).toBe(2);
+  });
+
+  it('unconfirmed + a new proposal: the same row', async () => {
+    const s = await seedThread(env);
+    const h = makeHarness();
+    const first = await offerSlots(s.t.handle, offerInput(s, threeSlots()), h.deps);
+    const second = await offerSlots(
+      s.t.handle,
+      { ...offerInput(s, later()), messageId: 'm2' },
+      h.deps,
+    );
+    expect(second.interviewId).toBe(first.interviewId);
+    expect(await countInterviewsForThread(s.t.handle, s.thread.id)).toBe(1);
   });
 });

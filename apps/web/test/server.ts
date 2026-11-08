@@ -91,6 +91,8 @@ export interface MockState {
   approveCalls: number;
   /** Versions sent in approve requests, in order. */
   approvedVersions: number[];
+  /** What approve answers for run_started. */
+  runStarted?: boolean;
   signedOut: boolean;
   usage: Pick<LlmUsageResponse, 'total' | 'by_purpose' | 'by_application' | 'recent'>;
 }
@@ -190,7 +192,11 @@ export const handlers = [
   }),
   http.post('*/api/sources/drive', async ({ request }) => {
     const { folder_ids } = (await request.json()) as { folder_ids: string[] };
-    return setConn(conn('drive', 'connected', { folder_ids }));
+    const folders = folder_ids.map((id) => ({
+      id,
+      name: state.folders.find((f) => f.id === id)?.name ?? id,
+    }));
+    return setConn(conn('drive', 'connected', { folder_ids, folders }));
   }),
   http.delete('*/api/sources/:kind', ({ params }) => {
     state.connections = state.connections.map((c) =>
@@ -257,7 +263,11 @@ export const handlers = [
       );
     state.profile.approved_version = state.profile.version;
     state.profile.approved_at = NOW;
-    return HttpResponse.json({ approved_version: state.profile.version, approved_at: NOW });
+    return HttpResponse.json({
+      approved_version: state.profile.version,
+      approved_at: NOW,
+      run_started: state.runStarted ?? false,
+    });
   }),
 
   http.get('*/api/survey', () => HttpResponse.json({ answers: state.survey })),

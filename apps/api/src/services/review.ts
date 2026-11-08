@@ -91,7 +91,7 @@ export async function saveProfileDocument(
 }
 
 export type ApproveResult =
-  | { ok: true; approved_version: number; approved_at: string }
+  | { ok: true; approved_version: number; approved_at: string; first_approval: boolean }
   | { ok: false; reason: 'no_profile' }
   | { ok: false; reason: 'version_mismatch'; latest_version: number }
   | { ok: false; reason: 'unresolved_flags'; flags: ProfileFlag[] };
@@ -122,6 +122,7 @@ export async function approveProfileVersion(
         ok: true,
         approved_version: row.version,
         approved_at: before.approvedProfileAt.toISOString(),
+        first_approval: false,
       } as const;
     }
     const user = await setApprovedProfileVersion(h, userId, row.version);
@@ -135,6 +136,7 @@ export async function approveProfileVersion(
       ok: true,
       approved_version: row.version,
       approved_at: user.approvedProfileAt!.toISOString(),
+      first_approval: before.approvedProfileVersion === null,
     } as const;
   });
 }

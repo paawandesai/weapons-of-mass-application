@@ -1,12 +1,13 @@
 import type { ProfileFlag } from '@wma/shared';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { formatTime } from '../src/api';
 import { App } from '../src/App';
 import { ProfileReviewPage } from '../src/pages/ProfileReviewPage';
-import { conn, fixtureDocument, NOW, state } from './server';
+import { conn, fixtureDocument, NOW, server, state } from './server';
 
 function renderAt(path: string) {
   return render(
@@ -86,6 +87,7 @@ describe('connections', () => {
   it('rejects a PNG resume on the client with a message', async () => {
     const user = userEvent.setup({ applyAccept: false });
     renderAt('/connections');
+    await user.click(await screen.findByRole('button', { name: 'Replace' }));
     const input = await screen.findByLabelText('Resume file');
     await user.upload(input, new File(['x'], 'photo.png', { type: 'image/png' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/PDF or DOCX/);
@@ -95,9 +97,19 @@ describe('connections', () => {
   it('accepts a PDF resume', async () => {
     const user = userEvent.setup();
     renderAt('/connections');
+    await user.click(await screen.findByRole('button', { name: 'Replace' }));
     const input = await screen.findByLabelText('Resume file');
     await user.upload(input, new File(['%PDF'], 'cv.pdf', { type: 'application/pdf' }));
     expect(await screen.findByText('Resume uploaded.')).toBeInTheDocument();
+    expect(await screen.findByText(/upload\.pdf/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Resume file')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Replace' })).toBeInTheDocument();
+  });
+
+  it('shows the saved resume with a Replace button and no dropzone', async () => {
+    renderAt('/connections');
+    expect(await screen.findByText(/ada\.pdf/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Resume file')).toBeNull();
   });
 
   it('saves GitHub and LinkedIn, validating input', async () => {
@@ -107,6 +119,14 @@ describe('connections', () => {
     await user.type(screen.getByLabelText('GitHub username'), 'ada-l');
     await user.click(screen.getByRole('button', { name: 'Save GitHub' }));
     expect(await screen.findByText('GitHub saved.')).toBeInTheDocument();
+    // Saved: the form collapses to the value and a Change button.
+    const github = screen.getByLabelText('GitHub', { selector: 'div' });
+    expect(within(github).getByText('ada-l')).toBeInTheDocument();
+    expect(screen.queryByLabelText('GitHub username')).toBeNull();
+    await user.click(within(github).getByRole('button', { name: 'Change' }));
+    expect(screen.getByLabelText('GitHub username')).toBeInTheDocument();
+    await user.click(within(github).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText('GitHub username')).toBeNull();
 
     await user.type(screen.getByLabelText('Public profile URL'), 'not a url');
     await user.click(screen.getByRole('button', { name: 'Save LinkedIn' }));
@@ -122,7 +142,83 @@ describe('connections', () => {
     expect(await screen.findByText('Drive folders saved.')).toBeInTheDocument();
     expect(state.connections.find((c) => c.kind === 'drive')?.config).toEqual({
       folder_ids: ['f1'],
+      folders: [{ id: 'f1', name: 'Career' }],
     });
+    // The picker collapses to the saved names.
+    const card = screen.getByLabelText('Drive folders', { selector: 'div' });
+    expect(within(card).getByLabelText('Saved Drive folders')).toHaveTextContent('Career');
+    expect(screen.queryByRole('button', { name: 'Save folders' })).toBeNull();
+    await user.click(within(card).getByRole('button', { name: 'Change folders' }));
+    expect(await screen.findByLabelText('Writing')).toBeInTheDocument();
+    expect(screen.getByLabelText('Career')).toBeChecked();
+  });
+
+  it('disables the save button and says Saving… while a save is in flight', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.post('*/api/sources/github', async () => {
+        await gate;
+        return HttpResponse.json({ connection: conn('github', 'connected') }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderAt('/connections');
+    await user.type(await screen.findByLabelText('GitHub username'), 'ada-l');
+    await user.click(screen.getByRole('button', { name: 'Save GitHub' }));
+    expect(await screen.findByRole('button', { name: 'Saving…' })).toBeDisabled();
+    release();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Saving…' })).toBeNull());
+  });
+
+  it('keeps Cancel disabled while a save of a connected source is in flight', async () => {
+    state.connections = state.connections.map((c) =>
+      c.kind === 'github' ? conn('github', 'connected', { username: 'ada' }) : c,
+    );
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.post('*/api/sources/github', async () => {
+        await gate;
+        return HttpResponse.json(
+          { connection: conn('github', 'connected', { username: 'ada-l' }) },
+          { status: 201 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderAt('/connections');
+    const github = (await screen.findByLabelText('GitHub', { selector: 'div' })) as HTMLElement;
+    await user.click(within(github).getByRole('button', { name: 'Change' }));
+    await user.type(within(github).getByLabelText('GitHub username'), 'ada-l');
+    await user.click(within(github).getByRole('button', { name: 'Save GitHub' }));
+    expect(await within(github).findByRole('button', { name: 'Saving…' })).toBeDisabled();
+    expect(within(github).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    release();
+    await waitFor(() =>
+      expect(within(github).queryByRole('button', { name: 'Cancel' })).toBeNull(),
+    );
+    expect(within(github).getByRole('button', { name: 'Change' })).toBeEnabled();
+  });
+
+  it('keeps the disconnect confirmation visible and disabled until it finishes', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    server.use(
+      http.delete('*/api/sources/:kind', async () => {
+        await gate;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderAt('/connections');
+    const card = (await screen.findByLabelText('Resume', { selector: 'div' })) as HTMLElement;
+    await user.click(within(card).getByRole('button', { name: 'Disconnect' }));
+    await user.click(within(card).getByRole('button', { name: 'Yes, disconnect' }));
+    expect(await within(card).findByRole('button', { name: 'Disconnecting…' })).toBeDisabled();
+    expect(within(card).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    release();
+    expect(await screen.findByText('resume disconnected.')).toBeInTheDocument();
   });
 
   it('asks for confirmation before disconnecting', async () => {
@@ -259,6 +355,106 @@ describe('profile review', () => {
     await user.click(screen.getByRole('button', { name: 'Approve' }));
     await screen.findByLabelText('Approval status');
     expect(state.approvedVersions).toEqual([1, 2]);
+  });
+
+  it('shows the first run link when approving starts a run', async () => {
+    const user = userEvent.setup();
+    seedProfile();
+    state.runStarted = true;
+    renderAt('/profile/review');
+    await user.click(await screen.findByRole('button', { name: 'Approve' }));
+    const note = await screen.findByText(/Your first run has started/);
+    expect(note).toHaveTextContent('Profile approved. Your first run has started.');
+    expect(within(note).getByRole('link')).toHaveAttribute('href', '/runs');
+  });
+
+  it('draws build progress from the step while a rebuild runs', async () => {
+    const user = userEvent.setup();
+    seedProfile();
+    state.buildStatuses = [
+      { state: 'idle' },
+      { state: 'running', step: 'gathering', started_at: NOW },
+      { state: 'running', step: 'extracting', started_at: NOW },
+      { state: 'running', step: 'checking', started_at: NOW },
+      { state: 'done', version: 2 },
+    ];
+    render(
+      <MemoryRouter>
+        <ProfileReviewPage pollMs={150} />
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Rebuild from sources' }));
+    const bar = await screen.findByRole('progressbar');
+    expect(bar).toHaveAttribute('max', '3');
+    expect(await screen.findByText('Extracting your profile')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('value', '1');
+    expect(await screen.findByText('Checking it against your sources')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('value', '2');
+    expect(await screen.findByText(/profile was rebuilt/)).toBeInTheDocument();
+  });
+
+  it('shows the first-build banner with progress', async () => {
+    seedProfile();
+    state.buildStatuses = [
+      { state: 'running', step: 'extracting', started_at: NOW },
+      { state: 'done', version: 2 },
+    ];
+    render(
+      <MemoryRouter>
+        <ProfileReviewPage pollMs={200} />
+      </MemoryRouter>,
+    );
+    const banner = (
+      await screen.findByText('Building your profile from your connected sources…', {
+        exact: false,
+      })
+    ).closest('[role="status"]')!;
+    expect(banner).not.toBeNull();
+    expect(within(banner as HTMLElement).getByRole('progressbar')).toHaveAttribute('value', '1');
+    expect(within(banner as HTMLElement).getByText('Extracting your profile')).toBeInTheDocument();
+  });
+
+  it('Go to field focuses a control inside the flagged entry', async () => {
+    const user = userEvent.setup();
+    seedProfile([
+      {
+        id: 'e1',
+        kind: 'unsupported_entry',
+        path: 'work_history.1',
+        message: 'Not in your sources',
+        sources: ['resume'],
+        resolved: false,
+      },
+    ]);
+    const doc = state.profile!.document;
+    doc.work_history.push({ ...doc.work_history[0]!, employer: 'Globex', sources: ['resume'] });
+    renderAt('/profile/review');
+    await user.click(await screen.findByRole('link', { name: 'Go to field' }));
+    const entry = document.getElementById('f-work_history.1')!;
+    expect(entry.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.id).toBe('f-work_history.1.employer');
+  });
+
+  it('a date conflict gets one link per entry, labelled by employer', async () => {
+    const user = userEvent.setup();
+    seedProfile([
+      {
+        id: 'dc2',
+        kind: 'date_conflict',
+        path: 'work_history.0',
+        paths: ['work_history.0', 'work_history.1'],
+        message: 'Overlap',
+        sources: ['resume'],
+        resolved: false,
+      },
+    ]);
+    const doc = state.profile!.document;
+    doc.work_history.push({ ...doc.work_history[0]!, employer: 'Globex', sources: ['resume'] });
+    renderAt('/profile/review');
+    const second = await screen.findByRole('link', { name: 'Globex' });
+    expect(screen.getByRole('link', { name: doc.work_history[0]!.employer })).toBeInTheDocument();
+    await user.click(second);
+    expect(document.activeElement?.id).toBe('f-work_history.1.employer');
   });
 
   it('keeps Approve disabled while a rebuild is running', async () => {
@@ -443,9 +639,11 @@ describe('profile review', () => {
         <ProfileReviewPage pollMs={10} />
       </MemoryRouter>,
     );
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Building your profile from your connected sources…',
-    );
+    expect(
+      await screen.findByText('Building your profile from your connected sources…', {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText('Full name')).toBeNull();
     expect(await screen.findByLabelText('Full name')).toBeInTheDocument();
     expect(screen.queryByText('Building your profile from your connected sources…')).toBeNull();

@@ -1,0 +1,1 @@
+ALTER TABLE "profile_builds" ADD COLUMN "step" text;

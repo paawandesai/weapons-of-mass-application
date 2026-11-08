@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, errorMessage, type InterviewView } from '../api';
@@ -28,7 +29,7 @@ export function PrepPlanPage() {
           {error}
         </p>
       ) : !interview ? (
-        <p className="muted">Loading…</p>
+        <Loading />
       ) : (
         <>
           <p>

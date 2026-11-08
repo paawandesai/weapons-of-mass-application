@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -135,7 +136,7 @@ export function BoardPage() {
           {loadError}
         </p>
       ) : null}
-      {board === null && !loadError ? <p className="muted">Loading…</p> : null}
+      {board === null && !loadError ? <Loading /> : null}
       {board ? (
         <div className="board">
           {COLUMNS.map(({ id, label }) => (

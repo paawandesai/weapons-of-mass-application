@@ -70,6 +70,8 @@ export interface OfferInput {
   messageId: string;
   slots: ProposedSlot[];
   compensationFlag: boolean;
+  /** The message moves a time already agreed (rule 53); a confirmed interview is only rescheduled when set. */
+  reschedule?: boolean;
 }
 
 /** A slot just stored, with its raw single-use token. The token lives only in memory and in the email. */
@@ -86,7 +88,8 @@ export interface RecordedOffer extends OfferResult {
 }
 
 export interface OfferResult {
-  status: 'offered' | 'no_slots' | 'no_free_slot' | 'already_offered' | 'blocked';
+  status:
+    'offered' | 'no_slots' | 'no_free_slot' | 'already_offered' | 'already_booked' | 'blocked';
   interviewId: string | null;
   /** True when this offer replaced a confirmed interview's time (rule 11). */
   reschedule: boolean;

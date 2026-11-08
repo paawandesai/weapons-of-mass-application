@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading';
 import type { MeResponse } from '@wma/shared';
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
@@ -36,7 +37,7 @@ export function DashboardPage() {
         {error}
       </p>
     );
-  if (!me) return <p className="muted">Loading…</p>;
+  if (!me) return <Loading />;
 
   const approved = me.user.approved_profile_version !== null;
   // Once the profile is approved the board is the home page.

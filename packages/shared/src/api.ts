@@ -53,6 +53,10 @@ export interface BuildStatus {
   state: 'idle' | 'running' | 'done' | 'failed';
   version?: number;
   reason?: string;
+  /** Running only. */
+  step?: 'gathering' | 'extracting' | 'checking';
+  /** Running only: when the build was reserved, ISO 8601. */
+  started_at?: string;
 }
 
 export interface ProfileResponse {

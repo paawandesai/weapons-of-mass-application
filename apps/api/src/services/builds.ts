@@ -84,5 +84,6 @@ export async function getBuildStatus(
   if (!b) return { state: 'idle' };
   if (b.state === 'done') return { state: 'done', version: b.version ?? undefined };
   if (b.state === 'failed') return { state: 'failed', reason: b.reason ?? undefined };
-  return { state: 'running' };
+  const step = b.step === 'extracting' || b.step === 'checking' ? b.step : 'gathering';
+  return { state: 'running', step, started_at: b.createdAt.toISOString() };
 }

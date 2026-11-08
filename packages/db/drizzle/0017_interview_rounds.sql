@@ -1,0 +1,2 @@
+ALTER TABLE "interviews" DROP CONSTRAINT "interviews_tenant_thread_key";--> statement-breakpoint
+CREATE INDEX "interviews_tenant_thread_created_idx" ON "interviews" USING btree ("tenant_id","thread_id","created_at");

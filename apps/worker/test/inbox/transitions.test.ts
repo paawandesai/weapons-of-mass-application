@@ -4,6 +4,7 @@ import {
   getApplication,
   getEmailThreadByGmailId,
   getMailSyncState,
+  insertInterview,
   isMessageProcessed,
   listInterviewsForApplication,
   listOutgoingMessagesForUser,
@@ -15,7 +16,7 @@ import {
 import { InboxClassificationJsonSchema, PREP_PLAN_JOB, SCHEDULE_REMINDERS_JOB } from '@wma/shared';
 import { recordConfirmedFromEmail } from '../../src/scheduling/confirmed';
 import { CalendarUnavailableError } from '../../src/scheduling/offer';
-import { INBOX_CLASSIFY_PROMPT } from '../../src/inbox/classify';
+import { INBOX_CLASSIFY_PROMPT, RESCHEDULE_WORDS } from '../../src/inbox/classify';
 import { processMessage, runMailSync } from '../../src/inbox/sync';
 import {
   approve,
@@ -90,6 +91,7 @@ describe('rule 3: classification', () => {
       'compensation_flag',
       'booking_link',
       'proposed_slots',
+      'reschedule',
       'confirmed_slot',
     ]);
   });
@@ -230,7 +232,7 @@ describe('a confirmed time in the email (self-scheduled interviews)', () => {
     expect(past.jobs).toHaveLength(0);
   });
 
-  it('a second confirmation on the thread reschedules in place; the same time changes nothing', async () => {
+  it('the same time again changes nothing; a reschedule moves it in place; another time is a new round', async () => {
     const r = await deliverConfirmed();
     const iv = r.interviews[0]!;
     const base = {
@@ -245,8 +247,10 @@ describe('a confirmed time in the email (self-scheduled interviews)', () => {
       endsAt: iv.endsAt!,
     });
     expect(same.status).toBe('unchanged');
+
     const moved = await recordConfirmedInterview(r.t.handle, {
       ...base,
+      reschedule: true,
       startsAt: new Date('2026-03-26T18:00:00Z'),
       endsAt: new Date('2026-03-26T19:00:00Z'),
     });
@@ -257,6 +261,49 @@ describe('a confirmed time in the email (self-scheduled interviews)', () => {
     expect(await listInterviewsForApplication(r.t.handle, r.s.application.id)).toHaveLength(1);
     const keys = (await listUndispatchedJobs(r.t.handle)).map((j) => j.dedupeKey);
     expect(keys).toContain(`schedule-reminders:${iv.id}:${moved.interview.confirmedGeneration}`);
+
+    // Rule 55: a further confirmed time that is not a move is the next round, its own row.
+    const next = await recordConfirmedInterview(r.t.handle, {
+      ...base,
+      startsAt: new Date('2026-03-30T18:00:00Z'),
+      endsAt: new Date('2026-03-30T19:00:00Z'),
+    });
+    expect(next.status).toBe('recorded');
+    expect(next.interview.id).not.toBe(iv.id);
+    expect(next.interview.threadId).toBe(r.thread!.id);
+    expect(await listInterviewsForApplication(r.t.handle, r.s.application.id)).toHaveLength(2);
+  });
+
+  it('a confirmation on a thread whose slot request is still out confirms that interview', async () => {
+    const t = await env.makeTenant();
+    await approve(t);
+    const s = await seed(t);
+    const thread = (await (async () => {
+      const f = fixture('interview', s);
+      await upsertMailSyncState(t.handle, t.userId, { historyId: 'h-1' });
+      const gmail = new FakeInboxGmail();
+      gmail.add(message(f));
+      const d = makeDeps(gmail, inboxLlm({ classify: classifyAnswers(f) }));
+      await runMailSync(t.handle, t.userId, d.deps);
+      return getEmailThreadByGmailId(t.handle, f.threadId);
+    })())!;
+    const { interview: offered } = await insertInterview(t.handle, {
+      userId: t.userId,
+      applicationId: s.application.id,
+      threadId: thread.id,
+    });
+    const r = await recordConfirmedInterview(t.handle, {
+      userId: t.userId,
+      applicationId: s.application.id,
+      threadId: thread.id,
+      bookedVia: 'email',
+      startsAt: new Date('2026-03-24T18:00:00Z'),
+      endsAt: new Date('2026-03-24T18:45:00Z'),
+    });
+    expect(r.status).toBe('recorded');
+    expect(r.interview.id).toBe(offered.id);
+    expect(r.interview.confirmedAt).not.toBeNull();
+    expect(r.interview.confirmedSlotId).toBeNull();
   });
 });
 
@@ -364,6 +411,25 @@ describe('rules 6 and 7: compensation and booking links', () => {
         slots: r.f.classification.proposed_slots,
       }),
     );
+  });
+
+  it('the classification reschedule flag reaches scheduling; absent it is false', async () => {
+    const plain = await deliver('interview');
+    expect(plain.offerSlots.mock.calls[0]![1]).toMatchObject({ reschedule: false });
+    const flagged = await deliver('interview', 'applied', (f) => ({
+      ...f,
+      classification: { ...f.classification, reschedule: true },
+    }));
+    expect(flagged.offerSlots.mock.calls[0]![1]).toMatchObject({ reschedule: true });
+  });
+
+  it('the RESCHEDULE_WORDS override reaches scheduling whatever the model said', async () => {
+    const r = await deliver('interview', 'applied', (f) => ({
+      ...f,
+      body: `${f.body}\n\nSorry, something came up, here are a few other options.`,
+      classification: { ...f.classification, reschedule: false },
+    }));
+    expect(r.offerSlots.mock.calls[0]![1]).toMatchObject({ reschedule: true });
   });
 
   it('booking link: digest item with the link, no slots offered, no reply', async () => {
@@ -554,5 +620,34 @@ describe('concurrent classifications', () => {
       expect(outcomes).toEqual(['linked', 'linked']);
       expect((await getApplication(t.handle, s.application.id))!.status).toBe('closed');
     }
+  });
+});
+
+describe('RESCHEDULE_WORDS (rule 53)', () => {
+  it.each([
+    'Can we reschedule?',
+    'Could we re-schedule for next week',
+    'We need to move our call to Friday',
+    'Please move the interview',
+    'Please move this meeting',
+    'That time no longer works for me',
+    'Sorry, something came up',
+    'Something has came up on our side',
+    'Can we push it back a day',
+    'We pushed the call back',
+    'Could we change the time?',
+    'We are changing our time',
+    'Would a different time work?',
+  ])('matches %s', (text) => {
+    expect(RESCHEDULE_WORDS.test(text)).toBe(true);
+  });
+
+  it.each([
+    'We would like to invite you to a technical interview',
+    'Next is the final conversation with our CTO',
+    'Here are three times that work for us',
+    'Thanks for your time',
+  ])('does not match %s', (text) => {
+    expect(RESCHEDULE_WORDS.test(text)).toBe(false);
   });
 });
