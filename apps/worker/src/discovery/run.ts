@@ -51,6 +51,8 @@ export type RunStep = (typeof RUN_STEPS)[number];
 
 export interface DailyRunDeps {
   llm: StructuredLlm;
+  /** A separate (usually faster, cheaper) model for the many judgments; defaults to `llm`. */
+  judgeLlm?: StructuredLlm;
   queue: SubmitQueue;
   http?: Http;
   now?: () => Date;
@@ -246,6 +248,9 @@ export async function executeDailyRun(
   const deps: DailyRunDeps = {
     ...rawDeps,
     llm: meterLlm(handle, userId, 'discovery', rawDeps.llm),
+    judgeLlm: rawDeps.judgeLlm
+      ? meterLlm(handle, userId, 'discovery', rawDeps.judgeLlm)
+      : undefined,
   };
   const now = deps.now ?? (() => new Date());
   const user = await getUserById(handle, userId);
@@ -362,7 +367,7 @@ export async function executeDailyRun(
       await setStep('judge', { counts });
       const results: JudgeResult[] = await judgeAll(
         capped.kept,
-        { llm: deps.llm, profile, today: p.date },
+        { llm: deps.judgeLlm ?? deps.llm, profile, today: p.date },
         deps.judgeConcurrency,
       );
       const judged = results.filter((r): r is Judged => r.status === 'judged');
