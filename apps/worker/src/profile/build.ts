@@ -146,6 +146,8 @@ async function carriedSections(
         notice_period: null,
         reasons_for_change: null,
         self_identification_default: null,
+        citizenship: null,
+        payroll_state: null,
       },
     };
   }

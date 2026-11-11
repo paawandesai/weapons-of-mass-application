@@ -60,6 +60,8 @@ const EDUCATION: Spec[] = [
 const STANDARD: Spec[] = [
   { key: 'work_authorization', label: 'Work authorization' },
   { key: 'visa_sponsorship_required', label: 'Visa sponsorship required', kind: 'tri' },
+  { key: 'citizenship', label: 'Citizenship (e.g. U.S. citizen)' },
+  { key: 'payroll_state', label: 'State you would be on payroll in' },
   { key: 'start_date', label: 'Start date (as text)' },
   { key: 'earliest_start_date', label: 'Earliest start date', kind: 'date' },
   { key: 'notice_period', label: 'Notice period' },

@@ -130,6 +130,13 @@ export const standardAnswersSchema = z.object({
    * stored before the field existed still parse.
    */
   self_identification_default: z.enum(['decline']).nullable().default(null),
+  /**
+   * Citizenship in the user's own words ("U.S. citizen"). Answers citizenship and "U.S. person"
+   * (export control) questions, which work_authorization alone cannot. Default so older documents parse.
+   */
+  citizenship: z.string().nullable().default(null),
+  /** The state or region the user would be on payroll in ("Texas"). Default so older documents parse. */
+  payroll_state: z.string().nullable().default(null),
 });
 
 export const flagKindSchema = z.enum([

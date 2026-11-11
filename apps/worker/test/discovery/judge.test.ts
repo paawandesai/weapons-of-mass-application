@@ -367,3 +367,29 @@ describe('selectWithCompanyCap', () => {
     expect(r.skipped).toEqual([]);
   });
 });
+
+describe('judge on a timed-out call', () => {
+  it('does not retry a timeout', async () => {
+    let calls = 0;
+    const llm = {
+      model: 't',
+      async generateStructured(): Promise<never> {
+        calls++;
+        throw new Error('llm: grok timed out after 300000ms');
+      },
+    };
+    const r = await judge(
+      {
+        source: 'seed',
+        companyName: 'Acme',
+        title: 'Eng',
+        url: 'https://x.test/1',
+        description: 'd',
+      } as never,
+      { llm, profile: {} as never, today: '2026-11-11' },
+      'system',
+    );
+    expect(r.status).toBe('unjudged');
+    expect(calls).toBe(1);
+  });
+});

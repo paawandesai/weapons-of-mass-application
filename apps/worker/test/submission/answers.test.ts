@@ -1525,7 +1525,7 @@ describe('rule 39: country from location', () => {
       );
     return Promise.all([
       expect(verdict('Where are you based?')).resolves.toBe('location'),
-      expect(verdict('Country of citizenship')).resolves.toBeUndefined(),
+      expect(verdict('Country of citizenship')).resolves.toBe('citizenship'),
     ]);
   });
 
@@ -1674,5 +1674,53 @@ describe('awards in answers', () => {
     const sent = callsTo(llm, 'answer-form-question/v1')[0]!.user;
     expect(sent).toContain('Dean&#39;s List'.replace('&#39;', "'"));
     expect(sent).not.toContain('"sources"');
+  });
+});
+
+describe('citizenship and payroll state', () => {
+  const withAnswers = (over: Record<string, unknown>) => ({
+    ...PROFILE,
+    standard_answers: { ...PROFILE.standard_answers, ...over },
+  });
+  const one = (profile: typeof PROFILE, f: FieldDescriptor) =>
+    resolveStandardFields({ profile }, [{ ...f, classification: 'standard' }])[0]!;
+
+  it('recognises the labels', () => {
+    expect(standardKeyFor('Are you a U.S. person under export control laws?')).toBe('citizenship');
+    expect(standardKeyFor('Are you a U.S. citizen?')).toBe('citizenship');
+    expect(standardKeyFor('What state will you be on payroll in?')).toBe('payroll_state');
+    expect(standardKeyFor('Are you legally authorized to work in the US?')).toBe(
+      'work_authorization',
+    );
+  });
+
+  it('answers a yes/no U.S. person question from the citizenship text', () => {
+    const f = field({
+      label: 'Are you a U.S. person?',
+      type: 'radio',
+      options: ['Yes', 'No'],
+      required: true,
+    });
+    expect(one(withAnswers({ citizenship: 'U.S. citizen' }), f)).toMatchObject({
+      status: 'filled',
+      value: 'Yes',
+    });
+    expect(one(withAnswers({ citizenship: 'Citizen of India' }), f)).toMatchObject({
+      status: 'filled',
+      value: 'No',
+    });
+  });
+
+  it('reports the profile field when citizenship or payroll state is missing', () => {
+    const c = field({ label: 'Citizenship', required: true });
+    expect(one(withAnswers({ citizenship: null }), c)).toMatchObject({
+      status: 'missing-profile-field',
+      profileField: 'standard_answers.citizenship',
+    });
+    const s = field({ label: 'Where will you be on payroll?', required: true });
+    expect(one(withAnswers({ payroll_state: 'Texas' }), s)).toMatchObject({
+      status: 'filled',
+      value: 'Texas',
+    });
   });
 });

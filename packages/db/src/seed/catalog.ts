@@ -403,6 +403,8 @@ export const DEMO_PROFILE: ProfileDocument = {
     notice_period: '2 weeks',
     reasons_for_change: 'Looking for broader platform ownership',
     self_identification_default: null,
+    citizenship: 'U.S. citizen',
+    payroll_state: 'California',
   },
   flags: [],
 };
