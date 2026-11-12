@@ -7,10 +7,14 @@ import {
   type TenantHandle,
 } from '@wma/db';
 import {
+  DRAFT_OUTREACH_JOB,
+  DRAFT_OUTREACH_QUEUE_OPTIONS,
   NEGOTIATION_JOB,
   NEGOTIATION_QUEUE_OPTIONS,
   PREP_PLAN_JOB,
   PREP_PLAN_QUEUE_OPTIONS,
+  SEND_OUTREACH_JOB,
+  SEND_OUTREACH_QUEUE_OPTIONS,
 } from '@wma/shared';
 import { MAIL_SYNC_JOB, mailSyncKey } from './mail-sync';
 import { repairPendingPrepPlans } from './prep-plan';
@@ -36,6 +40,14 @@ const SEND_OPTIONS: Record<string, (row: PendingJobRow) => SendOptions> = {
   [NEGOTIATION_JOB]: (row) => ({
     singletonKey: row.dedupeKey,
     ...retryOf(NEGOTIATION_QUEUE_OPTIONS),
+  }),
+  [DRAFT_OUTREACH_JOB]: (row) => ({
+    singletonKey: row.dedupeKey,
+    ...retryOf(DRAFT_OUTREACH_QUEUE_OPTIONS),
+  }),
+  [SEND_OUTREACH_JOB]: (row) => ({
+    singletonKey: row.dedupeKey,
+    ...retryOf(SEND_OUTREACH_QUEUE_OPTIONS),
   }),
   [MAIL_SYNC_JOB]: (row) => ({
     singletonKey: mailSyncKey(row.userId),

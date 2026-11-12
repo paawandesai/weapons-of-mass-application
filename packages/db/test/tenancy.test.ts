@@ -77,6 +77,7 @@ describe('role and RLS configuration (rules 3, 4)', () => {
         'llm_usage',
         'mail_sync_state',
         'outgoing_messages',
+        'outreach_drafts',
         'pending_jobs',
         'processed_messages',
         'profile_builds',

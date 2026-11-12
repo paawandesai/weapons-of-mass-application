@@ -26,6 +26,15 @@ Set `LLM_BACKEND` in `.env` and the worker drives a logged-in CLI instead of the
 
 Run the worker on your own machine (not in the container). Keep `JUDGE_CAP_PER_RUN` low, since subscriptions have usage caps, and leave `LLM_CLI_CONCURRENCY` at 2 or less. Personal use only: it is your own login on your own machine. Implementation: `packages/llm/src/cli.ts`.
 
+## Recruiter outreach (approval required)
+
+Open an application card, enter a recruiter or hiring manager you found yourself (name, email, optional
+profile link) and the app drafts a short email plus a LinkedIn note for you to paste by hand. Nothing is
+sent until you press **Approve and send** and confirm. The approval is tied to the exact recipient,
+subject and body you saw: any edit clears it, and the send job refuses a draft whose text no longer
+matches. Sends go through your Gmail, are limited to 5 per day, and never contain pay or compensation
+text. The app does not look people up and never touches LinkedIn.
+
 ## OpenSpec
 
 Install the CLI once:

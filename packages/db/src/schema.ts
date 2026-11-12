@@ -556,6 +556,7 @@ export const outgoingKind = pgEnum('outgoing_kind', [
   'reminder',
   'digest',
   'captcha_request',
+  'outreach',
   'other',
 ]);
 
@@ -916,5 +917,53 @@ export const llmUsage = pgTable(
       columns: [t.tenantId, t.applicationId],
       foreignColumns: [applications.tenantId, applications.id],
     }).onDelete('set null'),
+  ],
+);
+
+// Recruiter outreach: a drafted email that is only ever sent after the user approves it.
+export const outreachState = pgEnum('outreach_state', [
+  'draft',
+  'approved',
+  'sending',
+  'sent',
+  'rejected',
+  'failed',
+]);
+
+export const outreachDrafts = pgTable(
+  'outreach_drafts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    applicationId: uuid('application_id').notNull(),
+    contactName: text('contact_name').notNull(),
+    contactTitle: text('contact_title'),
+    contactProfileUrl: text('contact_profile_url'),
+    toAddress: text('to_address').notNull(),
+    subject: text('subject').notNull(),
+    bodyText: text('body_text').notNull(),
+    /** Connection note to paste into LinkedIn by hand (the app never touches LinkedIn). */
+    linkedinNote: text('linkedin_note'),
+    state: outreachState('state').notNull().default('draft'),
+    /** Hash of recipient + subject + body the user approved; the send refuses if it no longer matches. */
+    approvedHash: text('approved_hash'),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    outgoingId: uuid('outgoing_id'),
+    failureReason: text('failure_reason'),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('outreach_drafts_tenant_user_state_idx').on(t.tenantId, t.userId, t.state),
+    index('outreach_drafts_tenant_application_idx').on(t.tenantId, t.applicationId),
+    userRef(t),
+    foreignKey({
+      columns: [t.tenantId, t.applicationId],
+      foreignColumns: [applications.tenantId, applications.id],
+    }).onDelete('cascade'),
   ],
 );

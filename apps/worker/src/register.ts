@@ -9,6 +9,7 @@ import { registerDailyRun } from './jobs/daily-run';
 import { registerBookInterview } from './jobs/book-interview';
 import { registerDigest } from './jobs/digest';
 import { registerFollowUp } from './jobs/follow-up';
+import { registerOutreach } from './jobs/outreach';
 import { registerNegotiation } from './jobs/negotiation';
 import { registerPrepPlan } from './jobs/prep-plan';
 import { startPendingJobDispatcher } from './jobs/pending-jobs';
@@ -31,6 +32,7 @@ export async function registerWave3Jobs(boss: PgBoss, db: Db): Promise<void> {
   await registerFollowUp(boss, db);
   await registerReminders(boss, db);
   await registerDigest(boss, db);
+  await registerOutreach(boss, db);
 }
 
 /** Wave 4 job registration (prep plan, negotiation, simulated recruiter). */

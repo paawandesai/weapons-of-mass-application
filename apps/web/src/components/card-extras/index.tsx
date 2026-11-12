@@ -6,11 +6,13 @@ import { api, errorMessage, formatTime, type InterviewView, type NegotiationView
 import { formatUsd } from '../../pages/UsagePage';
 import { FeedbackForm } from './FeedbackForm';
 import { OfferPanel } from './OfferPanel';
+import { OutreachPanel } from './OutreachPanel';
 import { PrepPanel } from './PrepPanel';
 import { RecordInterviewForm } from './RecordInterviewForm';
 
 export { FeedbackForm } from './FeedbackForm';
 export { OfferPanel } from './OfferPanel';
+export { OutreachPanel } from './OutreachPanel';
 export { PrepPanel } from './PrepPanel';
 export { PrepPlanView } from './PrepPlanView';
 export { RecordInterviewForm } from './RecordInterviewForm';
@@ -120,6 +122,7 @@ export function CardExtras({ application }: { application: CardExtrasApplication
           onChanged={() => void load()}
         />
       ) : null}
+      {!closed ? <OutreachPanel applicationId={application.id} /> : null}
       {loaded?.llm_usage && loaded.llm_usage.calls > 0 ? (
         <p className="muted small usage-line">
           Agent cost for this application: {formatUsd(loaded.llm_usage.cost_usd)} across{' '}

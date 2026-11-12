@@ -7,6 +7,7 @@ import { adminRoutes } from './routes/admin';
 import { applicationsRoutes } from './routes/applications';
 import { boardRoutes } from './routes/board';
 import { captchaRoutes } from './routes/captcha';
+import { outreachRoutes } from './routes/outreach';
 import { companiesRoutes } from './routes/companies';
 import { confirmRoutes } from './routes/confirm';
 import { interviewsRoutes } from './routes/interviews';
@@ -51,6 +52,7 @@ export function createApp(opts: AppOptions = {}) {
   app.route('/api/board', boardRoutes);
   app.route('/api/search', searchRoutes);
   app.route('/api/interviews', interviewsRoutes);
+  app.route('/api/outreach', outreachRoutes);
   app.route('/api/admin', adminRoutes);
   // Public: the visitor holds only a single-use token, so this is outside requireSession.
   app.route('/captcha', captchaRoutes);
