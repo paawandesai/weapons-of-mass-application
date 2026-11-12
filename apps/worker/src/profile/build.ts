@@ -148,6 +148,7 @@ async function carriedSections(
         self_identification_default: null,
         citizenship: null,
         payroll_state: null,
+        employer_agreements_restrict: null,
       },
     };
   }

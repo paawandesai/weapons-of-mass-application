@@ -19,6 +19,7 @@ export const STANDARD_KEYS = [
   'authorized_without_sponsorship',
   'citizenship',
   'payroll_state',
+  'employer_agreements',
   'worked_before',
   'interviewed_before',
   'applied_before',
@@ -157,6 +158,9 @@ const NOT_RESIDENCE_COUNTRY =
 export function isCountryListField(f: Pick<FieldDescriptor, 'label' | 'options'>): boolean {
   const l = norm(f.label);
   if (/^country( of residence)?$|which country/.test(l)) return true;
+  // Any other label naming a country ("Country *", "Country/Region") when it is not asking about
+  // citizenship, birth, a phone code and the like.
+  if (/\bcountry\b|\bcountry\/region\b/.test(l) && !NOT_RESIDENCE_COUNTRY.test(l)) return true;
   return hasCountryOptions(f.options) && !NOT_RESIDENCE_COUNTRY.test(l);
 }
 
@@ -265,6 +269,11 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   [
     'payroll_state',
     /\bpayroll\b|state (?:or province )?(?:in which|where|of) you (?:will|would|plan to) (?:be )?(?:work|employ|reside|live)/,
+  ],
+  // Agreements with a current or former employer that limit the candidate.
+  [
+    'employer_agreements',
+    /non-?compete|non-?solicit|(?:agreement|contract|obligation|restriction|covenant)s?\b.*\b(?:current|former|previous|prior|past) employers?\b|\b(?:current|former|previous|prior|past) employers?\b.*\b(?:agreement|contract|obligation|restriction|covenant)s?\b/,
   ],
   // Rule 27: prior contact with the company. After sponsorship / work authorization so those keep
   // their labels; before the generic patterns.
