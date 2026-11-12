@@ -28,6 +28,7 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   authorized_without_sponsorship: 'standard_answers.work_authorization',
   citizenship: 'standard_answers.citizenship',
   payroll_state: 'standard_answers.payroll_state',
+  employer_agreements: 'standard_answers.employer_agreements_restrict',
   worked_before: 'work_history',
   interviewed_before: 'standard_answers.previous_interviews',
   applied_before: 'standard_answers.previous_interviews',
@@ -173,6 +174,8 @@ export function profileValue(
     }
     case 'payroll_state':
       return nonEmpty(p.standard_answers.payroll_state);
+    case 'employer_agreements':
+      return p.standard_answers.employer_agreements_restrict;
     case 'worked_before':
     case 'interviewed_before':
     case 'applied_before':
@@ -473,6 +476,28 @@ function countryNameFromLocation(loc: string | null | undefined): string | null 
 }
 
 /**
+ * The country the rest of the profile points to when the location text names none: the phone's
+ * dial code, a citizenship or work-authorization statement naming the U.S., or a U.S. payroll state.
+ */
+function profileCountryName(p: ProfileDocument): string | null {
+  const fromPhone = profileCountry(p);
+  if (fromPhone) return canonicalCountry(PLACE_NAME[fromPhone]!);
+  const sa = p.standard_answers;
+  for (const t of [sa.citizenship, sa.work_authorization]) {
+    const id = t ? locationCountryId(t) : null;
+    if (id) return canonicalCountry(PLACE_NAME[id]!);
+  }
+  if (
+    sa.payroll_state &&
+    (US_STATE_NAMES.test(sa.payroll_state) ||
+      US_STATE_CODES.includes(sa.payroll_state.trim().toUpperCase()))
+  ) {
+    return 'United States';
+  }
+  return null;
+}
+
+/**
  * An inferred work-authorization statement for a question: the country the profile implies, else
  * the countries the question itself names, else null (the question is then the user's to answer).
  * When the profile implies a country the question must be covered by it.
@@ -586,7 +611,8 @@ function valueForField(
   // Rule 39: a country list takes the country the profile's location implies; a city/state
   // question keeps the location text (the generic path below).
   if (key === 'location' && isCountryListField(f)) {
-    const country = countryNameFromLocation(profile.identity.location);
+    const country =
+      countryNameFromLocation(profile.identity.location) ?? profileCountryName(profile);
     if (!country) return null;
     if (f.options?.length) {
       const hit = f.options.find((o) => canonicalCountry(o) === country);
@@ -610,7 +636,9 @@ function valueForField(
     }
   }
   // Rule 45: where the candidate heard about the role is never a profile fact.
-  if (key === 'heard_about') return allowInference ? heardAbout(f) : null;
+  // Inferred even when the field looks optional: a box the form validates as required must not
+  // be left empty because the scan read it as optional.
+  if (key === 'heard_about') return heardAbout(f);
   // Rule 23b: a date picker always gets a date; a text box keeps the start-date text.
   if (key === 'start_date' && f.type === 'date') return { value: deriveStartDate(profile, today) };
   let value = profileValue(profile, key, f.label, prior);

@@ -1724,3 +1724,53 @@ describe('citizenship and payroll state', () => {
     });
   });
 });
+
+describe('country, heard-about and employer agreements', () => {
+  const withAnswers = (
+    over: Record<string, unknown>,
+    location: string | null = PROFILE.identity.location,
+  ) => ({
+    ...PROFILE,
+    identity: { ...PROFILE.identity, location },
+    standard_answers: { ...PROFILE.standard_answers, ...over },
+  });
+  const one = (profile: typeof PROFILE, f: FieldDescriptor) =>
+    resolveStandardFields({ profile }, [{ ...f, classification: 'standard' }])[0]!;
+
+  it('a Country dropdown falls back to the country the citizenship statement names', () => {
+    const f = field({
+      label: 'Country *',
+      type: 'select',
+      required: true,
+      options: ['Canada', 'United States', 'India'],
+    });
+    expect(one(withAnswers({ citizenship: 'U.S. citizen' }, 'Remote'), f)).toMatchObject({
+      status: 'filled',
+      value: 'United States',
+    });
+  });
+
+  it('does not treat country of citizenship as the residence country', () => {
+    expect(standardKeyFor('Country of citizenship')).toBe('citizenship');
+  });
+
+  it('types Job board into a free-text how-did-you-hear box even when it looks optional', () => {
+    const f = field({ label: 'How did you hear about this opportunity?', required: false });
+    expect(one(PROFILE, f)).toMatchObject({ status: 'filled', value: 'Job board' });
+  });
+
+  it('answers the employer-agreement question only from the profile', () => {
+    const q =
+      'Are you subject to any agreement with a current or former employer, such as a non-compete or NDA, that limits you?';
+    expect(standardKeyFor(q)).toBe('employer_agreements');
+    const f = field({ label: q, type: 'radio', required: true, options: ['Yes', 'No'] });
+    expect(one(withAnswers({ employer_agreements_restrict: null }), f)).toMatchObject({
+      status: 'missing-profile-field',
+      profileField: 'standard_answers.employer_agreements_restrict',
+    });
+    expect(one(withAnswers({ employer_agreements_restrict: false }), f)).toMatchObject({
+      status: 'filled',
+      value: 'No',
+    });
+  });
+});

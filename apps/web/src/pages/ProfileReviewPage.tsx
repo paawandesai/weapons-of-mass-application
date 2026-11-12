@@ -62,6 +62,12 @@ const STANDARD: Spec[] = [
   { key: 'visa_sponsorship_required', label: 'Visa sponsorship required', kind: 'tri' },
   { key: 'citizenship', label: 'Citizenship (e.g. U.S. citizen)' },
   { key: 'payroll_state', label: 'State you would be on payroll in' },
+  {
+    key: 'employer_agreements_restrict',
+    label:
+      'An agreement with a current or former employer (non-compete, NDA) limits where or how you can work',
+    kind: 'tri',
+  },
   { key: 'start_date', label: 'Start date (as text)' },
   { key: 'earliest_start_date', label: 'Earliest start date', kind: 'date' },
   { key: 'notice_period', label: 'Notice period' },

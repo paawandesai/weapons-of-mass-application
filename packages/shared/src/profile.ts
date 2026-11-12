@@ -137,6 +137,12 @@ export const standardAnswersSchema = z.object({
   citizenship: z.string().nullable().default(null),
   /** The state or region the user would be on payroll in ("Texas"). Default so older documents parse. */
   payroll_state: z.string().nullable().default(null),
+  /**
+   * Whether an agreement with a current or former employer (non-compete, non-solicit, NDA) limits
+   * where or how the user can work. true = one does. null = not answered: the question is the
+   * user's to answer, never guessed. Default so older documents parse.
+   */
+  employer_agreements_restrict: z.boolean().nullable().default(null),
 });
 
 export const flagKindSchema = z.enum([
