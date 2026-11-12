@@ -80,7 +80,7 @@ export const spawnRunner: CliRunner = (input) =>
 
 export interface CliLlmOptions {
   model?: string;
-  /** Per-call limit. Default 300000 (5 minutes). */
+  /** Per-call limit. Default LLM_CLI_TIMEOUT_MS or 300000 (5 minutes). */
   timeoutMs?: number;
   /** Calls in flight at once. Default LLM_CLI_CONCURRENCY or 2. */
   concurrency?: number;
@@ -344,7 +344,7 @@ function limiter(limit: number) {
 export function createCliLlm(backend: CliBackend, options: CliLlmOptions = {}): StructuredLlm {
   const spec = PROVIDERS[backend];
   const run = options.run ?? spawnRunner;
-  const timeoutMs = options.timeoutMs ?? 300_000;
+  const timeoutMs = options.timeoutMs ?? (Number(process.env.LLM_CLI_TIMEOUT_MS) || 300_000);
   const concurrency = options.concurrency ?? (Number(process.env.LLM_CLI_CONCURRENCY) || 2);
   const gate = limiter(Math.max(1, concurrency));
   const baseEnv = { ...(options.env ?? process.env) };

@@ -112,3 +112,32 @@ describe('unresolvedBlockingFlags', () => {
     expect(unresolvedBlockingFlags([flag('partial_source')])).toEqual([]);
   });
 });
+
+describe('awards and self-identification default', () => {
+  it('older documents without either field still parse, with the default null', () => {
+    const doc = clone();
+    delete doc.awards;
+    delete doc.standard_answers.self_identification_default;
+    const parsed = profileDocumentSchema.parse(doc);
+    expect(parsed.awards).toBeUndefined();
+    expect(parsed.standard_answers.self_identification_default).toBeNull();
+  });
+
+  it('accepts awards with provenance and rejects one with no source', () => {
+    const doc = clone();
+    doc.awards = [{ name: "Dean's List", issuer: null, date: '2018', sources: ['resume'] }];
+    expect(profileDocumentSchema.parse(doc).awards).toHaveLength(1);
+    doc.awards = [{ name: 'Invented prize', sources: [] }];
+    expect(profileDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+
+  it('only accepts decline (or null) as the self-identification default', () => {
+    const doc = clone();
+    doc.standard_answers.self_identification_default = 'decline';
+    expect(profileDocumentSchema.parse(doc).standard_answers.self_identification_default).toBe(
+      'decline',
+    );
+    doc.standard_answers.self_identification_default = 'male';
+    expect(profileDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+});

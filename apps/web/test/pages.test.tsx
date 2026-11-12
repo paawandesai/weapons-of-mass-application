@@ -1,4 +1,4 @@
-import type { ProfileFlag } from '@wma/shared';
+import type { ProfileDocument, ProfileFlag } from '@wma/shared';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -326,6 +326,21 @@ describe('profile review', () => {
     expect(await screen.findByLabelText('Approval status')).toHaveTextContent('Approved');
     expect(state.approvedVersions).toEqual([4]);
     expect(state.saved).toHaveLength(0);
+  });
+
+  it('saves the decline default and a typed award with the document', async () => {
+    const user = userEvent.setup();
+    seedProfile();
+    renderAt('/profile/review');
+    const select = await screen.findByLabelText(/Voluntary self-identification/);
+    await user.selectOptions(select, 'decline');
+    const awards = screen.getByLabelText('Honors and awards (one per line)');
+    await user.type(awards, "Dean's List");
+    await user.click(screen.getByRole('button', { name: /^Save/ }));
+    await waitFor(() => expect(state.saved).toHaveLength(1));
+    const saved = state.saved[0] as ProfileDocument;
+    expect(saved.standard_answers.self_identification_default).toBe('decline');
+    expect(saved.awards).toEqual([{ name: "Dean's List", sources: ['user'] }]);
   });
 
   it('approves the version it just saved when there were edits', async () => {

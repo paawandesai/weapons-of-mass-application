@@ -5,7 +5,7 @@ import { loadVersionedPrompt } from './prompts';
 import { profileForPrompt } from './profile-view';
 
 export const JUDGE_CONCURRENCY = 8;
-const MAX_DESCRIPTION_CHARS = 12_000;
+const MAX_DESCRIPTION_CHARS = 8_000;
 const MAX_RATIONALE = 600;
 
 export interface JudgeContext {
@@ -140,8 +140,10 @@ export async function judge(
           model: ctx.llm.model,
         };
       }
-    } catch {
-      // transport failure: same single retry as a malformed reply
+    } catch (e) {
+      // A timed-out call is not retried: the second attempt would burn another full timeout on the
+      // same posting. Other transport failures get the same single retry as a malformed reply.
+      if (e instanceof Error && /timed out/.test(e.message)) break;
     }
   }
   return {

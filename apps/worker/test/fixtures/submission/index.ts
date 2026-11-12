@@ -32,6 +32,9 @@ export const PROFILE: ProfileDocument = {
     notice_period: '30 days',
     reasons_for_change: 'Looking for a larger platform scope.',
     previous_interviews: null,
+    self_identification_default: null,
+    citizenship: null,
+    payroll_state: null,
   },
   flags: [],
 };

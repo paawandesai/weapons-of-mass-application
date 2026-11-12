@@ -17,6 +17,8 @@ export const STANDARD_KEYS = [
   'visa_sponsorship',
   'no_sponsorship_needed',
   'authorized_without_sponsorship',
+  'citizenship',
+  'payroll_state',
   'worked_before',
   'interviewed_before',
   'applied_before',
@@ -165,6 +167,20 @@ const SELF_ID =
 const DECLINE_OPTION =
   /(decline|prefer not|do(n't| not) wish|choose not|rather not)\b.*\b(self[- ]?identif\w*|identify)\b/;
 
+// Inside a field already known to be self-identification, any option that declines to answer.
+const DECLINE_CHOICE =
+  /\b(decline|prefer not|do(?:n't| not) (?:wish|want) to|choose not|rather not|not (?:wish|want) to (?:answer|say|disclose|identify))\b/;
+
+/**
+ * The option of a self-identification field that declines to answer, or null when the form has
+ * none (the field is then left alone, never guessed). Only meaningful for a field classified as
+ * self-identification: "Prefer not to answer" elsewhere can be an attestation, not a decline.
+ */
+export function declineOption(options: string[] | undefined): string | null {
+  if (!options) return null;
+  return options.find((o) => DECLINE_CHOICE.test(norm(o))) ?? null;
+}
+
 // Sponsorship wording, by polarity. "Do you require sponsorship?" is a different question from
 // "Can you work without sponsorship?" and from "Are you authorized to work without sponsorship?":
 // the first is answered Yes by someone who needs it, the others are answered Yes by someone who
@@ -242,6 +258,13 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   [
     'work_authorization',
     /(authori[sz]ed|eligible|right|permitted|legally able) to work|work authori[sz]ation|work permit|employment eligibility|authori[sz]ation to work|permanent(?:ly)? authori[sz](?:ed|ation)|eligib(?:le|ility) to work|legally (?:able|allowed|entitled) to work/,
+  ],
+  // Citizenship and export-control "U.S. person" questions, and the state the user would be on
+  // payroll in. After work authorization, so "authorized to work" keeps its own key.
+  ['citizenship', /\bcitizen(?:ship)?\b|\bu\.?s\.? persons?\b|export control|\bitar\b|nationality/],
+  [
+    'payroll_state',
+    /\bpayroll\b|state (?:or province )?(?:in which|where|of) you (?:will|would|plan to) (?:be )?(?:work|employ|reside|live)/,
   ],
   // Rule 27: prior contact with the company. After sponsorship / work authorization so those keep
   // their labels; before the generic patterns.

@@ -69,6 +69,18 @@ export const certificationSchema = z.object({
   sources: sourcesSchema,
 });
 
+/**
+ * An honor or award the user holds, as stated in a source. Optional in the document: older
+ * profiles have none. Form questions about honors and awards are answered from this list only.
+ */
+export const awardSchema = z.object({
+  name: z.string().min(1),
+  issuer: z.string().nullable().optional(),
+  /** YYYY-MM or YYYY when known. */
+  date: monthSchema.optional(),
+  sources: sourcesSchema,
+});
+
 export const remotePreferenceSchema = z.enum(['remote', 'hybrid', 'onsite', 'any']);
 
 export const preferencesSchema = z.object({
@@ -111,6 +123,20 @@ export const standardAnswersSchema = z.object({
   // Companies the candidate has interviewed at; [] means none, null means not yet answered.
   // Default so profile documents stored before the field existed still parse.
   previous_interviews: z.array(z.string()).nullable().default(null),
+  /**
+   * What to do with voluntary self-identification questions (gender, race, veteran status,
+   * disability). `decline`: choose the form's decline option when it has one; the question is still
+   * skipped, never guessed, when it has none. null: skip them all. Default so profile documents
+   * stored before the field existed still parse.
+   */
+  self_identification_default: z.enum(['decline']).nullable().default(null),
+  /**
+   * Citizenship in the user's own words ("U.S. citizen"). Answers citizenship and "U.S. person"
+   * (export control) questions, which work_authorization alone cannot. Default so older documents parse.
+   */
+  citizenship: z.string().nullable().default(null),
+  /** The state or region the user would be on payroll in ("Texas"). Default so older documents parse. */
+  payroll_state: z.string().nullable().default(null),
 });
 
 export const flagKindSchema = z.enum([
@@ -147,6 +173,8 @@ export const profileDocumentSchema = z.object({
   education: z.array(educationEntrySchema),
   /** Certifications the profile positively states; a resume may claim only these. */
   certifications: z.array(certificationSchema).optional(),
+  /** Honors and awards the profile positively states; an answer may claim only these. */
+  awards: z.array(awardSchema).optional(),
   preferences: preferencesSchema,
   survey: surveySchema,
   standard_answers: standardAnswersSchema,
@@ -194,6 +222,7 @@ export type ProfileDocument = z.infer<typeof profileDocumentSchema>;
 export type WorkHistoryEntry = z.infer<typeof workHistoryEntrySchema>;
 export type ProjectEntry = z.infer<typeof projectEntrySchema>;
 export type Certification = z.infer<typeof certificationSchema>;
+export type Award = z.infer<typeof awardSchema>;
 export type EducationEntry = z.infer<typeof educationEntrySchema>;
 export type ProfileFlag = z.infer<typeof flagSchema>;
 export type Survey = z.infer<typeof surveySchema>;

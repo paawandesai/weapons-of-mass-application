@@ -1,6 +1,6 @@
 import type { PgBoss } from 'pg-boss';
 import { deleteRunsBefore, type Db } from '@wma/db';
-import { createLlmClient, type StructuredLlm } from '@wma/llm';
+import { createLlmClient, parseBackend, type StructuredLlm } from '@wma/llm';
 import { bossSubmitQueue, type SubmitQueue } from '../discovery/handoff';
 import type { Http } from '@wma/discovery';
 import { DEFAULT_JUDGE_CAP, executeDailyRun, type DailyRunDeps } from '../discovery/run';
@@ -127,6 +127,8 @@ export async function cleanupOldRuns(
 
 export interface DailyRunRegistration {
   llm?: StructuredLlm;
+  /** Overrides `JUDGE_LLM_BACKEND` / `JUDGE_LLM_MODEL` (tests). */
+  judgeLlm?: StructuredLlm;
   queue?: SubmitQueue;
   roster?: Roster;
   http?: Http;
@@ -151,8 +153,20 @@ export async function registerDailyRun(
   const roster = options.roster ?? dbRoster(db);
   const queue = options.queue ?? bossSubmitQueue(boss);
   let llm = options.llm;
+  let judgeLlm = options.judgeLlm;
+  // Judging is dozens of short calls; a smaller or faster model there leaves the main model for
+  // the profile, answers and tailoring. Unset: judging uses the main model.
+  const judgeBackend = process.env.JUDGE_LLM_BACKEND?.trim();
+  const judgeModel = process.env.JUDGE_LLM_MODEL?.trim();
+  const separateJudge = Boolean(judgeBackend || judgeModel);
   const deps = (adapters: SourceAdapter[] | undefined): DailyRunDeps => ({
     llm: (llm ??= createLlmClient()),
+    judgeLlm: separateJudge
+      ? (judgeLlm ??= createLlmClient({
+          ...(judgeBackend ? { backend: parseBackend(judgeBackend) } : {}),
+          ...(judgeModel ? { model: judgeModel } : {}),
+        }))
+      : judgeLlm,
     queue,
     http: options.http,
     now,

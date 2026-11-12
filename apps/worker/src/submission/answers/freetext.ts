@@ -29,7 +29,20 @@ function profileForModel(p: ProfileDocument) {
     projects: p.projects.map(({ sources: _s, ...x }) => x),
     skills: p.skills,
     education: p.education.map(({ sources: _s, ...x }) => x),
+    // Honors and awards the profile states; a question about them is answered from this list only.
+    awards: (p.awards ?? []).map(({ sources: _s, ...x }) => x),
     preferences: p.preferences,
+    // What the user already told us in Profile Review (work authorization, citizenship, payroll
+    // state...). Without it the model answers "Where will you be on payroll?" from nothing.
+    standard_answers: {
+      work_authorization: p.standard_answers.work_authorization,
+      visa_sponsorship_required: p.standard_answers.visa_sponsorship_required,
+      citizenship: p.standard_answers.citizenship,
+      payroll_state: p.standard_answers.payroll_state,
+      start_date: p.standard_answers.start_date,
+      notice_period: p.standard_answers.notice_period,
+      previous_interviews: p.standard_answers.previous_interviews,
+    },
     // Never salary_floor or family_constraints.
     survey: {
       willing_to_relocate: p.survey.willing_to_relocate,

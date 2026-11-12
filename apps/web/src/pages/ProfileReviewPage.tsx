@@ -11,7 +11,7 @@ import { ApiError, api, errorMessage, formatTime } from '../api';
 import { Loading } from '../components/Loading';
 import { getAt, sameValue, setAt } from '../profilePaths';
 
-type Kind = 'text' | 'area' | 'month' | 'lines' | 'tri' | 'date' | 'list';
+type Kind = 'text' | 'area' | 'month' | 'lines' | 'tri' | 'date' | 'list' | 'decline';
 interface Spec {
   key: string;
   label: string;
@@ -60,6 +60,8 @@ const EDUCATION: Spec[] = [
 const STANDARD: Spec[] = [
   { key: 'work_authorization', label: 'Work authorization' },
   { key: 'visa_sponsorship_required', label: 'Visa sponsorship required', kind: 'tri' },
+  { key: 'citizenship', label: 'Citizenship (e.g. U.S. citizen)' },
+  { key: 'payroll_state', label: 'State you would be on payroll in' },
   { key: 'start_date', label: 'Start date (as text)' },
   { key: 'earliest_start_date', label: 'Earliest start date', kind: 'date' },
   { key: 'notice_period', label: 'Notice period' },
@@ -68,6 +70,11 @@ const STANDARD: Spec[] = [
     key: 'previous_interviews',
     label: 'Companies interviewed at before (comma-separated)',
     kind: 'list',
+  },
+  {
+    key: 'self_identification_default',
+    label: 'Voluntary self-identification questions (gender, race, veteran, disability)',
+    kind: 'decline',
   },
 ];
 
@@ -151,6 +158,33 @@ function ListInput({
   );
 }
 
+type Award = NonNullable<ProfileDocument['awards']>[number];
+
+/** Honors and awards, one name per line. Existing entries keep their issuer, date and sources. */
+function AwardsField({ awards, onChange }: { awards: Award[]; onChange: (next: Award[]) => void }) {
+  const [text, setText] = useState(awards.map((a) => a.name).join('\n'));
+  return (
+    <div className="field">
+      <label htmlFor="f-awards">Honors and awards (one per line)</label>
+      <textarea
+        id="f-awards"
+        rows={3}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          const names = e.target.value
+            .split('\n')
+            .map((n) => n.trim())
+            .filter(Boolean);
+          onChange(
+            names.map((name) => awards.find((a) => a.name === name) ?? { name, sources: ['user'] }),
+          );
+        }}
+      />
+    </div>
+  );
+}
+
 function Field({ doc, base, spec, onChange }: FieldProps) {
   const path = `${base}.${spec.key}`;
   const id = `f-${path}`;
@@ -188,6 +222,17 @@ function Field({ doc, base, spec, onChange }: FieldProps) {
         value={(value as string | null) ?? ''}
         onChange={(e) => onChange(path, e.target.value === '' ? null : e.target.value)}
       />
+    );
+  } else if (kind === 'decline') {
+    control = (
+      <select
+        id={id}
+        value={(value as string | null) ?? ''}
+        onChange={(e) => onChange(path, e.target.value === '' ? null : e.target.value)}
+      >
+        <option value="">Leave them blank</option>
+        <option value="decline">Choose the decline option when the form has one</option>
+      </select>
     );
   } else if (kind === 'tri') {
     const v = value === true ? 'yes' : value === false ? 'no' : '';
@@ -724,6 +769,17 @@ export function ProfileReviewPage({ pollMs = 2000 }: { pollMs?: number }) {
         {STANDARD.map((s) => (
           <Field key={s.key} doc={draft} base="standard_answers" spec={s} onChange={change} />
         ))}
+      </div>
+
+      <h2>Honors and awards</h2>
+      <div className="card">
+        <p className="muted">
+          Application questions about honors or awards are answered from this list only.
+        </p>
+        <AwardsField
+          awards={draft.awards ?? []}
+          onChange={(next) => change('awards', next.length ? next : undefined)}
+        />
       </div>
 
       <h2>Survey answers</h2>

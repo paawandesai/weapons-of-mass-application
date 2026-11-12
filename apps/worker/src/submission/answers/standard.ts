@@ -26,6 +26,8 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   visa_sponsorship: 'standard_answers.visa_sponsorship_required',
   no_sponsorship_needed: 'standard_answers.visa_sponsorship_required',
   authorized_without_sponsorship: 'standard_answers.work_authorization',
+  citizenship: 'standard_answers.citizenship',
+  payroll_state: 'standard_answers.payroll_state',
   worked_before: 'work_history',
   interviewed_before: 'standard_answers.previous_interviews',
   applied_before: 'standard_answers.previous_interviews',
@@ -152,6 +154,25 @@ export function profileValue(
       if (required) return false;
       return isAuthorizedFor(p.standard_answers.work_authorization, question);
     }
+    case 'citizenship': {
+      const text = nonEmpty(p.standard_answers.citizenship);
+      if (!text) return null;
+      // A yes/no question about citizenship or being a "U.S. person" is answered from the text;
+      // a text or list field gets the text itself.
+      const personQuestion = /\bu\.?s\.? persons?\b|export control|\bitar\b/i.test(question);
+      const isUsCitizen =
+        /\b(?:u\.?s\.?a?|united states|american)\b.*\bcitizen|\bcitizen\b.*\b(?:u\.?s\.?a?|united states)\b/i.test(
+          text,
+        );
+      const isUsPerson =
+        isUsCitizen || /permanent resident|green card|lawful(?:ly)? admitted/i.test(text);
+      if (personQuestion) return isUsPerson;
+      if (/country of citizenship|nationality/i.test(question))
+        return isUsCitizen ? 'United States' : text;
+      return isUsCitizen ? true : text;
+    }
+    case 'payroll_state':
+      return nonEmpty(p.standard_answers.payroll_state);
     case 'worked_before':
     case 'interviewed_before':
     case 'applied_before':
@@ -606,7 +627,11 @@ function valueForField(
     return mapped === null ? { unexpressible: true } : { value: mapped, ...flag };
   }
   if (f.options?.length) {
-    const hit = matchOption(value, f);
+    const hit =
+      matchOption(value, f) ??
+      (key === 'citizenship' && canonicalCountry(value)
+        ? f.options.find((o) => canonicalCountry(o) === canonicalCountry(value))
+        : undefined);
     return hit ? { value: hit, ...flag } : { value, ...flag };
   }
   return { value, ...flag };
