@@ -1773,4 +1773,44 @@ describe('country, heard-about and employer agreements', () => {
       value: 'No',
     });
   });
+
+  it('answers AI interview note-taker / recorder consent only from the profile', () => {
+    const sierra =
+      'We use Metaview, an AI notetaking tool, to streamline interviews by recording and summarizing discussions, enabling interviewers to be fully present without manual notetaking. With your approval, it silently records notes during interviews. Can Metaview transcribe all your interviews?';
+    const palantir =
+      'As part of our interview process, we may use AI notetakers to transcribe conversations for accuracy and efficiency. Please see our candidate privacy policy for more information on how we process your data. Your decision to opt in or out of this tooling will not impact your candidacy.';
+    const bright = 'Do you consent to BrightHire recording and transcribing your interviews?';
+    expect(standardKeyFor(sierra)).toBe('ai_interview_recording');
+    expect(standardKeyFor(palantir)).toBe('ai_interview_recording');
+    expect(standardKeyFor(bright)).toBe('ai_interview_recording');
+    // Experience and AI-policy acknowledgements are not this question.
+    expect(standardKeyFor('Have you used an AI notetaker before?')).toBeNull();
+    expect(
+      standardKeyFor('Please confirm you have reviewed the AI Policy for Application', 'checkbox'),
+    ).toBe('consent');
+    const f = field({
+      label: sierra,
+      type: 'radio',
+      required: true,
+      options: ['Yes', 'No'],
+    });
+    expect(one(withAnswers({ ai_interview_recording_consent: null }), f)).toMatchObject({
+      status: 'missing-profile-field',
+      profileField: 'standard_answers.ai_interview_recording_consent',
+    });
+    expect(one(withAnswers({ ai_interview_recording_consent: true }), f)).toMatchObject({
+      status: 'filled',
+      value: 'Yes',
+    });
+    const consentOpts = field({
+      label: palantir,
+      type: 'radio',
+      required: true,
+      options: ['Yes, I consent', 'No, I do not consent'],
+    });
+    expect(one(withAnswers({ ai_interview_recording_consent: true }), consentOpts)).toMatchObject({
+      status: 'filled',
+      value: 'Yes, I consent',
+    });
+  });
 });

@@ -143,6 +143,12 @@ export const standardAnswersSchema = z.object({
    * user's to answer, never guessed. Default so older documents parse.
    */
   employer_agreements_restrict: z.boolean().nullable().default(null),
+  /**
+   * Whether the user consents to AI interview note-takers or recorders (Metaview, BrightHire, and
+   * similar). true = consent / yes. null = not answered: the question is the user's to answer,
+   * never guessed. Default so older documents parse.
+   */
+  ai_interview_recording_consent: z.boolean().nullable().default(null),
 });
 
 export const flagKindSchema = z.enum([

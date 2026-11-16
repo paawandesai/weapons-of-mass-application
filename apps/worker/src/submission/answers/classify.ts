@@ -20,6 +20,7 @@ export const STANDARD_KEYS = [
   'citizenship',
   'payroll_state',
   'employer_agreements',
+  'ai_interview_recording',
   'worked_before',
   'interviewed_before',
   'applied_before',
@@ -274,6 +275,13 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   [
     'employer_agreements',
     /non-?compete|non-?solicit|(?:agreement|contract|obligation|restriction|covenant)s?\b.*\b(?:current|former|previous|prior|past) employers?\b|\b(?:current|former|previous|prior|past) employers?\b.*\b(?:agreement|contract|obligation|restriction|covenant)s?\b/,
+  ],
+  // Consent to AI interview note-takers / recorders (Metaview, BrightHire, and similar). Experience
+  // questions ("have you used an AI notetaker") are left to the model. AI-policy acknowledgements
+  // still match `consent` first via AI_POLICY above.
+  [
+    'ai_interview_recording',
+    /^(?!.*\b(?:have you (?:ever )?(?:used|worked with|tried)|experience (?:with|using)|are you familiar)\b)(?:.*\b(?:metaview|brighthire)\b|(?=.*\b(?:ai|artificial intelligence)\b)(?=.*\b(?:note[- ]?tak\w*|notetak\w*))|(?=.*\binterview\w*\b)(?=.*\b(?:ai|artificial intelligence)\b)(?=.*\b(?:record\w*|transcri\w*)))/,
   ],
   // Rule 27: prior contact with the company. After sponsorship / work authorization so those keep
   // their labels; before the generic patterns.

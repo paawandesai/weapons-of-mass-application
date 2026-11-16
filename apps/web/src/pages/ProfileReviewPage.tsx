@@ -68,6 +68,11 @@ const STANDARD: Spec[] = [
       'An agreement with a current or former employer (non-compete, NDA) limits where or how you can work',
     kind: 'tri',
   },
+  {
+    key: 'ai_interview_recording_consent',
+    label: 'Consent to AI interview note-takers or recorders (Metaview, BrightHire, and similar)',
+    kind: 'tri',
+  },
   { key: 'start_date', label: 'Start date (as text)' },
   { key: 'earliest_start_date', label: 'Earliest start date', kind: 'date' },
   { key: 'notice_period', label: 'Notice period' },

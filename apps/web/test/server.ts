@@ -63,6 +63,7 @@ export function fixtureDocument(): ProfileDocument {
       citizenship: null,
       payroll_state: null,
       employer_agreements_restrict: null,
+      ai_interview_recording_consent: null,
     },
     flags: [],
   };

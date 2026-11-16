@@ -29,6 +29,7 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   citizenship: 'standard_answers.citizenship',
   payroll_state: 'standard_answers.payroll_state',
   employer_agreements: 'standard_answers.employer_agreements_restrict',
+  ai_interview_recording: 'standard_answers.ai_interview_recording_consent',
   worked_before: 'work_history',
   interviewed_before: 'standard_answers.previous_interviews',
   applied_before: 'standard_answers.previous_interviews',
@@ -176,6 +177,8 @@ export function profileValue(
       return nonEmpty(p.standard_answers.payroll_state);
     case 'employer_agreements':
       return p.standard_answers.employer_agreements_restrict;
+    case 'ai_interview_recording':
+      return p.standard_answers.ai_interview_recording_consent;
     case 'worked_before':
     case 'interviewed_before':
     case 'applied_before':
