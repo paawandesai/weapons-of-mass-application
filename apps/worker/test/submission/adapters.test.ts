@@ -434,3 +434,14 @@ describe('lever has no accounts', () => {
     });
   });
 });
+
+describe('classifyField self-identification', () => {
+  it('treats pronouns as self-identification, never as a standard field', () => {
+    expect(classifyField({ label: 'Preferred pronouns', type: 'text', hint: '' })).toBe(
+      'self-identification',
+    );
+    expect(classifyField({ label: 'Gender', type: 'select', hint: '' })).toBe(
+      'self-identification',
+    );
+  });
+});

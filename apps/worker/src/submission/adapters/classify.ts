@@ -16,7 +16,7 @@ export interface RawField {
 
 const SELF_ID_SECTION = /(^|[^a-z])(eeoc?|self[- ]?identif|voluntary|demographic|diversity)/i;
 const SELF_ID_LABEL =
-  /\b(gender|race|ethnic\w*|hispanic|latino|latinx|veteran|disabilit\w*|sexual orientation|transgender|lgbtq?\w*)\b/i;
+  /\b(gender|race|ethnic\w*|hispanic|latino|latinx|veteran|disabilit\w*|sexual orientation|transgender|lgbtq?\w*|pronouns?)\b/i;
 const RESUME_LABEL = /\b(resume|r[eé]sum[eé]|cv|curriculum vitae)\b/i;
 
 const STANDARD_LABEL: RegExp[] = [
@@ -30,7 +30,7 @@ const STANDARD_LABEL: RegExp[] = [
   /\bcurrent (company|employer|title|role)\b/i,
   /\b(authori[sz]ed to work|work authori[sz]ation|right to work|visa|sponsorship|legally)\b/i,
   /\b(relocat\w*|notice period|start date|available to start|salary|compensation)\b/i,
-  /\b(how did you (hear|find)|referred by|pronouns?)\b/i,
+  /\b(how did you (hear|find)|referred by)\b/i,
   /\b(privacy|consent|acknowledge|agree|terms|gdpr)\b/i,
 ];
 
