@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { humanUserAgent, launchArgs } from '../../src/submission/browser';
+import { gotoWithRetry } from '../../src/submission/navigate';
 
 describe('rule 37: the real browser', () => {
   it('drops the Headless marker from the user agent', () => {
@@ -18,5 +19,30 @@ describe('rule 37: the real browser', () => {
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
     ]);
+  });
+});
+
+describe('gotoWithRetry', () => {
+  it('retries a failed page.goto once and succeeds on the second try', async () => {
+    let n = 0;
+    const page = {
+      goto: async (url: string) => {
+        n += 1;
+        if (n === 1) throw new Error(`page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at ${url}`);
+      },
+    };
+    await gotoWithRetry(page, 'https://job-boards.greenhouse.io/x', { backoffMs: 1, timeout: 50 });
+    expect(n).toBe(2);
+  });
+
+  it('rethrows after both attempts fail', async () => {
+    const page = {
+      goto: async () => {
+        throw new Error('page.goto: net::ERR_FAILED');
+      },
+    };
+    await expect(
+      gotoWithRetry(page, 'https://example.test', { backoffMs: 1, attempts: 2 }),
+    ).rejects.toThrow('net::ERR_FAILED');
   });
 });

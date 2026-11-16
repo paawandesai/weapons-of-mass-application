@@ -2,6 +2,7 @@ import type { Locator, Page } from 'playwright';
 import { applicationFileKey } from '@wma/db';
 import type { AtsId } from '@wma/shared';
 import { SubmissionFailure, sanitizeMessage } from '../failure';
+import { gotoWithRetry } from '../navigate';
 import type {
   Account,
   CaptchaHandle,
@@ -472,7 +473,7 @@ export class VendorAdapter implements FormAdapter {
       // not a URL we can rewrite; navigate as given
     }
     postTracker(page);
-    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: LOAD_TIMEOUT_MS });
+    await gotoWithRetry(page, target, { waitUntil: 'domcontentloaded', timeout: LOAD_TIMEOUT_MS });
     if (!(await this.waitForPage(page, LOAD_TIMEOUT_MS))) {
       throw new Error('the application form did not appear');
     }

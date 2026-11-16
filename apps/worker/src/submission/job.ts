@@ -37,6 +37,7 @@ import {
   isInfrastructureError,
   SubmissionFailure,
 } from './failure';
+import { gotoWithRetry } from './navigate';
 import { scheduleFollowUp } from './followup';
 import { enterVerificationCode, waitForVerification } from './accounts/verification';
 import { pollUntil } from './poll';
@@ -477,7 +478,7 @@ async function attempt(
         await recordTrace(ctx, again);
       } else {
         const linkPage = await (context as ContextLike | null)!.newPage();
-        await linkPage.goto(found.url);
+        await gotoWithRetry(linkPage, found.url);
       }
       return true;
     };
