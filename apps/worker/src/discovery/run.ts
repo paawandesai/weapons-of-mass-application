@@ -4,6 +4,7 @@ import {
   getUserById,
   insertRun,
   insertRunCandidates,
+  listRecentlyRejected,
   listUserCompanies,
   transitionRun,
   unselectRunCandidates,
@@ -19,15 +20,17 @@ import { meterLlm } from '../llm-usage';
 import { dropAlreadyApplied } from './applied';
 import { generateCompanyList } from './company-list';
 import { discover } from './discover';
-import { handOff, type SubmitQueue } from './handoff';
+import { handOff, stashReserve, type SubmitQueue } from './handoff';
 import { sharedHttp, type Http } from '@wma/discovery';
 import { judgeAll, type Judged, type JudgeResult } from './judge';
 import { loadProfileDocument } from './profile-view';
 import {
+  companyKey,
   rank,
   relevanceScore,
   selectWithCompanyCap,
   DEFAULT_MAX_PER_COMPANY,
+  type Ranked,
   type RelevanceProfile,
 } from './rank';
 import type { BoardRef, RemovedCompany, SourceAdapter } from './types';
@@ -62,9 +65,81 @@ export interface DailyRunDeps {
   judgeCap?: number;
   /** Most selections per company in one run (`MAX_PER_COMPANY_PER_RUN`, default 1). */
   maxPerCompany?: number;
+  /**
+   * Most postings one run judges across all its batches (`DAILY_JUDGE_CEILING`). Each batch is
+   * `judgeCap` postings; a further batch is judged only while the run is short of its target (or
+   * of its backfill reserve). Unset: `judgeCap`, i.e. one batch.
+   */
+  dailyJudgeCeiling?: number;
+  /**
+   * Approved, unselected postings at distinct companies a run keeps in reserve for backfill after
+   * failures (`TOPUP_RESERVE`). Another batch is judged while the reserve is smaller. Default 0.
+   */
+  topUpReserve?: number;
+  /**
+   * Postings judged not worth applying to in the user's runs of the last N days are not judged
+   * again (`SKIP_REJECTED_DAYS`). Unset or 0: off.
+   */
+  skipRejectedDays?: number;
 }
 
 export const DEFAULT_JUDGE_CAP = 120;
+
+/** `YYYY-MM-DD` minus `days` (UTC). */
+export function minusDays(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Drops candidates whose dedupe key is in `rejected`. */
+export function dropRejected(
+  candidates: readonly Candidate[],
+  rejected: ReadonlyArray<{ ats: Candidate['ats'] | null; atsJobId: string | null; url: string }>,
+): { kept: Candidate[]; dropped: number } {
+  const keys = new Set(
+    rejected.map((r) =>
+      dedupeKey({
+        ats: r.ats ?? undefined,
+        atsJobId: r.atsJobId ?? undefined,
+        url: r.url,
+      } as Candidate),
+    ),
+  );
+  const kept = candidates.filter((c) => !keys.has(dedupeKey(c)));
+  return { kept, dropped: candidates.length - kept.length };
+}
+
+/**
+ * The batches a run judges: consecutive slices of `batchSize` from `pool` (already in judging
+ * order), never past `ceiling` postings in total. `next` handles one batch and says whether the
+ * run still needs more; the walk stops at the first `false`, the ceiling, or the end of the pool.
+ * Returns how many postings were handed to `next`.
+ */
+export async function judgeInBatches<T>(
+  pool: readonly T[],
+  opts: { batchSize: number; ceiling: number },
+  next: (batch: T[], offset: number) => Promise<boolean>,
+): Promise<number> {
+  const size = Math.max(1, opts.batchSize);
+  const end = Math.min(pool.length, Math.max(0, opts.ceiling));
+  let offset = 0;
+  while (offset < end) {
+    const batch = pool.slice(offset, Math.min(offset + size, end));
+    const at = offset;
+    offset += batch.length;
+    if (!(await next(batch, at))) break;
+  }
+  return offset;
+}
+
+/** True while a run should judge another batch: short of its target or of its reserve. */
+export function needsTopUp(s: {
+  handedOff: number;
+  target: number;
+  reserveCompanies: number;
+  reserveWanted: number;
+}): boolean {
+  return s.handedOff < s.target || s.reserveCompanies < s.reserveWanted;
+}
 
 /**
  * The postings a run may judge: seeded source first (the seeded adapter reports candidates under the
@@ -139,6 +214,10 @@ export interface RunCounts {
   /** Selected postings another run had already turned into applications. */
   hand_off_conflicts: number;
   requeued: number;
+  /** Postings skipped because a recent run already judged them not worth applying to. */
+  recently_rejected: number;
+  /** Batches of `judgeCap` postings judged by this run. */
+  batches: number;
 }
 
 const emptyCounts = (): RunCounts => ({
@@ -159,6 +238,8 @@ const emptyCounts = (): RunCounts => ({
   removed_company: 0,
   hand_off_conflicts: 0,
   requeued: 0,
+  recently_rejected: 0,
+  batches: 0,
 });
 
 /**
@@ -351,98 +432,166 @@ export async function executeDailyRun(
       const { kept, dropped } = await dropAlreadyApplied(handle, userId, found.candidates);
       counts.already_applied = dropped.length;
 
+      let fresh = kept;
+      if (deps.skipRejectedDays && deps.skipRejectedDays > 0) {
+        const rejected = await listRecentlyRejected(
+          handle,
+          userId,
+          minusDays(p.date, deps.skipRejectedDays),
+          run.id,
+        );
+        const r = dropRejected(kept, rejected);
+        fresh = r.kept;
+        counts.recently_rejected = r.dropped;
+      }
+
       const cap = deps.judgeCap ?? DEFAULT_JUDGE_CAP;
-      const capped = applyJudgeCap(kept, cap, (c) => found.seededKeys.has(dedupeKey(c)), profile);
-      counts.over_cap = capped.dropped;
-      counts.prefilter_zero = capped.prefilterZero;
-      if (capped.dropped > 0) {
+      const ceiling = Math.max(cap, deps.dailyJudgeCeiling ?? cap);
+      const reserveWanted = Math.max(0, deps.topUpReserve ?? 0);
+      const maxPerCompany = deps.maxPerCompany ?? DEFAULT_MAX_PER_COMPANY;
+      // The whole pool in judging order; batches are taken from its front.
+      const ordered = applyJudgeCap(
+        fresh,
+        fresh.length,
+        (c) => found.seededKeys.has(dedupeKey(c)),
+        profile,
+      ).kept;
+      const zeroScore = (c: Candidate) => relevanceScore(c, profile) <= 0;
+
+      const perCompany = new Map<string, number>();
+      const reserve = new Map<string, Ranked>(); // company key -> best unselected approved posting
+      let handedOff = 0;
+      let rankBase = 0;
+      let recover = true;
+
+      const judgedThrough = await judgeInBatches(
+        ordered,
+        { batchSize: cap, ceiling },
+        async (batch) => {
+          counts.batches += 1;
+          counts.prefilter_zero += batch.filter(zeroScore).length;
+          await setStep('judge', { counts });
+          const results: JudgeResult[] = await judgeAll(
+            batch,
+            { llm: deps.judgeLlm ?? deps.llm, profile, today: p.date },
+            deps.judgeConcurrency,
+          );
+          const judged = results.filter((r): r is Judged => r.status === 'judged');
+          counts.unjudged += results.length - judged.length;
+          counts.judged += judged.length;
+
+          await setStep('rank', { counts });
+          const approved = judged.filter((j) => j.judgment.apply);
+          counts.skipped += judged.length - approved.length;
+          counts.approved += approved.length;
+          const { ranked: batchRanked, excluded } = rank(approved, p.date);
+          // Ranks continue across batches: a later batch's postings rank after earlier ones.
+          const ranked = batchRanked.map((r) => ({ ...r, rank: r.rank + rankBase }));
+          rankBase += ranked.length;
+          counts.deadline_passed += excluded.length;
+          const { selected, skipped } = selectWithCompanyCap(
+            ranked,
+            Math.max(0, target - handedOff),
+            maxPerCompany,
+            perCompany,
+          );
+          counts.company_cap += skipped.length;
+          counts.over_target += ranked.length - selected.length - skipped.length;
+          const companyCapKeys = new Set(skipped.map((x) => dedupeKey(x.candidate)));
+          const selectedKeys = new Set(selected.map((x) => dedupeKey(x.candidate)));
+          const rankByKey = new Map(ranked.map((r) => [dedupeKey(r.candidate), r.rank]));
+          const excludedKeys = new Set(excluded.map((e) => dedupeKey(e.item.candidate)));
+
+          const rows: RunCandidateInput[] = results.map((r) => {
+            const key = dedupeKey(r.candidate);
+            const base = {
+              title: r.candidate.title,
+              companyName: r.candidate.companyName,
+              url: r.candidate.url,
+              ats: r.candidate.ats,
+              atsJobId: r.candidate.atsJobId,
+              promptVersion: r.promptVersion,
+              model: r.model,
+            };
+            if (r.status === 'unjudged') return { ...base, exclusionReason: 'unjudged' };
+            const rk = rankByKey.get(key) ?? null;
+            const isSelected = selectedKeys.has(key);
+            const exclusionReason = isSelected
+              ? null
+              : companyCapKeys.has(key)
+                ? 'company_cap'
+                : rk !== null
+                  ? 'over_target'
+                  : excludedKeys.has(key)
+                    ? 'deadline_passed'
+                    : 'not_approved';
+            return {
+              ...base,
+              judgment: r.judgment,
+              rank: rk,
+              selected: isSelected,
+              exclusionReason,
+            };
+          });
+          const stored = await insertRunCandidates(handle, run.id, rows);
+          const rowIdByKey = new Map(
+            stored.map((row) => [
+              dedupeKey({ ats: row.ats, atsJobId: row.atsJobId, url: row.url }),
+              row.id,
+            ]),
+          );
+
+          await setStep('hand_off', { counts });
+          const handed = await handOff(
+            handle,
+            { userId, runId: run.id, runDate: p.date, selected, recover },
+            deps.queue,
+          );
+          recover = false;
+          counts.requeued += handed.requeued.length;
+          // Postings another run claimed first are not this run's selections: clear their flag so
+          // the stored selection, the stored applications and `counts.selected` all agree.
+          counts.hand_off_conflicts += handed.conflicts.length;
+          await unselectRunCandidates(
+            handle,
+            run.id,
+            handed.conflicts.flatMap((k) => rowIdByKey.get(k) ?? []),
+            'already_applied',
+          );
+          handedOff += handed.created.length;
+          counts.selected = handedOff;
+
+          // The approved postings not selected stay in reserve for backfill after a failure.
+          const unselected = ranked.filter((r) => !selectedKeys.has(dedupeKey(r.candidate)));
+          await stashReserve(handle, unselected);
+          for (const r of unselected) {
+            const k = companyKey(r.candidate);
+            if (!reserve.has(k)) reserve.set(k, r);
+          }
+          const reserveCompanies = [...reserve.keys()].filter((k) => !perCompany.has(k)).length;
+          await updateRun(handle, run.id, { counts });
+          return needsTopUp({ handedOff, target, reserveCompanies, reserveWanted });
+        },
+      );
+      counts.over_cap = ordered.length - judgedThrough;
+      if (counts.over_cap > 0) {
         await activity.logActivity(handle, {
           userId,
           actor: 'agent',
           action: 'judge_capped',
-          detail: { run_id: run.id, cap, dropped: capped.dropped },
+          detail: { run_id: run.id, cap, dropped: counts.over_cap },
         });
       }
-
-      await setStep('judge', { counts });
-      const results: JudgeResult[] = await judgeAll(
-        capped.kept,
-        { llm: deps.judgeLlm ?? deps.llm, profile, today: p.date },
-        deps.judgeConcurrency,
-      );
-      const judged = results.filter((r): r is Judged => r.status === 'judged');
-      counts.unjudged = results.length - judged.length;
-      counts.judged = judged.length;
-
-      await setStep('rank');
-      const approved = judged.filter((j) => j.judgment.apply);
-      counts.skipped = judged.length - approved.length;
-      counts.approved = approved.length;
-      const { ranked, excluded } = rank(approved, p.date);
-      counts.deadline_passed = excluded.length;
-      const { selected, skipped } = selectWithCompanyCap(
-        ranked,
-        target,
-        deps.maxPerCompany ?? DEFAULT_MAX_PER_COMPANY,
-      );
-      counts.selected = selected.length;
-      counts.company_cap = skipped.length;
-      counts.over_target = ranked.length - selected.length - skipped.length;
-      const companyCapKeys = new Set(skipped.map((s) => dedupeKey(s.candidate)));
-      const selectedKeys = new Set(selected.map((s) => dedupeKey(s.candidate)));
-      const rankByKey = new Map(ranked.map((r) => [dedupeKey(r.candidate), r.rank]));
-      const excludedKeys = new Set(excluded.map((e) => dedupeKey(e.item.candidate)));
-
-      const rows: RunCandidateInput[] = results.map((r) => {
-        const key = dedupeKey(r.candidate);
-        const base = {
-          title: r.candidate.title,
-          companyName: r.candidate.companyName,
-          url: r.candidate.url,
-          ats: r.candidate.ats,
-          atsJobId: r.candidate.atsJobId,
-          promptVersion: r.promptVersion,
-          model: r.model,
-        };
-        if (r.status === 'unjudged') return { ...base, exclusionReason: 'unjudged' };
-        const rk = rankByKey.get(key) ?? null;
-        const isSelected = selectedKeys.has(key);
-        const exclusionReason = isSelected
-          ? null
-          : companyCapKeys.has(key)
-            ? 'company_cap'
-            : rk !== null
-              ? 'over_target'
-              : excludedKeys.has(key)
-                ? 'deadline_passed'
-                : 'not_approved';
-        return { ...base, judgment: r.judgment, rank: rk, selected: isSelected, exclusionReason };
-      });
-      const stored = await insertRunCandidates(handle, run.id, rows);
-      const rowIdByKey = new Map(
-        stored.map((row) => [
-          dedupeKey({ ats: row.ats, atsJobId: row.atsJobId, url: row.url }),
-          row.id,
-        ]),
-      );
-
-      await setStep('hand_off', { counts });
-      const handed = await handOff(
-        handle,
-        { userId, runId: run.id, runDate: p.date, selected },
-        deps.queue,
-      );
-      counts.requeued = handed.requeued.length;
-      // Postings another run claimed first are not this run's selections: clear their flag so the
-      // stored selection, the stored applications and `counts.selected` all agree.
-      counts.hand_off_conflicts = handed.conflicts.length;
-      await unselectRunCandidates(
-        handle,
-        run.id,
-        handed.conflicts.flatMap((k) => rowIdByKey.get(k) ?? []),
-        'already_applied',
-      );
-      counts.selected = handed.created.length;
+      if (recover) {
+        // Nothing to judge: still recover pending rows of earlier hand-offs.
+        await setStep('hand_off', { counts });
+        const handed = await handOff(
+          handle,
+          { userId, runId: run.id, runDate: p.date, selected: [] },
+          deps.queue,
+        );
+        counts.requeued += handed.requeued.length;
+      }
 
       await setStep('finalize');
       const shortDay = counts.selected < target;

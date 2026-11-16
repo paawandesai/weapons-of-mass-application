@@ -262,6 +262,8 @@ export const pgBossRunQueue: RunQueue = {
     const id = await b.send(DAILY_RUN_JOB, data, {
       singletonKey: `daily-run:${data.userId}:${data.date}`,
       retryLimit: 0,
+      // A run judges in batches and can take hours (matches the worker's DAILY_RUN_EXPIRE_SECONDS).
+      expireInSeconds: 6 * 60 * 60,
     });
     return id !== null;
   },

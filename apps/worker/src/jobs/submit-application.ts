@@ -9,6 +9,8 @@ import {
 import type { SubmissionDeps } from '../submission/deps';
 import { createFollowUpQueue, reconcileFollowUps } from '../submission/followup';
 import { createSubmissionRunner, type SubmissionJobData } from '../submission/job';
+import { afterSubmissionAttempt } from '../discovery/backfill';
+import { bossSubmitQueue } from '../discovery/handoff';
 
 export { FOLLOW_UP_JOB, SUBMIT_APPLICATION_JOB, SUBMIT_QUEUE_OPTIONS, reconcileFollowUps };
 const FOLLOW_UP_RECONCILE_JOB = 'follow-up-reconcile';
@@ -25,6 +27,13 @@ export async function registerSubmitApplication(
   boss: PgBoss,
   db: Db,
   deps?: SubmissionDeps,
+  opts: {
+    /**
+     * After a first failed attempt, retry it the same day and apply to the next approved company
+     * of its run (`afterSubmissionAttempt`). The production registration turns this on.
+     */
+    backfill?: boolean;
+  } = {},
 ): Promise<void> {
   await boss.createQueue(SUBMIT_APPLICATION_JOB, SUBMIT_QUEUE_OPTIONS);
   await boss.createQueue(FOLLOW_UP_JOB);
@@ -43,7 +52,15 @@ export async function registerSubmitApplication(
       await Promise.all(
         jobs.map(async (job) => {
           try {
-            await (await getRunner()).run(job.data);
+            const outcome = await (await getRunner()).run(job.data);
+            if (opts.backfill) {
+              try {
+                await afterSubmissionAttempt(db, bossSubmitQueue(boss), job.data, outcome);
+              } catch (e) {
+                // The attempt's outcome is committed; a failed backfill must not retry it.
+                console.error('backfill failed:', e instanceof Error ? e.message : 'error');
+              }
+            }
           } catch (e) {
             console.error('submit-application failed:', e instanceof Error ? e.name : 'error');
             throw e;
