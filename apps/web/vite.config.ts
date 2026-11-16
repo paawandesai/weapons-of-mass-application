@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: Number(process.env.WEB_PORT ?? 5173),
+    // Public hosts for remote board access. Vite 7 blocks unknown Host headers.
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.dev', '.ngrok-free.app'],
     proxy: {
       '/api': process.env.API_ORIGIN ?? 'http://localhost:3000',
       '/auth': process.env.API_ORIGIN ?? 'http://localhost:3000',
