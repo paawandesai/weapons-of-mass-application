@@ -238,7 +238,10 @@ export function descriptorType(q: Question): FieldDescriptor['type'] {
   }
 }
 
-/** Rule 44: a phone widget's country selector (an `iti` ancestor, or options that all end in a dial code). */
+/**
+ * Rule 44: a phone widget's country selector (an `iti` ancestor, a flag-and-dial-code react-select
+ * in a phone group, or options that all end in a dial code).
+ */
 export function isPhoneCountry(q: Question): boolean {
   if (q.kind !== 'combobox') return false;
   if (q.phoneWidget) return true;
@@ -247,6 +250,8 @@ export function isPhoneCountry(q: Question): boolean {
 
 /** "United States: +1" and "United States+1" are both the country "united states". */
 const countryName = (s: string) => low(s).replace(/[\s:(-]*\+\d{1,4}\)?\s*$/, '');
+/** The trailing dial code of "United States +1" or "+1", digits only; '' when there is none. */
+const dialCodeOf = (s: string) => /\+(\d{1,4})\)?\s*$/.exec(norm(s))?.[1] ?? '';
 
 export function describe(q: Question): FieldDescriptor {
   const type = descriptorType(q);
@@ -781,7 +786,11 @@ export function stuck(q: Question, intent: Intent): boolean {
       if (isPhoneCountry(q)) {
         // Rule 44: the widget's selected-country element, by country name.
         const shown = countryName(curText);
-        return shown !== '' && shown === countryName(intent.chosen ?? intent.text);
+        const want = intent.chosen ?? intent.text;
+        if (shown !== '') return shown === countryName(want);
+        // Only a dial code is shown ("+1"): it verifies against the chosen option's dial code.
+        const dial = dialCodeOf(curText);
+        return dial !== '' && dial === dialCodeOf(want);
       }
       const t = low(curText);
       const w = low(intent.chosen ?? intent.text);

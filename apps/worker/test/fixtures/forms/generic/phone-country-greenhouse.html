@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Greenhouse job-boards phone group: a flag-and-dial-code country react-select</title>
+  </head>
+  <body>
+    <!-- Structure as captured from job-boards.greenhouse.io (2026-11-13): the country selector is a
+         react-select whose selected value is a flag (iti__flag iti__us) and the dial code, not a
+         country name, and there is no iti wrapper or iti__selected-country element. -->
+    <form id="app" data-country="">
+      <div class="phone-input">
+        <div class="phone-input__country">
+          <div class="select__container">
+            <label id="country-label" for="country" class="label select__label"
+              >Country<span aria-hidden="true">*</span></label
+            >
+            <div class="select-shell">
+              <div class="select__control">
+                <div class="select__value-container" id="country-value"></div>
+                <input
+                  class="select__input"
+                  id="country"
+                  type="text"
+                  role="combobox"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  aria-autocomplete="list"
+                  aria-labelledby="country-label"
+                  aria-required="true"
+                  autocomplete="off"
+                  value=""
+                />
+              </div>
+              <input
+                required
+                tabindex="-1"
+                aria-hidden="true"
+                value=""
+                style="opacity: 0; height: 0; position: absolute"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="phone-input__phone">
+          <label for="phone">Phone<span aria-hidden="true">*</span></label>
+          <input id="phone" type="tel" aria-required="true" />
+        </div>
+      </div>
+      <button type="submit">Submit application</button>
+    </form>
+    <script>
+      (function () {
+        var rows = [
+          ['us', 'United States', '1'],
+          ['af', 'Afghanistan', '93'],
+          ['ca', 'Canada', '1'],
+          ['gb', 'United Kingdom', '44'],
+          ['um', 'United States Minor Outlying Islands', '1'],
+        ];
+        var input = document.getElementById('country');
+        var valueEl = document.getElementById('country-value');
+        var twin = input.parentNode.parentNode.querySelector('input[aria-hidden]');
+        var menu = null;
+        function close() {
+          if (menu) menu.remove();
+          menu = null;
+          input.setAttribute('aria-expanded', 'false');
+        }
+        function select(r) {
+          valueEl.innerHTML =
+            '<div class="select__single-value"><div class="iti__flag iti__' +
+            r[0] +
+            '"></div><span>+' +
+            r[2] +
+            '</span></div>';
+          twin.value = r[1];
+          document.getElementById('app').setAttribute('data-country', r[1]);
+        }
+        input.addEventListener('click', function () {
+          close();
+          menu = document.createElement('div');
+          menu.setAttribute('role', 'listbox');
+          rows.forEach(function (r, n) {
+            var o = document.createElement('div');
+            o.setAttribute('role', 'option');
+            o.id = 'country-option-' + n;
+            o.innerHTML = '<div class="iti__flag iti__' + r[0] + '"></div>' + r[1] + ' +' + r[2];
+            o.addEventListener('click', function () {
+              select(r);
+              close();
+            });
+            menu.appendChild(o);
+          });
+          input.parentNode.appendChild(menu);
+          input.setAttribute('aria-expanded', 'true');
+        });
+        document.getElementById('app').addEventListener('submit', function (e) {
+          e.preventDefault();
+        });
+        if (location.hash === '#preset') select(rows[0]);
+      })();
+    </script>
+  </body>
+</html>
