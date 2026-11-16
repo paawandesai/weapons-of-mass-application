@@ -34,18 +34,28 @@ export const stripTags = (html: string) =>
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ');
 
+/** Gmail search string for ATS verification and confirmation mail, including Trash and Spam. */
+export function gmailSearchQuery(opts: {
+  fromDomains: string[];
+  after: Date;
+  subjectContains?: string;
+}): string {
+  return [
+    'in:anywhere',
+    `(${opts.fromDomains.map((d) => `from:${d}`).join(' OR ')})`,
+    `after:${Math.floor(opts.after.getTime() / 1000)}`,
+    opts.subjectContains ? `subject:"${opts.subjectContains.replace(/"/g, '')}"` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 /** Reads the user's mailbox through their Google connection (read-only). */
 export function createGmailPort(handle: TenantHandle, userId: string): GmailPort {
   return {
     async search({ fromDomains, after, subjectContains }) {
       const gmail = await getGmailClient(handle, userId);
-      const q = [
-        `(${fromDomains.map((d) => `from:${d}`).join(' OR ')})`,
-        `after:${Math.floor(after.getTime() / 1000)}`,
-        subjectContains ? `subject:"${subjectContains.replace(/"/g, '')}"` : '',
-      ]
-        .filter(Boolean)
-        .join(' ');
+      const q = gmailSearchQuery({ fromDomains, after, subjectContains });
       const list = await gmail.users.messages.list({ userId: 'me', q, maxResults: 20 });
       const out: InboundMessage[] = [];
       for (const ref of list.data.messages ?? []) {
