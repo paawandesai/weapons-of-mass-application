@@ -33,6 +33,7 @@ export const STANDARD_KEYS = [
   'consent',
   'heard_about',
   'travel',
+  'systems_audience',
 ] as const;
 export type StandardKey = (typeof STANDARD_KEYS)[number];
 
@@ -298,6 +299,10 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   [
     'travel',
     /^(?!.*\b(?:expenses?|reimburs\w*|history|visa|passport|restrictions?)\b)(?=.*\btravel\w*)(?=.*\b(?:willing\w*|able|open|comfortable|prepared|ready|up to|\d{1,3}\s*(?:%|percent)|required|requirement|expect\w*)\b)/,
+  ],
+  [
+    'systems_audience',
+    /internal or external|(?:ml\/?llm|machine learning|llm)[- ]powered systems for|who are you building/,
   ],
   ['notice_period', /notice period/],
   [

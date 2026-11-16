@@ -56,6 +56,7 @@ function userMessage(
   ctx: Pick<SubmissionContext, 'profile' | 'job'>,
   field: FieldDescriptor,
   rejected: string | null,
+  priorAnswers: Array<{ question: string; answer: string }> = [],
 ): string {
   const question = {
     question: field.label,
@@ -74,6 +75,11 @@ function userMessage(
     `<profile>\n${esc(JSON.stringify(profileForModel(ctx.profile), null, 1))}\n</profile>`,
     `<posting>\n${esc(JSON.stringify(posting, null, 1))}\n</posting>`,
   ];
+  if (priorAnswers.length > 0) {
+    parts.push(
+      `<previous_answers>\n${esc(JSON.stringify(priorAnswers, null, 1))}\n</previous_answers>`,
+    );
+  }
   if (rejected) parts.push(`<rejected>\n${esc(rejected)}\n</rejected>`);
   return parts.join('\n\n');
 }
@@ -154,6 +160,7 @@ function checkAnswer(field: FieldDescriptor, out: AnswerOutput): Checked {
 export async function resolveFreeText(
   ctx: Pick<SubmissionContext, 'profile' | 'job' | 'llm'>,
   field: FieldDescriptor,
+  priorAnswers: Array<{ question: string; answer: string }> = [],
 ): Promise<AnswerResolution> {
   const base = { fieldId: field.id, question: field.label };
   const unanswerable = (): AnswerResolution =>
@@ -169,7 +176,7 @@ export async function resolveFreeText(
     const out: AnswerOutput = await callStructured(
       ctx.llm,
       ANSWER_PROMPT,
-      userMessage(ctx, field, rejected),
+      userMessage(ctx, field, rejected, priorAnswers),
       answerSchema,
     );
     if (out.unanswerable) return unanswerable();
