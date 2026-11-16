@@ -1,5 +1,5 @@
 import type { PgBoss } from 'pg-boss';
-import { deleteRunsBefore, type Db } from '@wma/db';
+import { deleteRunsBefore, getRunForDate, type Db } from '@wma/db';
 import { createLlmClient, parseBackend, type StructuredLlm } from '@wma/llm';
 import { bossSubmitQueue, type SubmitQueue } from '../discovery/handoff';
 import type { Http } from '@wma/discovery';
@@ -104,6 +104,11 @@ export interface Roster {
   activeUsers(): Promise<RosterUser[]>;
   /** Tenants that own runs dated before `cutoff` (`YYYY-MM-DD`). */
   tenantsWithRunsBefore(cutoff: string): Promise<string[]>;
+  /**
+   * Whether the user already has a non-failed run for `date` (running, finished,
+   * short_day, or skipped). Failed runs do not count, so the date can be retried.
+   */
+  hasNonFailedRun(tenantId: string, userId: string, date: string): Promise<boolean>;
 }
 
 /** The production roster: the application connection and the roster functions, nothing more. */
@@ -111,10 +116,17 @@ export function dbRoster(db: Db): Roster {
   return {
     activeUsers: () => db.runRoster(),
     tenantsWithRunsBefore: (cutoff) => db.tenantsWithRunsBefore(cutoff),
+    hasNonFailedRun: async (tenantId, userId, date) =>
+      (await getRunForDate(db.forTenant(tenantId), userId, date)) !== null,
   };
 }
 
-/** Scheduler tick: one daily-run per active user whose run hour is `now`'s UTC hour. */
+/**
+ * Scheduler tick: one daily-run per active user whose run hour has been reached today.
+ * At the run hour itself, or later the same UTC day if no non-failed run exists yet
+ * (catch-up after a missed tick). Dates before today are never enqueued: the date is
+ * always `utcDate(now)`. An in-progress or finished run for today is left alone.
+ */
 export async function enqueueScheduledRuns(
   boss: PgBoss,
   roster: Roster,
@@ -125,7 +137,8 @@ export async function enqueueScheduledRuns(
   let enqueued = 0;
   let duplicates = 0;
   for (const u of await roster.activeUsers()) {
-    if (u.runHour !== hour) continue;
+    if (hour < u.runHour) continue;
+    if (await roster.hasNonFailedRun(u.tenantId, u.userId, date)) continue;
     const id = await enqueueDailyRun(boss, {
       tenantId: u.tenantId,
       userId: u.userId,
@@ -135,6 +148,7 @@ export async function enqueueScheduledRuns(
     if (id) enqueued++;
     else duplicates++;
   }
+  console.log('daily-run-tick', { date, hour, enqueued });
   return { date, enqueued, duplicates };
 }
 
@@ -249,7 +263,7 @@ export async function registerDailyRun(
     await cleanupOldRuns(db, roster, now());
   });
   if (options.schedule !== false) {
-    await boss.schedule(DAILY_RUN_TICK_JOB, '0 * * * *');
+    await boss.schedule(DAILY_RUN_TICK_JOB, '0 * * * *', undefined, { missed: 'once' });
     await boss.schedule(DAILY_RUN_CLEANUP_JOB, '30 3 * * *');
   }
 }
