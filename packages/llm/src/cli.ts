@@ -132,15 +132,60 @@ function inlineSchemaPrompt(c: PrepareCtx): string {
   ].join('\n');
 }
 
-/** First balanced-looking JSON object in free text (models sometimes wrap it in a fence). */
-export function extractJson(text: string): unknown {
-  const t = text.trim();
+/**
+ * Repairs the two ways models most often break JSON in long free-text answers: raw newlines, tabs
+ * or other control characters inside a string, and trailing commas before `}` or `]`.
+ */
+export function repairJson(text: string): string {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        out += ch;
+      } else if (ch === '\\') {
+        escaped = true;
+        out += ch;
+      } else if (ch === '"') {
+        inString = false;
+        out += ch;
+      } else if (ch === '\n') out += '\\n';
+      else if (ch === '\r') out += '\\r';
+      else if (ch === '\t') out += '\\t';
+      else if (ch < ' ') out += `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`;
+      else out += ch;
+    } else {
+      if (ch === '"') inString = true;
+      out += ch;
+    }
+  }
+  return out.replace(/,(\s*[}\]])/g, '$1');
+}
+
+function parseObject(t: string): unknown {
   try {
     return JSON.parse(t);
   } catch {
+    return JSON.parse(repairJson(t));
+  }
+}
+
+/** First balanced-looking JSON object in free text (models sometimes wrap it in a fence). */
+export function extractJson(text: string): unknown {
+  let t = text.trim();
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(t);
+  if (fenced?.[1] && fenced[1].trim().startsWith('{')) t = fenced[1].trim();
+  try {
+    const v = parseObject(t);
+    // A reply that is itself a JSON string holding the object (double-encoded).
+    if (typeof v === 'string' && v.trim().startsWith('{')) return parseObject(v.trim());
+    return v;
+  } catch {
     const a = t.indexOf('{');
     const b = t.lastIndexOf('}');
-    if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
+    if (a >= 0 && b > a) return parseObject(t.slice(a, b + 1));
     throw new Error('no JSON object in reply');
   }
 }
