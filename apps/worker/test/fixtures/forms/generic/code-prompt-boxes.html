@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Submit that asks for an emailed code, one box per character</title>
+  </head>
+  <body>
+    <div id="page">
+      <form id="app">
+        <div class="entry"><label for="name">Full name</label><input id="name" type="text" /></div>
+        <div id="prompt" hidden>
+          <p>
+            A verification code was sent to you@example.com. To submit your application, enter the
+            8-character code to confirm you're a human.
+          </p>
+          <label id="sec-label">Security code</label>
+          <div class="security-code" role="group" aria-labelledby="sec-label">
+            <div>
+              <input
+                id="security-input-0"
+                type="text"
+                maxlength="1"
+                aria-label="Security code character 1"
+                autocomplete="one-time-code"
+              />
+            </div>
+            <div>
+              <input
+                id="security-input-1"
+                type="text"
+                maxlength="1"
+                aria-label="Security code character 2"
+              />
+            </div>
+            <div>
+              <input
+                id="security-input-2"
+                type="text"
+                maxlength="1"
+                aria-label="Security code character 3"
+              />
+            </div>
+            <div>
+              <input
+                id="security-input-3"
+                type="text"
+                maxlength="1"
+                aria-label="Security code character 4"
+              />
+            </div>
+            <div>
+              <input
+                id="security-input-4"
+                type="text"
+                maxlength="1"
+                aria-label="Security code character 5"
+              />
+            </div>
+            <div>
+              <input
+                id="security-input-5"
+                type="text"
+                maxlength="1"
+                aria-label="Security code character 6"
+              />
+            </div>
+            <div>
+              <input
+                id="security-input-6"
+                type="text"
+                maxlength="1"
+                aria-label="Security code character 7"
+              />
+            </div>
+            <div>
+              <input
+                id="security-input-7"
+                type="text"
+                maxlength="1"
+                aria-label="Security code character 8"
+              />
+            </div>
+          </div>
+        </div>
+        <button type="submit">Submit application</button>
+      </form>
+    </div>
+    <script>
+      var boxes = [].slice.call(document.querySelectorAll('.security-code input'));
+      boxes.forEach(function (b, i) {
+        b.addEventListener('input', function () {
+          if (b.value && boxes[i + 1]) boxes[i + 1].focus();
+        });
+        b.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') e.preventDefault();
+        });
+      });
+      var state = 'start';
+      document.getElementById('app').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var code = boxes
+          .map(function (b) {
+            return b.value;
+          })
+          .join('');
+        if (state === 'start' || !/^\d{8}$/.test(code)) {
+          state = 'prompted';
+          document.getElementById('prompt').hidden = false;
+          return;
+        }
+        document.getElementById('page').innerHTML =
+          '<h2>Thank you for applying!</h2><p>We will be in touch.</p>';
+      });
+    </script>
+  </body>
+</html>

@@ -77,8 +77,69 @@ const CODE_INPUTS = [
   'input[aria-label*="code" i]',
 ];
 
+/**
+ * Greenhouse's security-code widget is one single-character box per character (8 of them): the
+ * visible `maxlength=1` text inputs next to the code prompt. Tags them `data-wma-code-box=<i>` in
+ * page order and returns how many there are (0 when the page has no such group).
+ */
+const TAG_CODE_BOXES = `(() => {
+  document.querySelectorAll('[data-wma-code-box]').forEach((e) => e.removeAttribute('data-wma-code-box'));
+  const shown = (e) => {
+    const r = e.getBoundingClientRect();
+    const st = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.display !== 'none';
+  };
+  const boxes = [...document.querySelectorAll('input')].filter(
+    (e) =>
+      shown(e) &&
+      !e.disabled &&
+      e.maxLength === 1 &&
+      ['text', 'number', 'tel', 'password', ''].includes((e.getAttribute('type') || '').toLowerCase()),
+  );
+  if (boxes.length < 4) return 0;
+  // Keep the largest run that shares a parent with the first box's group.
+  const groups = new Map();
+  for (const b of boxes) {
+    const key = b.parentElement && b.parentElement.parentElement ? b.parentElement.parentElement : b.parentElement;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(b);
+  }
+  let best = [];
+  for (const g of groups.values()) if (g.length > best.length) best = g;
+  if (best.length < 4) best = boxes;
+  best.forEach((b, i) => b.setAttribute('data-wma-code-box', String(i)));
+  return best.length;
+})()`;
+
+const READ_CODE_BOXES = `(() => [...document.querySelectorAll('[data-wma-code-box]')]
+  .sort((a, b) => Number(a.getAttribute('data-wma-code-box')) - Number(b.getAttribute('data-wma-code-box')))
+  .map((e) => e.value || '')
+  .join(''))()`;
+
+/** Fills a one-box-per-character code widget; true when every box ended up holding its character. */
+async function fillCodeBoxes(page: PageLike, code: string): Promise<boolean> {
+  if (!page.evaluate) return false;
+  const count = Number(await page.evaluate(TAG_CODE_BOXES).catch(() => 0)) || 0;
+  if (count < code.length) return false;
+  const box = (i: number) => `input[data-wma-code-box="${i}"]`;
+  const read = async () => String(await page.evaluate!(READ_CODE_BOXES).catch(() => ''));
+  // Typed one key per box, as a person would: the widget's key handlers move the focus along.
+  for (let i = 0; i < code.length; i++) {
+    await page.press(box(i), code[i]!, { timeout: 2000 }).catch(() => {});
+  }
+  if ((await read()) !== code) {
+    for (let i = 0; i < code.length; i++) {
+      await page.fill(box(i), code[i]!, { timeout: 2000 }).catch(() => {});
+    }
+  }
+  if ((await read()) !== code) return false;
+  await page.press(box(code.length - 1), 'Enter', { timeout: 2000 }).catch(() => {});
+  return true;
+}
+
 /** Types the code into the page's verification field and submits it with Enter. */
 export async function enterVerificationCode(page: PageLike, code: string): Promise<void> {
+  if (await fillCodeBoxes(page, code)) return;
   for (const selector of CODE_INPUTS) {
     try {
       await page.fill(selector, code, { timeout: 2000 });

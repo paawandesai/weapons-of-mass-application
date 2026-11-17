@@ -1228,6 +1228,24 @@ describe('rule 40: a code prompt after submit', () => {
     });
   }, 60_000);
 
+  it('fills a Greenhouse-style one-box-per-character security code', async () => {
+    await withPage(async (page) => {
+      await open(page, 'code-prompt-boxes.html');
+      const [name] = await bare.fields(page);
+      await bare.fill(page, { [name!.id]: 'Mara Quill' });
+      await bare.submit(page);
+      expect(await bare.codePrompt!(page)).toBe(true);
+      await enterVerificationCode(page as never, '06147577');
+      const typed = await page.evaluate(
+        `[...document.querySelectorAll('.security-code input')].map((e) => e.value).join('')`,
+      );
+      expect(typed).toBe('06147577');
+      await bare.advanceCode!(page);
+      await bare.submit(page);
+      expect(await bare.confirmed(page)).toBe(true);
+    });
+  }, 60_000);
+
   it('a confirmation page with "check your email" text but no code input is not a prompt', async () => {
     await withPage(async (page) => {
       await open(page, 'confirm-text.html');
