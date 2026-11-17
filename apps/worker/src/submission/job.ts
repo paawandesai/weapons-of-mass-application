@@ -470,9 +470,16 @@ async function attempt(
         await enterVerificationCode(formPage, found.code);
         await adapter.advanceCode?.(formPage);
         clickedAt = deps.clock.now();
-        const again = await adapter.submit(formPage).catch((e: unknown) => {
+        const again = await adapter.submit(formPage).catch(async (e: unknown) => {
           // Enter alone may already have submitted; a vanished button is then not a failure.
           if (e instanceof SubmissionFailure && e.reason === 'unmapped-field') return undefined;
+          // Greenhouse goes straight to its thank-you page on Enter, so the submit button the
+          // second click waits for is gone: that is a confirmation, not a browser error.
+          if (
+            !(e instanceof SubmissionFailure) &&
+            (await adapter.confirmed(formPage).catch(() => false))
+          )
+            return undefined;
           throw e;
         });
         await recordTrace(ctx, again);
