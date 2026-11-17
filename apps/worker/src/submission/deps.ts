@@ -18,6 +18,8 @@ export interface PageLike extends AdapterPage {
   screenshot(options?: { fullPage?: boolean }): Promise<Buffer>;
   fill(selector: string, value: string, options?: { timeout?: number }): Promise<void>;
   press(selector: string, key: string, options?: { timeout?: number }): Promise<void>;
+  /** Runs a script in the page (Playwright's `page.evaluate` with a string). */
+  evaluate?(script: string): Promise<unknown>;
 }
 
 export interface ContextLike {

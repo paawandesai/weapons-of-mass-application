@@ -405,6 +405,8 @@ export const DEMO_PROFILE: ProfileDocument = {
     self_identification_default: null,
     citizenship: 'U.S. citizen',
     payroll_state: 'California',
+    employer_agreements_restrict: false,
+    ai_interview_recording_consent: null,
   },
   flags: [],
 };

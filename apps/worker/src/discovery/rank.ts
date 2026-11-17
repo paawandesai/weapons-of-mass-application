@@ -68,10 +68,14 @@ export function selectWithCompanyCap<T extends { candidate: Candidate }>(
   ranked: readonly T[],
   target: number,
   cap: number = DEFAULT_MAX_PER_COMPANY,
+  /**
+   * Selections already made earlier in the same run, by `companyKey`. Updated in place, so a run
+   * that judges in batches keeps one company cap across all of them.
+   */
+  perCompany: Map<string, number> = new Map(),
 ): { selected: T[]; skipped: T[] } {
   const selected: T[] = [];
   const skipped: T[] = [];
-  const perCompany = new Map<string, number>();
   const limit = Math.max(0, target);
   for (const item of ranked) {
     if (selected.length >= limit) break;
@@ -101,14 +105,56 @@ const STOP_WORDS = new Set([
 const words = (text: string) => text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
 
 /**
- * The words of a target title that carry meaning: length >= 3, minus stop words. A title made only of
- * stop words ("Staff Software Engineer") would otherwise match every posting or none, so it falls
- * back to all its words of length >= 3.
+ * Two-letter terms that carry a title's meaning ("AI Engineer", "ML Engineer"). Without them
+ * "AI Engineer" would reduce to the stop word "engineer" and match every engineering posting.
  */
-function significantWords(title: string): string[] {
-  const long = words(title).filter((w) => w.length >= 3);
+const SHORT_TERMS = new Set(['ai', 'ml', 'qa', 'ux', 'ui', 'ar', 'vr', 'bi']);
+
+/**
+ * Title words that count as a significant word of the target. "AI" in a target also matches a
+ * posting titled with ML, LLM, GenAI, agents or "Machine Learning"; the reverse holds for "ML".
+ */
+const ALIASES: Record<string, readonly string[]> = {
+  ai: ['ai', 'ml', 'llm', 'llms', 'genai', 'agent', 'agents', 'agentic', 'machine learning'],
+  ml: ['ml', 'ai', 'machine learning'],
+};
+
+/** Titles above an early-career level, or not individual-contributor roles. */
+const SENIORITY_WORDS = new Set([
+  'senior',
+  'sr',
+  'staff',
+  'principal',
+  'lead',
+  'manager',
+  'director',
+  'head',
+  'vp',
+  'distinguished',
+]);
+/** Points a senior title loses when no target title is itself senior (larger than any title match). */
+export const SENIORITY_PENALTY = 6;
+
+/** True when `word` (or one of its aliases) appears in the posting title. */
+function titleHas(word: string, titleWords: Set<string>, titleText: string): boolean {
+  const alts = ALIASES[word] ?? [word];
+  return alts.some((a) => (a.includes(' ') ? titleText.includes(` ${a} `) : titleWords.has(a)));
+}
+
+/**
+ * The words of a target title that carry meaning: length >= 3 (or a known two-letter term such as
+ * "ai"), minus stop words. A title made only of stop words ("Staff Software Engineer") would
+ * otherwise match every posting or none, so it falls back to all its words of length >= 3.
+ */
+export function significantWords(title: string): string[] {
+  const long = words(title).filter((w) => w.length >= 3 || SHORT_TERMS.has(w));
   const sig = long.filter((w) => !STOP_WORDS.has(w));
-  return [...new Set(sig.length > 0 ? sig : long)];
+  return [...new Set(sig.length > 0 ? sig : long.filter((w) => w.length >= 3))];
+}
+
+/** True when the title names a level above early career (Senior, Staff, Lead, Manager, ...). */
+export function isSeniorTitle(title: string): boolean {
+  return words(title).some((w) => SENIORITY_WORDS.has(w));
 }
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -123,10 +169,12 @@ export interface RelevanceProfile {
 /**
  * Local, model-free relevance of a posting to the profile (wave 5 rule 17): +3 per target title or
  * role whose significant words all appear in the posting title, +1 per such word in the title, +1
- * per profile skill named in the title or the first 2,000 characters of the description (max +5).
+ * per profile skill named in the title or the first 2,000 characters of the description (max +5),
+ * and -SENIORITY_PENALTY for a senior title when none of the targets is senior.
  */
 export function relevanceScore(c: Candidate, profile: RelevanceProfile): number {
   const titleWords = new Set(words(c.title));
+  const titleText = ` ${words(c.title).join(' ')} `;
   // One entry per semantic target: the same token normalisation as matching, so case and
   // punctuation differences between preferences and survey do not score a target twice.
   const targets = new Map<string, string>();
@@ -140,9 +188,13 @@ export function relevanceScore(c: Candidate, profile: RelevanceProfile): number 
   for (const t of targets.values()) {
     const sig = significantWords(t);
     if (sig.length === 0) continue;
-    if (sig.every((w) => titleWords.has(w))) score += 3;
-    score += sig.filter((w) => titleWords.has(w)).length;
+    if (sig.every((w) => titleHas(w, titleWords, titleText))) score += 3;
+    score += sig.filter((w) => titleHas(w, titleWords, titleText)).length;
   }
+  // A senior title is judged last for a person whose own targets are not senior: those postings
+  // are almost always skipped for seniority and would crowd out the ones worth judging.
+  const targetsSenior = [...targets.values()].some(isSeniorTitle);
+  if (!targetsSenior && targets.size > 0 && isSeniorTitle(c.title)) score -= SENIORITY_PENALTY;
   const haystack = `${c.title}\n${(c.description ?? '').slice(0, 2000)}`.toLowerCase();
   let skills = 0;
   for (const s of new Set(profile.skills.map((k) => k.name.trim().toLowerCase()).filter(Boolean))) {

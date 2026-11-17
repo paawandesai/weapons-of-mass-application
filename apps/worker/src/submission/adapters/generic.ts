@@ -1,6 +1,7 @@
 import type { Locator, Page } from 'playwright';
 import { SubmissionFailure } from '../failure';
 import type { CaptchaHandle, FieldDescriptor, FieldValues, FormNotice } from '../types';
+import { declineOption } from '../answers/classify';
 import { classifyField } from './classify';
 import { OPTIONS_SCRIPT, PROBE_SCRIPT, SCAN_SCRIPT } from './scan-script';
 
@@ -94,7 +95,9 @@ const TYPED_OPTIONS_WAIT_MS = 3_000;
 const NETWORK_IDLE_MS = 8_000;
 const STABLE_MS = 500;
 const STABLE_MAX_MS = 10_000;
-const RESULTS_WAIT_MS = 1_500;
+const RESULTS_WAIT_MS = 2_500;
+/** After a matching option appears, wait for late filter replies to finish replacing the menu. */
+const RESULTS_SETTLE_MS = 300;
 const MAX_STEPS = 12;
 const STEP_WAIT_MS = 3_000;
 
@@ -238,7 +241,10 @@ export function descriptorType(q: Question): FieldDescriptor['type'] {
   }
 }
 
-/** Rule 44: a phone widget's country selector (an `iti` ancestor, or options that all end in a dial code). */
+/**
+ * Rule 44: a phone widget's country selector (an `iti` ancestor, a flag-and-dial-code react-select
+ * in a phone group, or options that all end in a dial code).
+ */
 export function isPhoneCountry(q: Question): boolean {
   if (q.kind !== 'combobox') return false;
   if (q.phoneWidget) return true;
@@ -247,6 +253,8 @@ export function isPhoneCountry(q: Question): boolean {
 
 /** "United States: +1" and "United States+1" are both the country "united states". */
 const countryName = (s: string) => low(s).replace(/[\s:(-]*\+\d{1,4}\)?\s*$/, '');
+/** The trailing dial code of "United States +1" or "+1", digits only; '' when there is none. */
+const dialCodeOf = (s: string) => /\+(\d{1,4})\)?\s*$/.exec(norm(s))?.[1] ?? '';
 
 export function describe(q: Question): FieldDescriptor {
   const type = descriptorType(q);
@@ -300,33 +308,32 @@ async function collectOptions(
 
 /**
  * After typing into a combobox the previous options often stay mounted until the filtered result
- * arrives. Waits until an option containing the text is there, or the option set has changed and
- * settled, or the time is up; never mistakes the old rows for the answer.
+ * arrives. Waits until an option containing the text is there and the option set has settled (late
+ * filter replies can replace the menu a beat later), or the time is up. An empty or merely-changed
+ * list is not treated as the answer: that is often the stale menu mid-refresh.
  */
 async function waitForResults(
   page: Page,
   q: Question,
   text: string,
-  before: string[],
+  _before: string[],
   totalMs: number,
 ): Promise<OptionRow[]> {
   const want = low(text);
   const started = Date.now();
-  let lastKey = before.join('\n');
-  let changed = false;
-  let stableSince = Date.now();
+  let lastKey = '';
+  let lastChange = Date.now();
   for (;;) {
     const rows = await collectOptions(page, q, 0, 0);
-    if (rows.some((r) => low(r.text).includes(want))) return rows;
-    const key = rows.map((r) => r.text).join('\n');
+    const key = rows.map((r) => r.text).join('\0');
+    const now = Date.now();
     if (key !== lastKey) {
       lastKey = key;
-      changed = true;
-      stableSince = Date.now();
-    } else if (changed && Date.now() - stableSince >= 300) {
-      return rows;
+      lastChange = now;
     }
-    if (Date.now() - started >= totalMs) return rows;
+    const matched = rows.some((r) => low(r.text).includes(want));
+    if (matched && now - lastChange >= RESULTS_SETTLE_MS) return rows;
+    if (now - started >= totalMs) return rows;
     await sleep(100);
   }
 }
@@ -781,7 +788,11 @@ export function stuck(q: Question, intent: Intent): boolean {
       if (isPhoneCountry(q)) {
         // Rule 44: the widget's selected-country element, by country name.
         const shown = countryName(curText);
-        return shown !== '' && shown === countryName(intent.chosen ?? intent.text);
+        const want = intent.chosen ?? intent.text;
+        if (shown !== '') return shown === countryName(want);
+        // Only a dial code is shown ("+1"): it verifies against the chosen option's dial code.
+        const dial = dialCodeOf(curText);
+        return dial !== '' && dial === dialCodeOf(want);
       }
       const t = low(curText);
       const w = low(intent.chosen ?? intent.text);
@@ -878,8 +889,19 @@ export async function fillPage(page: Page, values: FieldValues): Promise<FillFai
   const isSelfId = (q: Question): boolean =>
     classifyField({ label: q.label, type: descriptorType(q), hint: q.context }) ===
     'self-identification';
-  // A self-identification question has a value only when the resolver chose its decline option.
-  const wanted = (q: Question): boolean => values[q.id] !== undefined && q.kind !== 'file';
+  const isDeclineValue = (q: Question, value: unknown): boolean => {
+    const texts = (Array.isArray(value) ? value : [value]).map((v) => String(v ?? '').trim());
+    const decline = declineOption(q.options);
+    if (decline && texts.some((t) => t.toLowerCase() === decline.trim().toLowerCase())) return true;
+    return texts.some((t) => declineOption([t]) !== null);
+  };
+  // A self-identification question is filled only with the form's decline option
+  // (or a decline phrase). Values like she/her or Female are ignored and left blank.
+  const wanted = (q: Question): boolean => {
+    if (values[q.id] === undefined || q.kind === 'file') return false;
+    if (isSelfId(q) && !isDeclineValue(q, values[q.id])) return false;
+    return true;
+  };
   const plan = initial.questions.filter(wanted);
   const intents = new Map<string, Intent>();
   for (const q of plan) intents.set(q.id, intentOf(q, values[q.id]!));

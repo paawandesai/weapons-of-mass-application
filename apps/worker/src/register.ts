@@ -21,7 +21,7 @@ import type { BuildDeps } from './profile/build';
 /** Wave 2 job registration; each file owns its own handler. */
 export async function registerWave2Jobs(boss: PgBoss, db: Db): Promise<void> {
   await registerDailyRun(boss, db);
-  await registerSubmitApplication(boss, db);
+  await registerSubmitApplication(boss, db, undefined, { backfill: true });
 }
 
 /** Wave 3 job registration (inbox, scheduling, follow-ups, reminders, digest). */

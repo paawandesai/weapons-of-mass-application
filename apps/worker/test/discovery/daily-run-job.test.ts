@@ -64,9 +64,12 @@ async function freshBoss(): Promise<PgBoss> {
 const roster = (
   users: Array<{ tenantId: string; userId: string; runHour: number }>,
   tenants: string[] = [],
+  existing: Array<{ userId: string; date: string }> = [],
 ): Roster => ({
   activeUsers: async () => users,
   tenantsWithRunsBefore: async () => tenants,
+  hasNonFailedRun: async (_tenantId, userId, date) =>
+    existing.some((r) => r.userId === userId && r.date === date),
 });
 
 describe('daily-run singleton', () => {
@@ -118,6 +121,90 @@ describe('scheduler tick', () => {
       );
   });
 
+  it('a late tick still enqueues when the run hour has passed and no run exists', async () => {
+    await boss.createQueue(DAILY_RUN_JOB, { policy: 'exclusive' });
+    const late = new Date('2026-11-07T15:07:00Z');
+    const mine = { tenantId: randomUUID(), userId: randomUUID(), runHour: 8 };
+    const future = { tenantId: randomUUID(), userId: randomUUID(), runHour: 18 };
+    const r = roster([mine, future]);
+    const tick = await enqueueScheduledRuns(boss, r, late);
+    expect(tick).toEqual({ date: TODAY, enqueued: 1, duplicates: 0 });
+    const queued = await boss.fetch<{ userId: string; date: string; trigger: string }>(
+      DAILY_RUN_JOB,
+      { batchSize: 100 },
+    );
+    const hit = queued.filter(
+      (j) => j.data.userId === mine.userId || j.data.userId === future.userId,
+    );
+    expect(hit).toHaveLength(1);
+    expect(hit[0]!.data).toMatchObject({
+      userId: mine.userId,
+      date: TODAY,
+      trigger: 'scheduled',
+    });
+    if (queued.length)
+      await boss.complete(
+        DAILY_RUN_JOB,
+        queued.map((j) => j.id),
+      );
+  });
+
+  it('a late tick does not enqueue when a non-failed run for today already exists', async () => {
+    await boss.createQueue(DAILY_RUN_JOB, { policy: 'exclusive' });
+    const late = new Date('2026-11-07T15:07:00Z');
+    const mine = { tenantId: randomUUID(), userId: randomUUID(), runHour: 8 };
+    const r = roster([mine], [], [{ userId: mine.userId, date: TODAY }]);
+    const tick = await enqueueScheduledRuns(boss, r, late);
+    expect(tick).toEqual({ date: TODAY, enqueued: 0, duplicates: 0 });
+    const queued = await boss.fetch<{ userId: string }>(DAILY_RUN_JOB, { batchSize: 100 });
+    expect(queued.map((j) => j.data.userId)).not.toContain(mine.userId);
+    if (queued.length)
+      await boss.complete(
+        DAILY_RUN_JOB,
+        queued.map((j) => j.id),
+      );
+  });
+
+  it('a tick before the run hour does not enqueue', async () => {
+    await boss.createQueue(DAILY_RUN_JOB, { policy: 'exclusive' });
+    const early = new Date('2026-11-07T07:00:00Z');
+    const mine = { tenantId: randomUUID(), userId: randomUUID(), runHour: 8 };
+    const r = roster([mine]);
+    const tick = await enqueueScheduledRuns(boss, r, early);
+    expect(tick).toEqual({ date: TODAY, enqueued: 0, duplicates: 0 });
+    const queued = await boss.fetch<{ userId: string }>(DAILY_RUN_JOB, { batchSize: 100 });
+    expect(queued.map((j) => j.data.userId)).not.toContain(mine.userId);
+    if (queued.length)
+      await boss.complete(
+        DAILY_RUN_JOB,
+        queued.map((j) => j.id),
+      );
+  });
+
+  it('an in-progress run for today is treated as already existing (no second enqueue)', async () => {
+    const t = await env.makeTenant();
+    await approveProfile(t.handle, t.userId, 5);
+    await insertRun(t.handle, {
+      userId: t.userId,
+      date: TODAY,
+      trigger: 'manual',
+      targetN: 12,
+      status: 'running',
+      step: 'judge',
+    });
+    await boss.createQueue(DAILY_RUN_JOB, { policy: 'exclusive' });
+    const late = new Date('2026-11-07T16:30:00Z');
+    const tick = await enqueueScheduledRuns(boss, dbRoster(env.db), late);
+    const queued = await boss.fetch<{ userId: string }>(DAILY_RUN_JOB, { batchSize: 1000 });
+    expect(queued.map((j) => j.data.userId)).not.toContain(t.userId);
+    expect(tick.date).toBe(TODAY);
+    if (queued.length)
+      await boss.complete(
+        DAILY_RUN_JOB,
+        queued.map((j) => j.id),
+      );
+  });
+
   it('the production roster enumerates through the application connection (no owner credentials)', async () => {
     const t = await env.makeTenant();
     const unapproved = await env.makeTenant();
@@ -156,8 +243,11 @@ describe('scheduler tick', () => {
         queue: fakeQueue(),
         adapters: [],
       });
-      const names = (await own.getSchedules()).map((s) => s.name);
+      const schedules = await own.getSchedules();
+      const names = schedules.map((s) => s.name);
       expect(names).toEqual(expect.arrayContaining([DAILY_RUN_TICK_JOB, DAILY_RUN_CLEANUP_JOB]));
+      const tick = schedules.find((s) => s.name === DAILY_RUN_TICK_JOB);
+      expect(tick?.options).toMatchObject({ missed: 'once' });
     } finally {
       await own.stop({ graceful: false, timeout: 2000 });
     }

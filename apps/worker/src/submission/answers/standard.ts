@@ -28,6 +28,8 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   authorized_without_sponsorship: 'standard_answers.work_authorization',
   citizenship: 'standard_answers.citizenship',
   payroll_state: 'standard_answers.payroll_state',
+  employer_agreements: 'standard_answers.employer_agreements_restrict',
+  ai_interview_recording: 'standard_answers.ai_interview_recording_consent',
   worked_before: 'work_history',
   interviewed_before: 'standard_answers.previous_interviews',
   applied_before: 'standard_answers.previous_interviews',
@@ -40,6 +42,7 @@ const PROFILE_FIELD_NAME: Record<StandardKey, string> = {
   consent: 'standard_answers.consent',
   heard_about: 'application source (not a profile field)',
   travel: 'travel willingness (not a profile field)',
+  systems_audience: 'product users (from work history)',
 };
 
 /** What the resolver knows beyond the profile: the posting's company and earlier applied rows. */
@@ -173,6 +176,10 @@ export function profileValue(
     }
     case 'payroll_state':
       return nonEmpty(p.standard_answers.payroll_state);
+    case 'employer_agreements':
+      return p.standard_answers.employer_agreements_restrict;
+    case 'ai_interview_recording':
+      return p.standard_answers.ai_interview_recording_consent;
     case 'worked_before':
     case 'interviewed_before':
     case 'applied_before':
@@ -194,7 +201,8 @@ export function profileValue(
       return true;
     case 'heard_about':
     case 'travel':
-      // Not profile facts; rules 45 and 46 infer them (inferValue / heardAbout).
+    case 'systems_audience':
+      // Not profile facts; inferred from the form's options or work history.
       return null;
   }
 }
@@ -329,6 +337,63 @@ function yesNo(value: boolean, f: FieldDescriptor): string | boolean | null {
 function matchOption(text: string, f: FieldDescriptor): string | null {
   const hit = f.options?.find((o) => o.trim().toLowerCase() === text.trim().toLowerCase());
   return hit ?? null;
+}
+
+const US_PERSON_OPT =
+  /\b(u\.?s\.? (?:citizen|national|person)|united states citizen|lawful permanent resident|green card|asylee|refugee)\b/i;
+const NOT_US_PERSON_OPT =
+  /\bnot (?:a )?(?:u\.?s\.? person|u\.?s\.? citizen|united states citizen|lawful permanent resident)\b/i;
+const AUTH_OK_OPT =
+  /\b(authori[sz]ed|eligible|citizen|do not (?:need|require) sponsorship|does not require sponsorship|without sponsorship|no sponsorship)\b/i;
+const NEED_SPONSOR_OPT =
+  /\b(?:(?:will|do|does|would) (?:need|require)|requires?) (?:visa )?sponsorship\b/i;
+
+/**
+ * The option that expresses U.S. person / citizen status, or authorization without sponsorship,
+ * when the form's wording does not exactly match the profile text.
+ */
+export function pickLegalStatusOption(
+  options: string[] | undefined,
+  kind: 'us-person' | 'authorized',
+): string | null {
+  if (!options?.length) return null;
+  if (kind === 'us-person') {
+    const yes = options.filter((o) => US_PERSON_OPT.test(o) && !NOT_US_PERSON_OPT.test(o));
+    const citizen = yes.find((o) => /citizen/i.test(o));
+    return citizen ?? yes[0] ?? null;
+  }
+  const good = options.filter((o) => {
+    const needs =
+      NEED_SPONSOR_OPT.test(o) && !/do(?:es)? not|without sponsorship|no sponsorship/i.test(o);
+    return AUTH_OK_OPT.test(o) && !needs;
+  });
+  return good[0] ?? null;
+}
+
+/** Internal, external, or both product users, from the options the form offers. */
+function systemsAudienceValue(f: FieldDescriptor): string | string[] | null {
+  const options = f.options ?? [];
+  const both = options.find((o) => /\bboth\b|internal and external/i.test(o));
+  const external = options.filter(
+    (o) => /\bexternal\b/i.test(o) && !/\binternal and external|\bboth\b/i.test(o),
+  );
+  const internal = options.filter(
+    (o) => /\binternal\b/i.test(o) && !/\binternal and external|\bboth\b/i.test(o),
+  );
+  const extOnly = external.filter((o) => !/\binternal\b/i.test(o));
+  const intOnly = internal.filter((o) => !/\bexternal\b/i.test(o));
+  if (f.type === 'checkbox' && options.length > 0) {
+    if (both) return [both];
+    if (intOnly[0] && extOnly[0]) return [intOnly[0], extOnly[0]];
+    if (extOnly[0]) return [extOnly[0]];
+    return null;
+  }
+  if (both) return both;
+  if (extOnly[0]) return extOnly[0];
+  if (!options.length) {
+    return 'Both internal and external users, mostly external (for example a clinical co-pilot and a call-center agent).';
+  }
+  return null;
 }
 
 type Resolved =
@@ -473,6 +538,28 @@ function countryNameFromLocation(loc: string | null | undefined): string | null 
 }
 
 /**
+ * The country the rest of the profile points to when the location text names none: the phone's
+ * dial code, a citizenship or work-authorization statement naming the U.S., or a U.S. payroll state.
+ */
+function profileCountryName(p: ProfileDocument): string | null {
+  const fromPhone = profileCountry(p);
+  if (fromPhone) return canonicalCountry(PLACE_NAME[fromPhone]!);
+  const sa = p.standard_answers;
+  for (const t of [sa.citizenship, sa.work_authorization]) {
+    const id = t ? locationCountryId(t) : null;
+    if (id) return canonicalCountry(PLACE_NAME[id]!);
+  }
+  if (
+    sa.payroll_state &&
+    (US_STATE_NAMES.test(sa.payroll_state) ||
+      US_STATE_CODES.includes(sa.payroll_state.trim().toUpperCase()))
+  ) {
+    return 'United States';
+  }
+  return null;
+}
+
+/**
  * An inferred work-authorization statement for a question: the country the profile implies, else
  * the countries the question itself names, else null (the question is then the user's to answer).
  * When the profile implies a country the question must be covered by it.
@@ -578,7 +665,7 @@ function valueForField(
       return mapped === null ? { unexpressible: true } : { value: mapped, ...flag };
     }
     if (f.options?.length) {
-      const hit = matchOption(text, f);
+      const hit = matchOption(text, f) ?? pickLegalStatusOption(f.options, 'authorized');
       return hit ? { value: hit, ...flag } : { unexpressible: true };
     }
     return { value: text, ...flag };
@@ -586,7 +673,8 @@ function valueForField(
   // Rule 39: a country list takes the country the profile's location implies; a city/state
   // question keeps the location text (the generic path below).
   if (key === 'location' && isCountryListField(f)) {
-    const country = countryNameFromLocation(profile.identity.location);
+    const country =
+      countryNameFromLocation(profile.identity.location) ?? profileCountryName(profile);
     if (!country) return null;
     if (f.options?.length) {
       const hit = f.options.find((o) => canonicalCountry(o) === country);
@@ -610,7 +698,13 @@ function valueForField(
     }
   }
   // Rule 45: where the candidate heard about the role is never a profile fact.
-  if (key === 'heard_about') return allowInference ? heardAbout(f) : null;
+  // Inferred even when the field looks optional: a box the form validates as required must not
+  // be left empty because the scan read it as optional.
+  if (key === 'heard_about') return heardAbout(f);
+  if (key === 'systems_audience') {
+    const mapped = systemsAudienceValue(f);
+    return mapped === null ? { unexpressible: true } : { value: mapped, inferred: true };
+  }
   // Rule 23b: a date picker always gets a date; a text box keeps the start-date text.
   if (key === 'start_date' && f.type === 'date') return { value: deriveStartDate(profile, today) };
   let value = profileValue(profile, key, f.label, prior);
@@ -623,14 +717,23 @@ function valueForField(
   }
   if (value === null) return null;
   if (typeof value === 'boolean') {
-    const mapped = yesNo(value, f);
+    const mapped =
+      yesNo(value, f) ??
+      (key === 'citizenship'
+        ? value
+          ? pickLegalStatusOption(f.options, 'us-person')
+          : (f.options?.find((o) => NOT_US_PERSON_OPT.test(o)) ?? null)
+        : null);
     return mapped === null ? { unexpressible: true } : { value: mapped, ...flag };
   }
   if (f.options?.length) {
     const hit =
       matchOption(value, f) ??
-      (key === 'citizenship' && canonicalCountry(value)
-        ? f.options.find((o) => canonicalCountry(o) === canonicalCountry(value))
+      (key === 'citizenship'
+        ? (pickLegalStatusOption(f.options, 'us-person') ??
+          (canonicalCountry(value)
+            ? f.options.find((o) => canonicalCountry(o) === canonicalCountry(value))
+            : undefined))
         : undefined);
     return hit ? { value: hit, ...flag } : { value, ...flag };
   }

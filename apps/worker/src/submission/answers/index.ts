@@ -69,9 +69,16 @@ export async function resolveAnswers(
       case 'standard':
         out.push(standard.get(f.id) as AnswerResolution);
         break;
-      case 'free-text':
-        out.push(await resolveFreeText(ctx, f));
+      case 'free-text': {
+        const priorAnswers = out
+          .filter((r) => r.status === 'filled')
+          .map((r) => ({
+            question: r.question,
+            answer: Array.isArray(r.value) ? r.value.join(', ') : String(r.value),
+          }));
+        out.push(await resolveFreeText(ctx, f, priorAnswers));
         break;
+      }
     }
   }
   return out;

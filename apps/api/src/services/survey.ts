@@ -58,6 +58,8 @@ export function emptyDocument(
       self_identification_default: null,
       citizenship: null,
       payroll_state: null,
+      employer_agreements_restrict: null,
+      ai_interview_recording_consent: null,
     },
     flags: [],
   };

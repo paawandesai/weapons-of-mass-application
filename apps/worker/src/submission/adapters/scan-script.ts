@@ -744,6 +744,23 @@ export const SCAN_SCRIPT = String.raw`(opts) => {
           : dial
             ? norm(dial.textContent)
             : '';
+      } else {
+        // Greenhouse job-boards: a react-select in the phone group (phone-input__country) whose
+        // selected value is a flag (iti__flag iti__us) and the dial code ("+1"). The flag's
+        // region code names the country, so the value reads "United States +1".
+        const sv = ownShell(first).querySelector(SINGLE_SEL);
+        const flag = sv ? sv.querySelector('[class*="iti__flag"]') : null;
+        if (flag || first.closest('[class*="phone-input__country"]')) {
+          q.phoneWidget = true;
+          const iso = flag ? /\biti__([a-z]{2})\b/.exec(klass(flag)) : null;
+          let name = '';
+          try {
+            name = iso ? new Intl.DisplayNames(['en'], { type: 'region' }).of(iso[1].toUpperCase()) || '' : '';
+          } catch (e) {
+            name = '';
+          }
+          if (flag) q.current = norm(name + ' ' + (sv.textContent || ''));
+        }
       }
     }
     if (kind === 'unknown') q.note = 'unknown-control';

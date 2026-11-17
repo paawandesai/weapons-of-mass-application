@@ -19,6 +19,8 @@ export const STANDARD_KEYS = [
   'authorized_without_sponsorship',
   'citizenship',
   'payroll_state',
+  'employer_agreements',
+  'ai_interview_recording',
   'worked_before',
   'interviewed_before',
   'applied_before',
@@ -31,6 +33,7 @@ export const STANDARD_KEYS = [
   'consent',
   'heard_about',
   'travel',
+  'systems_audience',
 ] as const;
 export type StandardKey = (typeof STANDARD_KEYS)[number];
 
@@ -157,6 +160,9 @@ const NOT_RESIDENCE_COUNTRY =
 export function isCountryListField(f: Pick<FieldDescriptor, 'label' | 'options'>): boolean {
   const l = norm(f.label);
   if (/^country( of residence)?$|which country/.test(l)) return true;
+  // Any other label naming a country ("Country *", "Country/Region") when it is not asking about
+  // citizenship, birth, a phone code and the like.
+  if (/\bcountry\b|\bcountry\/region\b/.test(l) && !NOT_RESIDENCE_COUNTRY.test(l)) return true;
   return hasCountryOptions(f.options) && !NOT_RESIDENCE_COUNTRY.test(l);
 }
 
@@ -266,6 +272,18 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
     'payroll_state',
     /\bpayroll\b|state (?:or province )?(?:in which|where|of) you (?:will|would|plan to) (?:be )?(?:work|employ|reside|live)/,
   ],
+  // Agreements with a current or former employer that limit the candidate.
+  [
+    'employer_agreements',
+    /non-?compete|non-?solicit|(?:agreement|contract|obligation|restriction|covenant)s?\b.*\b(?:current|former|previous|prior|past) employers?\b|\b(?:current|former|previous|prior|past) employers?\b.*\b(?:agreement|contract|obligation|restriction|covenant)s?\b/,
+  ],
+  // Consent to AI interview note-takers / recorders (Metaview, BrightHire, and similar). Experience
+  // questions ("have you used an AI notetaker") are left to the model. AI-policy acknowledgements
+  // still match `consent` first via AI_POLICY above.
+  [
+    'ai_interview_recording',
+    /^(?!.*\b(?:have you (?:ever )?(?:used|worked with|tried)|experience (?:with|using)|are you familiar)\b)(?:.*\b(?:metaview|brighthire)\b|(?=.*\b(?:ai|artificial intelligence)\b)(?=.*\b(?:note[- ]?tak\w*|notetak\w*))|(?=.*\binterview\w*\b)(?=.*\b(?:ai|artificial intelligence)\b)(?=.*\b(?:record\w*|transcri\w*)))/,
+  ],
   // Rule 27: prior contact with the company. After sponsorship / work authorization so those keep
   // their labels; before the generic patterns.
   ['worked_before', /\bhave you (?:ever |previously )?worked (?:at|for)\b/],
@@ -281,6 +299,10 @@ const STANDARD_RULES: Array<[StandardKey, RegExp]> = [
   [
     'travel',
     /^(?!.*\b(?:expenses?|reimburs\w*|history|visa|passport|restrictions?)\b)(?=.*\btravel\w*)(?=.*\b(?:willing\w*|able|open|comfortable|prepared|ready|up to|\d{1,3}\s*(?:%|percent)|required|requirement|expect\w*)\b)/,
+  ],
+  [
+    'systems_audience',
+    /internal or external|(?:ml\/?llm|machine learning|llm)[- ]powered systems for|who are you building/,
   ],
   ['notice_period', /notice period/],
   [

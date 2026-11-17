@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import type { TenantHandle } from '../client';
-import { runCandidates } from '../schema';
+import { runCandidates, runs } from '../schema';
 
 export type RunCandidateRow = typeof runCandidates.$inferSelect;
 
@@ -80,6 +80,59 @@ export async function unselectRunCandidates(
           eq(runCandidates.tenantId, handle.tenantId),
           eq(runCandidates.runId, runId),
           inArray(runCandidates.id, ids),
+        ),
+      ),
+  );
+}
+
+/**
+ * Postings the user's runs dated `since` (`YYYY-MM-DD`) or later judged as not worth applying to,
+ * other than `excludeRunId`. A run skips these so each batch it judges is new postings.
+ */
+export function listRecentlyRejected(
+  handle: TenantHandle,
+  userId: string,
+  since: string,
+  excludeRunId?: string,
+): Promise<Array<Pick<RunCandidateRow, 'ats' | 'atsJobId' | 'url'>>> {
+  const conds = [
+    eq(runCandidates.tenantId, handle.tenantId),
+    eq(runs.userId, userId),
+    gte(runs.date, since),
+    sql`${runCandidates.judgment}->>'apply' = 'false'`,
+  ];
+  if (excludeRunId) conds.push(ne(runs.id, excludeRunId));
+  return handle.run((tx) =>
+    tx
+      .selectDistinct({
+        ats: runCandidates.ats,
+        atsJobId: runCandidates.atsJobId,
+        url: runCandidates.url,
+      })
+      .from(runCandidates)
+      .innerJoin(
+        runs,
+        and(eq(runs.tenantId, runCandidates.tenantId), eq(runs.id, runCandidates.runId)),
+      )
+      .where(and(...conds)),
+  );
+}
+
+/** Marks one candidate of a run selected (a backfill turned it into an application). */
+export async function selectRunCandidate(
+  handle: TenantHandle,
+  runId: string,
+  id: string,
+): Promise<void> {
+  await handle.run((tx) =>
+    tx
+      .update(runCandidates)
+      .set({ selected: true, exclusionReason: null })
+      .where(
+        and(
+          eq(runCandidates.tenantId, handle.tenantId),
+          eq(runCandidates.runId, runId),
+          eq(runCandidates.id, id),
         ),
       ),
   );

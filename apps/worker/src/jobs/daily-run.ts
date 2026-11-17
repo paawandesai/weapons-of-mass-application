@@ -1,5 +1,5 @@
 import type { PgBoss } from 'pg-boss';
-import { deleteRunsBefore, type Db } from '@wma/db';
+import { deleteRunsBefore, getRunForDate, type Db } from '@wma/db';
 import { createLlmClient, parseBackend, type StructuredLlm } from '@wma/llm';
 import { bossSubmitQueue, type SubmitQueue } from '../discovery/handoff';
 import type { Http } from '@wma/discovery';
@@ -38,6 +38,32 @@ export function parseMaxPerCompany(value: string | undefined): number {
   return DEFAULT_MAX_PER_COMPANY;
 }
 
+/** A positive-integer env knob (0 allowed when `allowZero`), else `fallback` with one warning. */
+export function parseCount(
+  name: string,
+  value: string | undefined,
+  fallback: number,
+  allowZero = false,
+): number {
+  if (value === undefined || value.trim() === '') return fallback;
+  const n = /^\d+$/.test(value.trim()) ? Number(value.trim()) : Number.NaN;
+  if (Number.isSafeInteger(n) && (n >= 1 || (allowZero && n === 0))) return n;
+  console.warn(`${name}=${JSON.stringify(value)} is not a valid count; using ${fallback}`);
+  return fallback;
+}
+
+/** Most postings judged per user per day across a run's batches (`DAILY_JUDGE_CEILING`). */
+export const DEFAULT_DAILY_JUDGE_CEILING = 450;
+/** Approved postings at other companies kept for backfill (`TOPUP_RESERVE`). */
+export const DEFAULT_TOPUP_RESERVE = 6;
+/** Postings rejected in the last N days are not judged again (`SKIP_REJECTED_DAYS`, 0 = off). */
+export const DEFAULT_SKIP_REJECTED_DAYS = 7;
+/**
+ * How long a daily-run job may stay active before pg-boss expires it. A run with several batches
+ * of slow judgments takes hours; the default 15 minutes expired the Nov 13 run mid-discovery.
+ */
+export const DAILY_RUN_EXPIRE_SECONDS = 6 * 60 * 60;
+
 export interface DailyRunJobData {
   tenantId: string;
   userId: string;
@@ -57,6 +83,7 @@ export function enqueueDailyRun(boss: PgBoss, data: DailyRunJobData): Promise<st
   return boss.send(DAILY_RUN_JOB, data, {
     singletonKey: dailyRunKey(data.userId, data.date),
     retryLimit: 0,
+    expireInSeconds: DAILY_RUN_EXPIRE_SECONDS,
   });
 }
 
@@ -77,6 +104,11 @@ export interface Roster {
   activeUsers(): Promise<RosterUser[]>;
   /** Tenants that own runs dated before `cutoff` (`YYYY-MM-DD`). */
   tenantsWithRunsBefore(cutoff: string): Promise<string[]>;
+  /**
+   * Whether the user already has a non-failed run for `date` (running, finished,
+   * short_day, or skipped). Failed runs do not count, so the date can be retried.
+   */
+  hasNonFailedRun(tenantId: string, userId: string, date: string): Promise<boolean>;
 }
 
 /** The production roster: the application connection and the roster functions, nothing more. */
@@ -84,10 +116,17 @@ export function dbRoster(db: Db): Roster {
   return {
     activeUsers: () => db.runRoster(),
     tenantsWithRunsBefore: (cutoff) => db.tenantsWithRunsBefore(cutoff),
+    hasNonFailedRun: async (tenantId, userId, date) =>
+      (await getRunForDate(db.forTenant(tenantId), userId, date)) !== null,
   };
 }
 
-/** Scheduler tick: one daily-run per active user whose run hour is `now`'s UTC hour. */
+/**
+ * Scheduler tick: one daily-run per active user whose run hour has been reached today.
+ * At the run hour itself, or later the same UTC day if no non-failed run exists yet
+ * (catch-up after a missed tick). Dates before today are never enqueued: the date is
+ * always `utcDate(now)`. An in-progress or finished run for today is left alone.
+ */
 export async function enqueueScheduledRuns(
   boss: PgBoss,
   roster: Roster,
@@ -98,7 +137,8 @@ export async function enqueueScheduledRuns(
   let enqueued = 0;
   let duplicates = 0;
   for (const u of await roster.activeUsers()) {
-    if (u.runHour !== hour) continue;
+    if (hour < u.runHour) continue;
+    if (await roster.hasNonFailedRun(u.tenantId, u.userId, date)) continue;
     const id = await enqueueDailyRun(boss, {
       tenantId: u.tenantId,
       userId: u.userId,
@@ -108,6 +148,7 @@ export async function enqueueScheduledRuns(
     if (id) enqueued++;
     else duplicates++;
   }
+  console.log('daily-run-tick', { date, hour, enqueued });
   return { date, enqueued, duplicates };
 }
 
@@ -150,6 +191,23 @@ export async function registerDailyRun(
   const now = options.now ?? (() => new Date());
   const judgeCap = parseJudgeCap(process.env.JUDGE_CAP_PER_RUN);
   const maxPerCompany = parseMaxPerCompany(process.env.MAX_PER_COMPANY_PER_RUN);
+  const dailyJudgeCeiling = parseCount(
+    'DAILY_JUDGE_CEILING',
+    process.env.DAILY_JUDGE_CEILING,
+    DEFAULT_DAILY_JUDGE_CEILING,
+  );
+  const topUpReserve = parseCount(
+    'TOPUP_RESERVE',
+    process.env.TOPUP_RESERVE,
+    DEFAULT_TOPUP_RESERVE,
+    true,
+  );
+  const skipRejectedDays = parseCount(
+    'SKIP_REJECTED_DAYS',
+    process.env.SKIP_REJECTED_DAYS,
+    DEFAULT_SKIP_REJECTED_DAYS,
+    true,
+  );
   const roster = options.roster ?? dbRoster(db);
   const queue = options.queue ?? bossSubmitQueue(boss);
   let llm = options.llm;
@@ -173,9 +231,15 @@ export async function registerDailyRun(
     adapters,
     judgeCap,
     maxPerCompany,
+    dailyJudgeCeiling,
+    topUpReserve,
+    skipRejectedDays,
   });
 
-  await boss.createQueue(DAILY_RUN_JOB, { policy: 'exclusive' });
+  await boss.createQueue(DAILY_RUN_JOB, {
+    policy: 'exclusive',
+    expireInSeconds: DAILY_RUN_EXPIRE_SECONDS,
+  });
   await boss.createQueue(DAILY_RUN_TICK_JOB);
   await boss.createQueue(DAILY_RUN_CLEANUP_JOB);
 
@@ -199,7 +263,7 @@ export async function registerDailyRun(
     await cleanupOldRuns(db, roster, now());
   });
   if (options.schedule !== false) {
-    await boss.schedule(DAILY_RUN_TICK_JOB, '0 * * * *');
+    await boss.schedule(DAILY_RUN_TICK_JOB, '0 * * * *', undefined, { missed: 'once' });
     await boss.schedule(DAILY_RUN_CLEANUP_JOB, '30 3 * * *');
   }
 }

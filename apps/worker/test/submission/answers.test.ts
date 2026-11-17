@@ -13,6 +13,7 @@ import {
   toFieldValues,
   toFormAnswers,
 } from '../../src/submission/answers';
+import { pickLegalStatusOption } from '../../src/submission/answers/standard';
 import { planFill } from '../../src/submission/fill';
 import type { FieldClassification, FieldDescriptor } from '../../src/submission/types';
 import { callsTo, makeCtx, PROFILE, scripted } from '../fixtures/submission';
@@ -1722,5 +1723,222 @@ describe('citizenship and payroll state', () => {
       status: 'filled',
       value: 'Texas',
     });
+  });
+});
+
+describe('country, heard-about and employer agreements', () => {
+  const withAnswers = (
+    over: Record<string, unknown>,
+    location: string | null = PROFILE.identity.location,
+  ) => ({
+    ...PROFILE,
+    identity: { ...PROFILE.identity, location },
+    standard_answers: { ...PROFILE.standard_answers, ...over },
+  });
+  const one = (profile: typeof PROFILE, f: FieldDescriptor) =>
+    resolveStandardFields({ profile }, [{ ...f, classification: 'standard' }])[0]!;
+
+  it('a Country dropdown falls back to the country the citizenship statement names', () => {
+    const f = field({
+      label: 'Country *',
+      type: 'select',
+      required: true,
+      options: ['Canada', 'United States', 'India'],
+    });
+    expect(one(withAnswers({ citizenship: 'U.S. citizen' }, 'Remote'), f)).toMatchObject({
+      status: 'filled',
+      value: 'United States',
+    });
+  });
+
+  it('does not treat country of citizenship as the residence country', () => {
+    expect(standardKeyFor('Country of citizenship')).toBe('citizenship');
+  });
+
+  it('types Job board into a free-text how-did-you-hear box even when it looks optional', () => {
+    const f = field({ label: 'How did you hear about this opportunity?', required: false });
+    expect(one(PROFILE, f)).toMatchObject({ status: 'filled', value: 'Job board' });
+  });
+
+  it('answers the employer-agreement question only from the profile', () => {
+    const q =
+      'Are you subject to any agreement with a current or former employer, such as a non-compete or NDA, that limits you?';
+    expect(standardKeyFor(q)).toBe('employer_agreements');
+    const f = field({ label: q, type: 'radio', required: true, options: ['Yes', 'No'] });
+    expect(one(withAnswers({ employer_agreements_restrict: null }), f)).toMatchObject({
+      status: 'missing-profile-field',
+      profileField: 'standard_answers.employer_agreements_restrict',
+    });
+    expect(one(withAnswers({ employer_agreements_restrict: false }), f)).toMatchObject({
+      status: 'filled',
+      value: 'No',
+    });
+  });
+
+  it('answers AI interview note-taker / recorder consent only from the profile', () => {
+    const sierra =
+      'We use Metaview, an AI notetaking tool, to streamline interviews by recording and summarizing discussions, enabling interviewers to be fully present without manual notetaking. With your approval, it silently records notes during interviews. Can Metaview transcribe all your interviews?';
+    const palantir =
+      'As part of our interview process, we may use AI notetakers to transcribe conversations for accuracy and efficiency. Please see our candidate privacy policy for more information on how we process your data. Your decision to opt in or out of this tooling will not impact your candidacy.';
+    const bright = 'Do you consent to BrightHire recording and transcribing your interviews?';
+    expect(standardKeyFor(sierra)).toBe('ai_interview_recording');
+    expect(standardKeyFor(palantir)).toBe('ai_interview_recording');
+    expect(standardKeyFor(bright)).toBe('ai_interview_recording');
+    // Experience and AI-policy acknowledgements are not this question.
+    expect(standardKeyFor('Have you used an AI notetaker before?')).toBeNull();
+    expect(
+      standardKeyFor('Please confirm you have reviewed the AI Policy for Application', 'checkbox'),
+    ).toBe('consent');
+    const f = field({
+      label: sierra,
+      type: 'radio',
+      required: true,
+      options: ['Yes', 'No'],
+    });
+    expect(one(withAnswers({ ai_interview_recording_consent: null }), f)).toMatchObject({
+      status: 'missing-profile-field',
+      profileField: 'standard_answers.ai_interview_recording_consent',
+    });
+    expect(one(withAnswers({ ai_interview_recording_consent: true }), f)).toMatchObject({
+      status: 'filled',
+      value: 'Yes',
+    });
+    const consentOpts = field({
+      label: palantir,
+      type: 'radio',
+      required: true,
+      options: ['Yes, I consent', 'No, I do not consent'],
+    });
+    expect(one(withAnswers({ ai_interview_recording_consent: true }), consentOpts)).toMatchObject({
+      status: 'filled',
+      value: 'Yes, I consent',
+    });
+  });
+});
+
+describe('legal-status dropdowns and systems audience', () => {
+  const withAnswers = (over: Record<string, unknown>) => ({
+    ...PROFILE,
+    standard_answers: { ...PROFILE.standard_answers, ...over },
+  });
+  const one = (profile: typeof PROFILE, f: FieldDescriptor) =>
+    resolveStandardFields({ profile }, [{ ...f, classification: 'standard' }])[0]!;
+
+  it('recognises Snorkel-style authorization, Anduril export-control, and Glean audience labels', () => {
+    expect(standardKeyFor('Your authorization to work in the country where you live')).toBe(
+      'work_authorization',
+    );
+    expect(
+      standardKeyFor(
+        'EXPORT CONTROLS - This position requires access to information subject to U.S. export controls.',
+      ),
+    ).toBe('citizenship');
+    expect(
+      standardKeyFor(
+        'Who are you building ML/LLM-powered systems for? Internal or External Users?',
+      ),
+    ).toBe('systems_audience');
+  });
+
+  it('picks a U.S. citizen / U.S. person option on an export-control dropdown', () => {
+    const options = [
+      'I am a U.S. citizen or national',
+      'I am a lawful permanent resident',
+      'I am not a U.S. person',
+    ];
+    expect(pickLegalStatusOption(options, 'us-person')).toBe('I am a U.S. citizen or national');
+    const f = field({
+      label: 'EXPORT CONTROLS - eligibility under U.S. export control laws',
+      type: 'select',
+      required: true,
+      options,
+    });
+    expect(one(withAnswers({ citizenship: 'U.S. citizen' }), f)).toMatchObject({
+      status: 'filled',
+      value: 'I am a U.S. citizen or national',
+    });
+  });
+
+  it('picks an authorized-without-sponsorship option when the profile text does not match exactly', () => {
+    const options = [
+      'I am authorized to work in the country where I live and do not require sponsorship',
+      'I will require sponsorship now or in the future',
+    ];
+    expect(pickLegalStatusOption(options, 'authorized')).toBe(options[0]);
+    const f = field({
+      label: 'Your authorization to work in the country where you live',
+      type: 'select',
+      required: true,
+      options,
+    });
+    expect(
+      one(
+        withAnswers({
+          work_authorization: 'U.S. citizen, authorized to work, no sponsorship needed',
+        }),
+        f,
+      ),
+    ).toMatchObject({
+      status: 'filled',
+      value: options[0],
+    });
+  });
+
+  it('selects both internal and external options on a checkbox, or Both / External on a select', () => {
+    const boxes = field({
+      label: 'Who are you building ML/LLM-powered systems for? Internal or External Users?',
+      type: 'checkbox',
+      required: true,
+      options: ['Internal Users', 'External Users'],
+    });
+    expect(one(PROFILE, boxes)).toMatchObject({
+      status: 'filled',
+      value: ['Internal Users', 'External Users'],
+    });
+    const select = field({
+      label: 'Who are you building ML/LLM-powered systems for? Internal or External Users?',
+      type: 'select',
+      required: true,
+      options: ['Internal', 'External', 'Both'],
+    });
+    expect(one(PROFILE, select)).toMatchObject({ status: 'filled', value: 'Both' });
+    const extOnly = field({
+      label: 'Who are you building ML/LLM-powered systems for? Internal or External Users?',
+      type: 'select',
+      required: true,
+      options: ['Internal users', 'External users'],
+    });
+    expect(one(PROFILE, extOnly)).toMatchObject({ status: 'filled', value: 'External users' });
+  });
+});
+
+describe('follow-up free-text sees previous answers', () => {
+  it('includes earlier filled answers when asking a "question above" follow-up', async () => {
+    const llm = scripted({
+      'answer-form-question/v1': [
+        {
+          answer: 'Built a clinical co-pilot for hospital staff.',
+          grounded: true,
+          unanswerable: false,
+          guessed: false,
+          ungrounded_claims: [],
+        },
+      ],
+    });
+    // The earlier question was already filled; pass it in as prior context for the follow-up.
+    await resolveFreeText(
+      makeCtx(llm),
+      field({
+        id: 'ex',
+        label: 'If yes to question above, briefly describe one example.',
+        type: 'textarea',
+        required: true,
+      }),
+      [{ question: 'Have you built LLM-powered systems before?', answer: 'Yes' }],
+    );
+    const sent = callsTo(llm, 'answer-form-question/v1')[0]!.user;
+    expect(sent).toContain('previous_answers');
+    expect(sent).toContain('Have you built LLM-powered systems before?');
+    expect(sent).toContain('Yes');
   });
 });

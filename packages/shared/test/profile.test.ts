@@ -140,4 +140,18 @@ describe('awards and self-identification default', () => {
     doc.standard_answers.self_identification_default = 'male';
     expect(profileDocumentSchema.safeParse(doc).success).toBe(false);
   });
+
+  it('defaults ai_interview_recording_consent to null so older documents parse', () => {
+    const doc = clone();
+    delete doc.standard_answers.ai_interview_recording_consent;
+    expect(
+      profileDocumentSchema.parse(doc).standard_answers.ai_interview_recording_consent,
+    ).toBeNull();
+    doc.standard_answers.ai_interview_recording_consent = true;
+    expect(profileDocumentSchema.parse(doc).standard_answers.ai_interview_recording_consent).toBe(
+      true,
+    );
+    doc.standard_answers.ai_interview_recording_consent = 'yes';
+    expect(profileDocumentSchema.safeParse(doc).success).toBe(false);
+  });
 });

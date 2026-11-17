@@ -233,6 +233,27 @@ describe('rule 40: the emailed code after submit', () => {
     expect(JSON.stringify(log)).not.toContain('48151623');
   });
 
+  it('a thank-you page after the code is applied even though the second submit button is gone', async () => {
+    const t = await tenant();
+    const s = await seedApplication(t);
+    const adapter = new FakeAdapter();
+    adapter.codePrompts = 1;
+    const deps = makeDeps(env.db, { adapter });
+    deps.gmailBox.add(mail(s.companyName, deps.clock.now()));
+    const submit = adapter.submit.bind(adapter);
+    adapter.submit = async () => {
+      if (adapter.submits >= 1) {
+        // Enter on the last code box already submitted: Greenhouse shows its thank-you page.
+        throw Object.assign(new Error('locator.click: Timeout 5000ms exceeded.'), {
+          name: 'TimeoutError',
+        });
+      }
+      return submit();
+    };
+    const out = await runSubmission(deps, env.db, data(t, s.application.id));
+    expect(out).toEqual({ outcome: 'applied', source: 'page', prior: false });
+  });
+
   it('no code within the cap is verification-timeout', async () => {
     const t = await tenant();
     const s = await seedApplication(t);

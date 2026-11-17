@@ -1,3 +1,4 @@
+import { gotoWithRetry } from '../navigate';
 import {
   getAtsCredential,
   insertAtsCredential,
@@ -130,7 +131,7 @@ async function register(
 
   const verification = await waitForVerification(ctx, since);
   if (verification.kind === 'link') {
-    await page.goto(verification.url);
+    await gotoWithRetry(page, verification.url);
     await adapter.load(page, ctx.job.url);
     if (await adapter.requiresAccount(page)) {
       await signInStored(ctx, adapter, page, credential, companyId);

@@ -856,6 +856,19 @@ describe('truncated values are not verified (review)', () => {
     ).toBe(true);
   });
 
+  it("a phone country widget showing only a dial code verifies by the chosen option's dial code", () => {
+    const widget = (current: string): Question => ({
+      ...q('combobox', current),
+      phoneWidget: true,
+    });
+    expect(stuck(widget('+1'), intent('United States', { chosen: 'United States +1' }))).toBe(true);
+    expect(stuck(widget('+44'), intent('United States', { chosen: 'United States +1' }))).toBe(
+      false,
+    );
+    expect(stuck(widget(''), intent('United States', { chosen: 'United States +1' }))).toBe(false);
+    expect(stuck(widget('United States +1'), intent('United States'))).toBe(true);
+  });
+
   it('a phone value must carry all the digits that were typed', () => {
     expect(stuck(q('tel', '8'), intent('+1 555 010 0198', { typed: '5550100198' }))).toBe(false);
     expect(
@@ -1152,6 +1165,52 @@ describe('rule 44: the phone widget country selector', () => {
   }, 60_000);
 });
 
+describe('rule 44: the Greenhouse job-boards flag-and-dial-code country selector', () => {
+  it('is tagged phone-country, picks United States and reads the flag back as the country', async () => {
+    await withPage(async (page) => {
+      await open(page, 'phone-country-greenhouse.html');
+      const fields = await bare.fields(page);
+      const country = byLabel(fields, 'Country');
+      expect(country.hint).toBe('phone-country');
+      expect(country.required).toBe(true);
+      const phone = byLabel(fields, 'Phone');
+      const failures = await fillPage(page, {
+        [country.id]: 'United States',
+        [phone.id]: '(512) 555-0100',
+      });
+      expect(failures).toEqual([]);
+      expect(await page.locator('#app').getAttribute('data-country')).toBe('United States');
+      const scan = await scanPage(page);
+      expect(scan.questions.find((q) => q.id === 'country')?.current).toBe('United States +1');
+    });
+  }, 60_000);
+
+  it('does not mistake a Canada +1 selection for United States', async () => {
+    await withPage(async (page) => {
+      await open(page, 'phone-country-greenhouse.html');
+      const fields = await bare.fields(page);
+      const country = byLabel(fields, 'Country');
+      await fillPage(page, { [country.id]: 'Canada' });
+      const scan = await scanPage(page);
+      const q = scan.questions.find((x) => x.id === 'country')!;
+      expect(q.current).toBe('Canada +1');
+      expect(stuck(q, { text: 'United States', list: ['United States'], bool: false })).toBe(false);
+    });
+  }, 60_000);
+
+  it('the adapter fill raises nothing when the widget already shows the country', async () => {
+    await withPage(async (page) => {
+      await bare.load(page, `${urlOf('generic', 'phone-country-greenhouse.html')}#preset`);
+      const fields = await bare.fields(page);
+      const country = byLabel(fields, 'Country');
+      const phone = byLabel(fields, 'Phone');
+      await expect(
+        bare.fill(page, { [country.id]: 'United States', [phone.id]: '(512) 555-0100' }),
+      ).resolves.toBeUndefined();
+    });
+  }, 60_000);
+});
+
 describe('rule 40: a code prompt after submit', () => {
   it('is detected by its text and field, the code goes in, and the same submit finishes it', async () => {
     await withPage(async (page) => {
@@ -1163,6 +1222,24 @@ describe('rule 40: a code prompt after submit', () => {
       expect(await bare.codePrompt!(page)).toBe(true);
       expect(await bare.confirmed(page)).toBe(false);
       await enterVerificationCode(page as never, '481516');
+      await bare.advanceCode!(page);
+      await bare.submit(page);
+      expect(await bare.confirmed(page)).toBe(true);
+    });
+  }, 60_000);
+
+  it('fills a Greenhouse-style one-box-per-character security code', async () => {
+    await withPage(async (page) => {
+      await open(page, 'code-prompt-boxes.html');
+      const [name] = await bare.fields(page);
+      await bare.fill(page, { [name!.id]: 'Mara Quill' });
+      await bare.submit(page);
+      expect(await bare.codePrompt!(page)).toBe(true);
+      await enterVerificationCode(page as never, '06147577');
+      const typed = await page.evaluate(
+        `[...document.querySelectorAll('.security-code input')].map((e) => e.value).join('')`,
+      );
+      expect(typed).toBe('06147577');
       await bare.advanceCode!(page);
       await bare.submit(page);
       expect(await bare.confirmed(page)).toBe(true);

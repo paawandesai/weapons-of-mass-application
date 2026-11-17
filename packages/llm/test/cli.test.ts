@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createCliLlm, createLlmClient, parseBackend, type CliRunInput } from '../src';
+import { createCliLlm, createLlmClient, extractJson, parseBackend, type CliRunInput } from '../src';
 
 const schema = z.object({ a: z.number(), note: z.string().nullable() });
 const req = { prompt: 't/v1', system: 'SYS', user: 'USER', schema };
@@ -156,5 +156,20 @@ describe('grok backend (Grok Build CLI)', () => {
     await expect(
       llm.generateStructured({ ...req, images: [{ mediaType: 'image/png', data: 'AAAA' }] }),
     ).rejects.toThrow(/cannot take images/);
+  });
+});
+
+describe('extractJson repairs', () => {
+  it('accepts raw newlines inside strings and trailing commas', () => {
+    const text = '{"answer": "Line one.\nLine two\twith a tab.", "grounded": true,}';
+    expect(extractJson(text)).toEqual({
+      answer: 'Line one.\nLine two\twith a tab.',
+      grounded: true,
+    });
+  });
+
+  it('unwraps a fenced or double-encoded object', () => {
+    expect(extractJson('```json\n{"a": 1}\n```')).toEqual({ a: 1 });
+    expect(extractJson(JSON.stringify('{"a": 1}'))).toEqual({ a: 1 });
   });
 });

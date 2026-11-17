@@ -1,4 +1,4 @@
-import { loadPrompt, type StructuredLlm } from '@wma/llm';
+import { extractJson, loadPrompt, type StructuredLlm } from '@wma/llm';
 import type { z } from 'zod';
 
 export class StructuredOutputError extends Error {
@@ -16,6 +16,18 @@ export class StructuredOutputError extends Error {
  * the schema, and an invalid reply gets exactly one retry that quotes the issue. Transport errors
  * propagate unchanged.
  */
+
+/** Turns a model reply that should have been an object into one, when it is JSON (possibly fenced). */
+export function coerceStructuredOutput(output: unknown): unknown {
+  if (typeof output !== 'string') return output;
+  try {
+    return extractJson(output);
+  } catch {
+    // leave the string so schema validation can reject and retry
+    return output;
+  }
+}
+
 export async function callStructured<T>(
   llm: StructuredLlm,
   name: string,
@@ -37,8 +49,15 @@ export async function callStructured<T>(
       schema,
       maxTokens,
     });
-    const parsed = schema.safeParse(res.output);
+    const output = coerceStructuredOutput(res.output);
+    const parsed = schema.safeParse(output);
     if (parsed.success) return parsed.data;
+    if (typeof output === 'string') {
+      // Not JSON at all: say so, since "expected object, received string" tells the model nothing.
+      issue =
+        'it was not valid JSON. Reply with exactly one JSON object and nothing else; inside strings, write line breaks as \\n and escape double quotes as \\"';
+      continue;
+    }
     issue = parsed.error.issues
       .slice(0, 5)
       .map((i) => `${i.path.join('.')}: ${i.message}`)
